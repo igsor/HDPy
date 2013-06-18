@@ -287,3 +287,7 @@ epub_copyright = u'2013, Matthias Baumgartner'
 
 # Example configuration for intersphinx: refer to the Python standard library.
 intersphinx_mapping = {'http://docs.python.org/': None}
+# -- Custom config, added by hand  --------------------------------------------
+
+todo_include_todos=True
+

@@ -9,5 +9,5 @@ setup(
     packages=['rrl'],
     license='Free for use',
     long_description=open('README').read(),
-    requires=("scipy","numpy")
+    requires=("scipy","numpy","mdp","Oger")
 )

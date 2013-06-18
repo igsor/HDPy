@@ -9,7 +9,17 @@ Welcome to Reinforcement Reservoir Learning's documentation!
 Contents:
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
+   
+   intro
+   rc
+   rl
+   
+   download
+   license
+   resources
+   
+   todopg
 
 
 
