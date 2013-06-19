@@ -61,7 +61,9 @@ class SparseReservoirNode(Oger.nodes.ReservoirNode):
         nrentries = int((out_size**2 * self.fan_in_w)/100.0)
         out_size = int(out_size)
         # Keep generating random matrices until convergence
-        while not converged:
+        numIter=1000
+        while not converged and numIter > 0:
+            numIter -= 1
             try:
                 idx = np.random.choice(out_size**2, nrentries, False)
                 ij = np.array(zip(*map(lambda i: (i/out_size, i%out_size), idx)))
@@ -72,6 +74,7 @@ class SparseReservoirNode(Oger.nodes.ReservoirNode):
                 w *= (specrad / np.amax(np.absolute(we)))
             except:
                 pass
+        if numIter <= 0: raise Exception('Reservoir matrix could not be built')
         return w
     
     def dense_w_in(self, out_size, in_size, scaling, rnd_fu=lambda size: np.random.uniform(size=size)*2.0-1.0):
@@ -161,13 +164,55 @@ class OrthogonalReservoirNode(SparseReservoirNode):
     such that it is orthogonal.
     
     .. todo::
-        This class is a stub so far, there's no implementation.
+        Integration into Oger/SparseReservoirNode (code and test)
     
     """
-    def sparse_w(self, out_size, specrad, rnd_fu=np.random.normal):
+    def sparse_w(self, out_size, specrad, rnd_fu=None):
         """Orthogonal reservoir construction algorithm.
+        
+        The algorithm starts off with a diagonal matrix, then multiplies
+        it with random orthogonal matrices (meaning that the product
+        will again be orthogonal). For details, see [TS12]_.
+        
+        All absolute eigenvalues of the resulting matrix will be
+        identical to ``specrad``.
+        
+        ``out_size``
+            Reservoir matrix dimension.
+        
+        ``specrad``
+            Desired spectral radius.
+        
+        ``rnd_fu``
+            This argument is obsolete in this function, but present for
+            compatibility only.
+        
         """
-        raise NotImplementedError()
+        import scipy.sparse
+        from math import cos,sin,pi
+        num_entries = int((out_size**2 * self.fan_in_w)/100.0)
+        W = np.random.permutation(np.eye(out_size))
+        W = scipy.sparse.csc_matrix(W)
+        while W.nnz < num_entries:
+            phi = np.random.uniform(0, 2*pi)
+            h=k=0
+            while h==k:
+                h,k = np.random.randint(0, out_size, size=2)
+            
+            Q = scipy.sparse.eye(out_size, out_size, format='lil')
+            Q[h,h] = cos(phi)
+            Q[k,k] = cos(phi)
+            Q[h,k] = -sin(phi)
+            Q[k,h] = sin(phi)
+            
+            if np.random.randint(0,2) == 0:
+                W = Q.tocsc().dot(W)
+            else:
+                W = W.dot(Q.tocsc())
+        
+        # Scale to desired spectral radius
+        W = specrad * W
+        return W
 
 class ChainOfNeurons(SparseReservoirNode):
     """
