@@ -211,7 +211,7 @@ class ActorCritic(PuPy.PuppyActor):
         self.policy = policy
         self.set_alpha(alpha)
         self.set_gamma(gamma)
-        self.numEpisode = 0
+        self.num_episode = 0
         self.new_episode()
         
         # Check assumptions
@@ -228,11 +228,11 @@ class ActorCritic(PuPy.PuppyActor):
         it is loaded from a file.
         """
         self.reservoir.reset()
-        self.numEpisode += 1
+        self.num_episode += 1
         self.a_curr = self.policy.initial_action()
         self._motor_action_dim = self.a_curr.shape[0]
         self.s_curr = dict()
-        self.numStep = 0
+        self.num_step = 0
     
     def __call__(self, epoch, time_start_ms, time_end_ms, step_size_ms):
         """One round in the actor-critic cycle. The current observations
@@ -244,9 +244,9 @@ class ActorCritic(PuPy.PuppyActor):
             Detailed description of the algorithm.
         
         """
-        if self.numStep < 3: # FIXME
+        if self.num_step < 3: # FIXME
             # TODO: Initialization
-            self.numStep += 1
+            self.num_step += 1
             self.s_curr = epoch
             return self.policy.get_iterator(time_start_ms, time_end_ms, step_size_ms)
         
@@ -270,7 +270,7 @@ class ActorCritic(PuPy.PuppyActor):
         deriv = deriv.T # AxL
         
         # gradient training of action (acc. to eq. 10)
-        a_next = self.a_curr + self.alpha(self.numStep) * deriv
+        a_next = self.a_curr + self.alpha(self.num_step) * deriv
         
         # ESN-critic, second instance: in(k+1) => J(k+1)
         in_state = self.plant.state_input(epoch, a_next)
@@ -279,7 +279,7 @@ class ActorCritic(PuPy.PuppyActor):
         j_next = self.readout(x_next)
         
         # TD_error(k) = J(k) - U(k) - gamma * J(k+1)
-        err = reward + self.gamma(self.numStep) * j_next - j_curr
+        err = reward + self.gamma(self.num_step) * j_next - j_curr
         
         # One-step RLS training => Trained ESN
         self.readout.train(x_curr, e=err)
@@ -297,7 +297,7 @@ class ActorCritic(PuPy.PuppyActor):
         # increment
         self.a_curr = a_next
         self.s_curr = epoch # TODO: Copy?
-        self.numStep += 1
+        self.num_step += 1
         
         # return next action
         self.policy.update(a_next)

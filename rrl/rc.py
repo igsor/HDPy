@@ -8,8 +8,9 @@ At some point, some of this code might be merged back to Oger.
 
 import Oger
 import mdp
-import warnings
+#import warnings
 import numpy as np
+import scipy.sparse
 
 ## RESERVOIR BASE CLASS ##
 
@@ -25,8 +26,10 @@ class SparseReservoirNode(Oger.nodes.ReservoirNode):
              nonlin_func=np.tanh, reset_states=True, bias_scaling=0, input_scaling=1, dtype='float64', _instance=0,
              w_bias=None, fan_in_w=20, fan_in_i=100, w=None, w_in=None):
         
-        if w is None: w = self.sparse_w
-        if w_in is None: w_in = self.sparse_w_in
+        if w is None:
+            w = self.sparse_w
+        if w_in is None:
+            w_in = self.sparse_w_in
         self.fan_in_w = fan_in_w
         self.fan_in_i = fan_in_i
         
@@ -54,31 +57,31 @@ class SparseReservoirNode(Oger.nodes.ReservoirNode):
             distribution.
         
         """
-        import scipy.sparse
-        from scipy.sparse.linalg import eigs
+        from scipy.sparse.linalg import eigs, ArpackNoConvergence
         converged = False
         # Initialize reservoir weight matrix
         nrentries = int((out_size**2 * self.fan_in_w)/100.0)
         out_size = int(out_size)
         # Keep generating random matrices until convergence
-        numIter=1000
-        while not converged and numIter > 0:
-            numIter -= 1
+        num_iter = 1000
+        while not converged:
             try:
                 idx = np.random.choice(out_size**2, nrentries, False)
-                ij = np.array(zip(*map(lambda i: (i/out_size, i%out_size), idx)))
+                locs = np.array(zip(*map(lambda i: (i/out_size, i%out_size), idx)))
                 datavec = rnd_fu(size=nrentries)
-                w = scipy.sparse.csc_matrix((datavec, ij), shape=(out_size, out_size))
-                we = eigs(w,return_eigenvectors=False,k=3)
+                w = scipy.sparse.csc_matrix((datavec, locs), shape=(out_size, out_size))
+                eigvals = eigs(w, return_eigenvectors=False, k=3)
                 converged = True
-                w *= (specrad / np.amax(np.absolute(we)))
-            except:
-                pass
-        if numIter <= 0: raise Exception('Reservoir matrix could not be built')
+                w *= (specrad / np.amax(np.absolute(eigvals)))
+            except ArpackNoConvergence:
+                num_iter -= 1
+                if num_iter < 1:
+                    raise Exception('Reservoir matrix could not be built')
         return w
     
     def dense_w_in(self, out_size, in_size, scaling, rnd_fu=lambda size: np.random.uniform(size=size)*2.0-1.0):
-        return scaling * rnd_fu(size=(self.output_dim, self.input_dim))
+        """Dense input matrix."""
+        return scaling * rnd_fu(size=(out_size, in_size))
     
     def sparse_w_in(self, out_size, in_size, scaling, rnd_fu=lambda size: np.random.uniform(size=size)*2.0-1.0):
         """:py:meth:`Oger.nodes.SparseReservoirNode.sparse_w_in` with
@@ -101,14 +104,13 @@ class SparseReservoirNode(Oger.nodes.ReservoirNode):
             the generated random number list. The default is the uniform
             distribution between -1.0 and 1.0.
         
-        """
-        import scipy.sparse
+        """ 
         # Initialize reservoir weight matrix
         nrentries = np.int32(out_size * in_size * self.fan_in_i / 100.0)
         idx = np.random.choice(out_size*in_size, nrentries, False)
-        ij = np.array(zip(*map(lambda i: (i/in_size, i%in_size), idx)))
+        locs = np.array(zip(*map(lambda i: (i/in_size, i%in_size), idx)))
         datavec = rnd_fu(size=nrentries)
-        w = scaling * scipy.sparse.csc_matrix((datavec, ij),dtype=self._dtype, shape=(out_size, in_size))
+        w = scaling * scipy.sparse.csc_matrix((datavec, locs), dtype=self._dtype, shape=(out_size, in_size))
         return w
     
     def reset(self):
@@ -146,20 +148,21 @@ class SparseReservoirNode(Oger.nodes.ReservoirNode):
         nonlinear_function_pointer = self.nonlin_func
 
         # Loop over the input data and compute the reservoir states
-        for n in range(steps):
-            states[n + 1, :] = nonlinear_function_pointer(self.w*states[n, :] + self.w_in* x[n, :] + self.w_bias)
-            self._post_update_hook(states, x, n)
+        for i in range(steps):
+            states[i + 1, :] = nonlinear_function_pointer(self.w*states[i, :] + self.w_in* x[i, :] + self.w_bias)
+            self._post_update_hook(states, x, i)
 
         # Strip the initial state
-        states = states[1:,:]
+        states = states[1:, :]
         # Save the state for re-initialization unless in simulatino
-        if not simulate: self.states = states
+        if not simulate:
+            self.states = states
         # Return the updated reservoir state
         return states
 
 ## SPECIFIC RESERVOIR SETUP ##
 
-def OrthogonalReservoir(self, out_size, specrad, rnd_fu=None):
+class OrthogonalReservoir(SparseReservoirNode): # FIXME: better as function but then fan_in_w not available
     """Orthogonal reservoir construction algorithm.
     
     The algorithm starts off with a diagonal matrix, then multiplies
@@ -180,33 +183,33 @@ def OrthogonalReservoir(self, out_size, specrad, rnd_fu=None):
         compatibility only.
     
     """
-    import scipy.sparse
-    from math import cos,sin,pi
-    num_entries = int((out_size**2 * self.fan_in_w)/100.0)
-    W = np.random.permutation(np.eye(out_size))
-    W = scipy.sparse.csc_matrix(W)
-    while W.nnz < num_entries:
-        phi = np.random.uniform(0, 2*pi)
-        h=k=0
-        while h==k:
-            h,k = np.random.randint(0, out_size, size=2)
+    def sparse_w(self, out_size, specrad, rnd_fu=None):
+        from math import cos, sin, pi
+        num_entries = int((out_size**2 * self.fan_in_w)/100.0)
+        w = np.random.permutation(np.eye(out_size))
+        w = scipy.sparse.csc_matrix(w)
+        while w.nnz < num_entries:
+            phi = np.random.uniform(0, 2*pi)
+            i = j = 0
+            while i == j:
+                i, j = np.random.randint(0, out_size, size=2)
+            
+            rot = scipy.sparse.eye(out_size, out_size, format='lil')
+            rot[i, i] = cos(phi)
+            rot[j, j] = cos(phi)
+            rot[i, j] = -sin(phi)
+            rot[j, i] = sin(phi)
+            
+            if np.random.randint(0, 2) == 0:
+                w = rot.tocsc().dot(w)
+            else:
+                w = w.dot(rot.tocsc())
         
-        Q = scipy.sparse.eye(out_size, out_size, format='lil')
-        Q[h,h] = cos(phi)
-        Q[k,k] = cos(phi)
-        Q[h,k] = -sin(phi)
-        Q[k,h] = sin(phi)
-        
-        if np.random.randint(0,2) == 0:
-            W = Q.tocsc().dot(W)
-        else:
-            W = W.dot(Q.tocsc())
-    
-    # Scale to desired spectral radius
-    W = specrad * W
-    return W
+        # Scale to desired spectral radius
+        w = specrad * w
+        return w
 
-def ChainOfNeurons(self, out_size, specrad, rnd_fu=None):
+def chain_of_neurons(out_size, specrad, rnd_fu=None):
     """
     
     ``out_size``
@@ -224,7 +227,7 @@ def ChainOfNeurons(self, out_size, specrad, rnd_fu=None):
     w = specrad * w
     return w
 
-def RingOfNeurons(self, out_size, specrad, rnd_fu=None):
+def ring_of_neurons(out_size, specrad, rnd_fu=None):
     """
     
     ``out_size``
@@ -239,7 +242,7 @@ def RingOfNeurons(self, out_size, specrad, rnd_fu=None):
     
     """
     w = scipy.sparse.diags([1.0]*(out_size-1), -1, format='lil')
-    w[0,-1] = 1.0
+    w[0, -1] = 1.0
     w = specrad * w
     return w.tocsc()
 
@@ -262,7 +265,7 @@ class FreerunFlow(Oger.nodes.FreerunFlow):
 
 ## RLS ##
 
-class OnlineLinearRegression(mdp.Node):
+class OnlineLinearRegression(mdp.Node): # FIXME: Does not work properly
     """Compute online least-square, multivariate linear regression on
     the input data, i.e., learn coefficients ``b_j`` so that::
     
@@ -318,7 +321,9 @@ class OnlineLinearRegression(mdp.Node):
         self._is_initialized = False
     
     def _initialize(self, input_dim):
-        if self._is_initialized: return
+        """Initialize the internals (i.e. regression coefficient)."""
+        if self._is_initialized:
+            return
         
         if self.with_bias:
             input_dim += 1
@@ -341,7 +346,7 @@ class OnlineLinearRegression(mdp.Node):
         if y.shape[0] != x.shape[0]:
             msg = ("The number of output points should be equal to the "
                    "number of datapoints (%d != %d)" % (y.shape[0], x.shape[0]))
-            raise TrainingException(msg)
+            raise TrainingException(msg) # FIXME: Module for exception
 
     def _train(self, x, d):
         """Train the linear regression on some samples.
@@ -355,7 +360,8 @@ class OnlineLinearRegression(mdp.Node):
         
         """
         # initialize internal vars if necessary
-        if not self._is_initialized: self._initialize(self.get_input_dim())
+        if not self._is_initialized:
+            self._initialize(self.get_input_dim())
         if self.with_bias:
             x = self._add_constant(x)
         
@@ -426,11 +432,12 @@ class PlainRLS:
     
     """
     def __init__(self, input_dim, output_dim, with_bias=True, lambda_=1.0):
-        self.input_dim=input_dim
-        self.output_dim=output_dim
+        self.input_dim = input_dim
+        self.output_dim = output_dim
         self.lambda_ = lambda_
         self.with_bias = with_bias
-        if self.with_bias: input_dim += 1
+        if self.with_bias:
+            input_dim += 1
         self.beta = np.zeros((input_dim, self.output_dim))
         self._psiInv = np.eye(input_dim, input_dim) * 10000.0
 
@@ -447,7 +454,8 @@ class PlainRLS:
             Sample error terms. Array of size (K, output_dim)
         
         """
-        if self.with_bias: x = self._add_constant(x)
+        if self.with_bias:
+            x = self._add_constant(x)
         for n in range(x.shape[0]):
             # preliminaries
             xn = np.atleast_2d(x[n]).T
@@ -468,7 +476,8 @@ class PlainRLS:
     def __call__(self, x):
         """Evaluate the linear approximation on some point ``x``.
         """
-        if self.with_bias: x = self._add_constant(x)
+        if self.with_bias:
+            x = self._add_constant(x)
         return self.beta.T.dot(x.T).T
     
     def _add_constant(self, x):
@@ -536,7 +545,8 @@ class StabilizedRLS(PlainRLS):
             Sample error terms. Array of size (K, output_dim)
         
         """
-        if self.with_bias: x = self._add_constant(x)
+        if self.with_bias:
+            x = self._add_constant(x)
         for n in range(x.shape[0]):
             # preliminaries
             xn = np.atleast_2d(x[n]).T
