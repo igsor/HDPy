@@ -44,7 +44,9 @@ readout = rrl.StabilizedRLS(
     lambda_=1.0
 )
 
-acd = rrl.ActorCritic(
+expfile = '/tmp/acd.hdf5'
+acd = rrl.CollectingADHDP(#  rrl.ADHDP(
+    expfile,
     reservoir,
     readout,
     plant,
@@ -95,6 +97,6 @@ pylab.show(block=False)
 import tempfile, os
 fh, pth = tempfile.mkstemp()
 acd.save(pth)
-acd2 = rrl.ActorCritic.load(pth)
+acd2 = rrl.ADHDP.load(pth)
 os.unlink(pth)
 

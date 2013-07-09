@@ -17,7 +17,7 @@ Example
 Reference
 ---------
 
-.. autoclass:: ActorCritic
+.. autoclass:: ADHDP
     :members:
     :show-inheritance:
 
@@ -35,3 +35,6 @@ Reference
     :members:
     :show-inheritance:
 
+.. autoclass:: CollectingADHDP
+    :members:
+    :show-inheritance:

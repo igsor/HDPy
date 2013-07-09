@@ -153,7 +153,7 @@ class SpeedReward(Plant):
         """Return the size of the state space."""
         return 2
 
-class ActorCritic(PuPy.PuppyActor):
+class ADHDP(PuPy.PuppyActor):
     """Actor-critic design.
     
     The Actor-Critic estimates the return function
@@ -204,7 +204,7 @@ class ActorCritic(PuPy.PuppyActor):
         
     """
     def __init__(self, reservoir, readout, plant, policy, gamma=1.0, alpha=1.0):
-        super(ActorCritic, self).__init__()
+        super(ADHDP, self).__init__()
         self.reservoir = reservoir
         self.readout = readout
         self.plant = plant
@@ -230,7 +230,7 @@ class ActorCritic(PuPy.PuppyActor):
         self.reservoir.reset()
         self.num_episode += 1
         self.a_curr = self.policy.initial_action()
-        self._motor_action_dim = self.a_curr.shape[0]
+        self._motor_action_dim = self.policy.action_space_dim()
         self.s_curr = dict()
         self.num_step = 0
     
@@ -296,7 +296,7 @@ class ActorCritic(PuPy.PuppyActor):
         
         # increment
         self.a_curr = a_next
-        self.s_curr = epoch # TODO: Copy?
+        self.s_curr = epoch # TODO: Copy? # FIXME: Sufficient to store in_state for current epoch
         self.num_step += 1
         
         # return next action
@@ -350,10 +350,10 @@ class ActorCritic(PuPy.PuppyActor):
         cls.new_episode()
         
         if cls.alpha is None:
-            cls.set_alpha(cls._ActorCritic__const_alpha_value)
+            cls.set_alpha(cls._ADHDP__const_alpha_value)
         
         if cls.gamma is None:
-            cls.set_gamma(cls._ActorCritic__const_gamma_value)
+            cls.set_gamma(cls._ADHDP__const_gamma_value)
         
         return cls
     
@@ -384,9 +384,65 @@ class ActorCritic(PuPy.PuppyActor):
         else:
             self.__const_gamma_value = gamma
             self.gamma = self.__const_gamma_fu
+
+class CollectingADHDP(ADHDP):
+    """Actor-Critic design with data collector.
+    
+    A :py:class:`PuPy.PuppyCollector` instance is created for recording
+    sensor data and actor-critic internals together. The file is stored
+    at ``expfile``.
+    """
+    def __init__(self, expfile, *args, **kwargs):
+        self.expfile = expfile
+        self.collector = None
+        super(CollectingADHDP, self).__init__(*args, **kwargs)
+    
+    def _pre_increment_hook(self, epoch, reward, deriv, err, curr, next_):
+        """Add the *ActorCritic* internals to the epoch and use the
+        *collector* to save all the data.
+        """
+        # TODO: copy?
+        epoch['reward']  = np.array([reward])
+        epoch['gamma']   = np.array([self.gamma(self.num_step)])
+        epoch['a_curr']  = np.array(self.a_curr).T
+        epoch['err']     = err.T
+        epoch['readout'] = self.readout.beta.T
+        self.collector(epoch, 0, 1, 1)
+    
+    def save(self, pth):
+        """Save the instance without the *collector*.
+        
+        .. note::
+            When an instance is reloaded via :py:meth:`ActorCritic.load`
+            a new group will be created in *expfile*.
+        
+        """
+        # Shift collector to local
+        collector = self.collector
+        self.collector = None
+        super(CollectingADHDP, self).save(pth)
+        # Shift collector to class
+        self.collector = collector
+
+    def new_episode(self):
+        """Do everything the parent does and additionally reinitialize
+        the collector. The reservoir weights are stored as header
+        information.
+        """
+        super(CollectingADHDP, self).new_episode()
+        
+        # init/reset collector
+        if self.collector is not None:
+            del self.collector
+        
+        self.collector = PuPy.PuppyCollector(
+            actor=None,
+            expfile=self.expfile,
+            headers={
+                'r_weights': self.reservoir.w.todense(),
+                'r_input'  : self.reservoir.w_in.todense()
+                }
+        )
     
     def __del__(self):
-        """Teardown of the ActorCritic. Does nothing by default.
-        """
-        pass
-    
+        del self.collector
