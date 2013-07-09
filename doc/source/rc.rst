@@ -33,9 +33,7 @@ Reference
     :members:
     :show-inheritance:
 
-.. autoclass:: OrthogonalReservoirNode
-    :members:
-    :show-inheritance:
+.. autofunction:: OrthogonalReservoir
 
 .. autoclass:: FreerunFlow
     :members:

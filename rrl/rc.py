@@ -159,78 +159,89 @@ class SparseReservoirNode(Oger.nodes.ReservoirNode):
 
 ## SPECIFIC RESERVOIR SETUP ##
 
-class OrthogonalReservoirNode(SparseReservoirNode):
-    """Reservoir node where the reservoir weight matrix is constructed
-    such that it is orthogonal.
+def OrthogonalReservoir(self, out_size, specrad, rnd_fu=None):
+    """Orthogonal reservoir construction algorithm.
     
-    .. todo::
-        Integration into Oger/SparseReservoirNode (code and test)
+    The algorithm starts off with a diagonal matrix, then multiplies
+    it with random orthogonal matrices (meaning that the product
+    will again be orthogonal). For details, see [TS12]_.
+    
+    All absolute eigenvalues of the resulting matrix will be
+    identical to ``specrad``.
+    
+    ``out_size``
+        Reservoir matrix dimension.
+    
+    ``specrad``
+        Desired spectral radius.
+    
+    ``rnd_fu``
+        This argument is obsolete in this function, but present for
+        compatibility only.
     
     """
-    def sparse_w(self, out_size, specrad, rnd_fu=None):
-        """Orthogonal reservoir construction algorithm.
+    import scipy.sparse
+    from math import cos,sin,pi
+    num_entries = int((out_size**2 * self.fan_in_w)/100.0)
+    W = np.random.permutation(np.eye(out_size))
+    W = scipy.sparse.csc_matrix(W)
+    while W.nnz < num_entries:
+        phi = np.random.uniform(0, 2*pi)
+        h=k=0
+        while h==k:
+            h,k = np.random.randint(0, out_size, size=2)
         
-        The algorithm starts off with a diagonal matrix, then multiplies
-        it with random orthogonal matrices (meaning that the product
-        will again be orthogonal). For details, see [TS12]_.
+        Q = scipy.sparse.eye(out_size, out_size, format='lil')
+        Q[h,h] = cos(phi)
+        Q[k,k] = cos(phi)
+        Q[h,k] = -sin(phi)
+        Q[k,h] = sin(phi)
         
-        All absolute eigenvalues of the resulting matrix will be
-        identical to ``specrad``.
-        
-        ``out_size``
-            Reservoir matrix dimension.
-        
-        ``specrad``
-            Desired spectral radius.
-        
-        ``rnd_fu``
-            This argument is obsolete in this function, but present for
-            compatibility only.
-        
-        """
-        import scipy.sparse
-        from math import cos,sin,pi
-        num_entries = int((out_size**2 * self.fan_in_w)/100.0)
-        W = np.random.permutation(np.eye(out_size))
-        W = scipy.sparse.csc_matrix(W)
-        while W.nnz < num_entries:
-            phi = np.random.uniform(0, 2*pi)
-            h=k=0
-            while h==k:
-                h,k = np.random.randint(0, out_size, size=2)
-            
-            Q = scipy.sparse.eye(out_size, out_size, format='lil')
-            Q[h,h] = cos(phi)
-            Q[k,k] = cos(phi)
-            Q[h,k] = -sin(phi)
-            Q[k,h] = sin(phi)
-            
-            if np.random.randint(0,2) == 0:
-                W = Q.tocsc().dot(W)
-            else:
-                W = W.dot(Q.tocsc())
-        
-        # Scale to desired spectral radius
-        W = specrad * W
-        return W
+        if np.random.randint(0,2) == 0:
+            W = Q.tocsc().dot(W)
+        else:
+            W = W.dot(Q.tocsc())
+    
+    # Scale to desired spectral radius
+    W = specrad * W
+    return W
 
-class ChainOfNeurons(SparseReservoirNode):
+def ChainOfNeurons(self, out_size, specrad, rnd_fu=None):
     """
     
-    .. todo::
-        It's a stub, needs implementation
+    ``out_size``
+        Reservoir matrix dimension.
+    
+    ``specrad``
+        Desired spectral radius.
+    
+    ``rnd_fu``
+        This argument is obsolete in this function, but present for
+        compatibility only.
     
     """
-    pass
+    w = scipy.sparse.diags([1.0]*(out_size-1), -1, format='csc')
+    w = specrad * w
+    return w
 
-class RingOfNeurons(SparseReservoirNode):
+def RingOfNeurons(self, out_size, specrad, rnd_fu=None):
     """
     
-    .. todo::
-        It's a stub, needs implementation
+    ``out_size``
+        Reservoir matrix dimension.
+    
+    ``specrad``
+        Desired spectral radius.
+    
+    ``rnd_fu``
+        This argument is obsolete in this function, but present for
+        compatibility only.
     
     """
-    pass
+    w = scipy.sparse.diags([1.0]*(out_size-1), -1, format='lil')
+    w[0,-1] = 1.0
+    w = specrad * w
+    return w.tocsc()
 
 ## FLOW ##
 
