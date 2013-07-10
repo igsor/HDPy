@@ -12,7 +12,7 @@ gait = PuPy.Gait(params={
     'phase'     : (0.0, 0.0, 0.5, 0.5)
 })
 
-policy = rrl.GaitPolicy(gait)
+policy = rrl.FRA(gait)
 
 # Plot action
 it = policy.get_iterator(0, 100, 20)

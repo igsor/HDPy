@@ -56,8 +56,8 @@ class Policy(object):
     to digest.
     
     """
-    def __init__(self):
-        pass
+    def __init__(self, action_space_dim=None):
+        self._action_space_dim = action_space_dim
     
     def initial_action(self):
         """Return the initial action. A valid action must be returned
@@ -93,65 +93,9 @@ class Policy(object):
         This value is equal to the size of the vector returned by
         :py:meth:`initial_action`.
         """
-        raise NotImplementedError()
-
-class GaitPolicy(Policy):
-    """A concrete implementation of the :py:class:`Policy`. This one
-    updates the *amplitude* parameter of a :py:class:`PuPy.Gait`.
-    """
-    def __init__(self, gait):
-        super(GaitPolicy, self).__init__()
-        self.gait = gait
-    
-    def initial_action(self):
-        """Return the initial action. This is the default *amplitude*
-        for front and read legs.
-        """
-        return np.atleast_2d([0.56, 0.65]).T
-    
-    def update(self, action):
-        """Update the gait according to the computed next action to
-        take.
-        """
-        self.gait.params['amplitude'] = (action[0, 0], action[0, 0], action[1, 0], action[1, 0])
-    
-    def get_iterator(self, time_start_ms, time_end_ms, step_size_ms):
-        """Return an iterator for the *motor_target* sequence.
-        """
-        return self.gait.iter(time_start_ms, step_size_ms)
-    
-    def action_space_dim(self):
-        """Return the size of the action space."""
-        return 2
-
-class SpeedReward(Plant):
-    """A :py:class:`Plant` with focus on the speed of the robot.
-    """
-    def __init__(self):
-        super(SpeedReward, self).__init__()
-    
-    def state_input(self, state, action):
-        """Return the latest *GPS* (x,y) values.
-        """
-        sio =  np.atleast_2d([
-            state['puppyGPS_x'][-1],
-            state['puppyGPS_y'][-1]
-        ]).T
-        return sio
-    
-    def reward(self, epoch):
-        """Return the covered distance and -1.0 if the robot tumbled.
-        """
-        if (epoch['accelerometer_z'] < 1.0).sum() > 80:
-            return -1.0
-        
-        x = epoch['puppyGPS_x']
-        y = epoch['puppyGPS_y']
-        return np.linalg.norm(np.array([x[-1] - x[0], y[-1] - y[0]]))
-    
-    def state_space_dim(self):
-        """Return the size of the state space."""
-        return 2
+        if self._action_space_dim is None:
+            raise NotImplementedError()
+        return self._action_space_dim
 
 class ADHDP(PuPy.PuppyActor):
     """Actor-critic design.
@@ -401,12 +345,13 @@ class CollectingADHDP(ADHDP):
         """Add the *ActorCritic* internals to the epoch and use the
         *collector* to save all the data.
         """
-        # TODO: copy?
-        epoch['reward']  = np.array([reward])
-        epoch['gamma']   = np.array([self.gamma(self.num_step)])
-        epoch['a_curr']  = np.array(self.a_curr).T
+        epoch['reward']  = np.array([reward]).T
+        epoch['deriv']   = np.a
         epoch['err']     = err.T
         epoch['readout'] = self.readout.beta.T
+        epoch['gamma']   = np.array([self.gamma(self.num_step)])
+        epoch['i_curr'], epoch['x_curr'], epoch['j_curr'], epoch['a_curr'] = curr
+        epoch['i_next'], epoch['x_next'], epoch['j_next'], epoch['a_next'] = next_
         self.collector(epoch, 0, 1, 1)
     
     def save(self, pth):

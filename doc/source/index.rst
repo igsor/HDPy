@@ -12,6 +12,7 @@ Contents
    
    rc
    rl
+   analysis
    
    download
    license

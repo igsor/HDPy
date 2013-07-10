@@ -27,7 +27,7 @@ Reference
 .. autoclass:: Policy
     :members:
 
-.. autoclass:: GaitPolicy
+.. autoclass:: FRA
     :members:
     :show-inheritance:
 
