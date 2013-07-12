@@ -14,8 +14,8 @@ class Plant(object):
     and robot states.
     
     """
-    def __init__(self):
-        pass
+    def __init__(self, state_space_dim=None):
+        self._state_space_dim = state_space_dim
     
     def state_input(self, state, action):
         """Return the state-part of the critic input
@@ -47,7 +47,9 @@ class Plant(object):
         This value is equal to the size of the vector returned by
         :py:meth:`state_input`.
         """
-        raise NotImplementedError()
+        if self._state_space_dim is None:
+            raise NotImplementedError()
+        return self._state_space_dim
 
 class Policy(object):
     """A template for Actor-Critic *policies*. The *Policy* defines how
