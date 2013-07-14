@@ -99,6 +99,14 @@ class Policy(object):
             raise NotImplementedError()
         return self._action_space_dim
 
+class _ConstParam:
+    """Stub for wrapping constant values into an executable function."""
+    def __init__(self, value):
+        self._value = value
+    def __call__(self, time):
+        """Return the constant value."""
+        return self._value
+
 class ADHDP(PuPy.PuppyActor):
     """Actor-critic design.
     
@@ -190,8 +198,7 @@ class ADHDP(PuPy.PuppyActor):
             Detailed description of the algorithm.
         
         """
-        if self.num_step < 3: # FIXME
-            # TODO: Initialization
+        if self.num_step < 3: # FIXME: Initialization
             self.num_step += 1
             self.s_curr = epoch
             return self.policy.get_iterator(time_start_ms, time_end_ms, step_size_ms)
@@ -265,27 +272,11 @@ class ADHDP(PuPy.PuppyActor):
             If ``alpha`` or ``gamma`` was set to a user-defined
             function, make sure it's pickable. Especially, anonymous
             functions (:keyword:`lambda`) can't be pickled.
-            
-            The same issue applies to the ``reward`` function.
-        
-        .. todo::
-            alpha and gamma pickling works but is a bit messy. Possibly
-            there's a better approach.
         
         """
-        # alpha, gamma to local
-        alpha, gamma = self.alpha, self.gamma
-        if self.alpha == self.__const_alpha_fu:
-            self.alpha = None
-        
-        if self.gamma == self.__const_gamma_fu:
-            self.gamma = None
-        
         f = open(pth, 'w')
         pickle.dump(self, f)
         f.close()
-        # alpha, gamma to instance
-        self.alpha, self.gamma = alpha, gamma
     
     @staticmethod
     def load(pth):
@@ -294,22 +285,7 @@ class ADHDP(PuPy.PuppyActor):
         f = open(pth, 'r')
         cls = pickle.load(f)
         cls.new_episode()
-        
-        if cls.alpha is None:
-            cls.set_alpha(cls._ADHDP__const_alpha_value)
-        
-        if cls.gamma is None:
-            cls.set_gamma(cls._ADHDP__const_gamma_value)
-        
         return cls
-    
-    def __const_alpha_fu(self, step):
-        """Return a constant value for alpha."""
-        return self.__const_alpha_value
-        
-    def __const_gamma_fu(self, step):
-        """Return a constant value for gamma."""
-        return self.__const_gamma_value
     
     def set_alpha(self, alpha):
         """Define a value for ``alpha``. May be either a constant or
@@ -318,8 +294,7 @@ class ADHDP(PuPy.PuppyActor):
         if callable(alpha):
             self.alpha = alpha
         else:
-            self.__const_alpha_value = alpha
-            self.alpha = self.__const_alpha_fu
+            self.alpha = _ConstParam(alpha)
     
     def set_gamma(self, gamma):
         """Define a value for ``gamma``. May be either a constant or
@@ -328,8 +303,7 @@ class ADHDP(PuPy.PuppyActor):
         if callable(gamma):
             self.gamma = gamma
         else:
-            self.__const_gamma_value = gamma
-            self.gamma = self.__const_gamma_fu
+            self.gamma = _ConstParam(gamma)
 
 class CollectingADHDP(ADHDP):
     """Actor-Critic design with data collector.
@@ -348,7 +322,7 @@ class CollectingADHDP(ADHDP):
         *collector* to save all the data.
         """
         epoch['reward']  = np.array([reward]).T
-        epoch['deriv']   = np.a
+        epoch['deriv']   = deriv.T
         epoch['err']     = err.T
         epoch['readout'] = self.readout.beta.T
         epoch['gamma']   = np.array([self.gamma(self.num_step)])
