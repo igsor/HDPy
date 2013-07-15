@@ -201,6 +201,20 @@ class ADHDP(PuPy.PuppyActor):
         if self.num_step < 3: # FIXME: Initialization
             self.num_step += 1
             self.s_curr = epoch
+            """
+            # phony history
+            i = np.random.normal(size=(1, self.reservoir.get_input_dim()))
+            x = np.random.normal(size=(1, self.reservoir.get_output_dim()))
+            j = np.random.normal(size=(1,1))
+            self._pre_increment_hook(
+                epoch,
+                np.random.normal(size=(1,1)),
+                np.random.normal(size=(1,self._motor_action_dim)),
+                np.random.normal(size=(1,1)),
+                (i, x, j, self.a_curr),
+                (i, x, j, self.a_curr)
+                )
+            """
             return self.policy.get_iterator(time_start_ms, time_end_ms, step_size_ms)
         
         # extern through the robot:
@@ -224,6 +238,8 @@ class ADHDP(PuPy.PuppyActor):
         
         # gradient training of action (acc. to eq. 10)
         a_next = self.a_curr + self.alpha(self.num_step) * deriv
+        #from math import pi # FIXME: ESN-ACD comparison
+        #a_next = a_next % (2*pi) # FIXME: ESN-ACD comparison
         
         # ESN-critic, second instance: in(k+1) => J(k+1)
         in_state = self.plant.state_input(epoch, a_next)
