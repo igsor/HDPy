@@ -337,11 +337,11 @@ class CollectingADHDP(ADHDP):
         """Add the *ActorCritic* internals to the epoch and use the
         *collector* to save all the data.
         """
-        epoch['reward']  = np.array([reward]).T
+        epoch['reward']  = np.atleast_2d([reward]).T
         epoch['deriv']   = deriv.T
         epoch['err']     = err.T
         epoch['readout'] = self.readout.beta.T
-        epoch['gamma']   = np.array([self.gamma(self.num_step)])
+        epoch['gamma']   = np.atleast_2d([self.gamma(self.num_step)]).T
         epoch['i_curr'], epoch['x_curr'], epoch['j_curr'], epoch['a_curr'] = curr
         epoch['i_next'], epoch['x_next'], epoch['j_next'], epoch['a_next'] = next_
         self.collector(epoch, 0, 1, 1)
