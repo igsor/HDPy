@@ -201,7 +201,7 @@ class ADHDP(PuPy.PuppyActor):
         if self.num_step < 3: # FIXME: Initialization
             self.num_step += 1
             self.s_curr = epoch
-            """
+            """ # FIXME: ESN-ACD comparison
             # phony history
             i = np.random.normal(size=(1, self.reservoir.get_input_dim()))
             x = np.random.normal(size=(1, self.reservoir.get_output_dim()))
@@ -214,7 +214,7 @@ class ADHDP(PuPy.PuppyActor):
                 (i, x, j, self.a_curr),
                 (i, x, j, self.a_curr)
                 )
-            """
+            #"""
             return self.policy.get_iterator(time_start_ms, time_end_ms, step_size_ms)
         
         # extern through the robot:
