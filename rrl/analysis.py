@@ -89,7 +89,6 @@ If the controller is working, we should see that:
 """
 
 import numpy as np
-import pylab
 import h5py
 
 def gen_query(history):
@@ -105,7 +104,7 @@ def gen_query(history):
     return query
 
 class Analysis:
-    """
+    """Collection of functions to analyze a HDF5 data file at ``pth``.
     """
     def __init__(self, pth):
         self.f = h5py.File(pth,'r')
@@ -116,9 +115,12 @@ class Analysis:
         self.experiments = exp
     
     def __del__(self):
+        """Close open files."""
         self.f.close()
 
     def stack_all_data(self):
+        """Return a :py:keyword:`dict` with all concatenated data,
+        sorted by the data key."""
         all_keys = self.f[self.experiments[0]].keys()
         data = {}
         for key in all_keys:
@@ -127,10 +129,11 @@ class Analysis:
         return data
     
     def get_data(self, key):
+        """Return a list of all data belonging to ``key``."""
         return [self.f[exp][key][:] for exp in self.experiments]
     
     def get_history(self):
-        """Return the old *history* structure from the HDF5 data file.
+        """Return the old ``history`` structure from the HDF5 data file.
         
         .. deprecated:: 0.0
             Compatibility to the esn_acd history interface. Should not
@@ -140,78 +143,92 @@ class Analysis:
         all_keys = self.f[self.experiments[0]].keys()
         history = {}
         for key in all_keys:
-            history[k] = self.get_data(key)
+            history[key] = self.get_data(key)
         
         return history
     
     def stack_data(self, key):
+        """Return data related to ``key`` of all experiments in a single
+        array."""
         data = [self.f[exp][key][:] for exp in self.experiments]
         return np.concatenate(data)
     
     def num_steps(self, key=None):
+        """Return the number of steps per experiment."""
         if key is None:
             key = self.f[self.experiments[0]].keys()[0]
         
         steps = [self.f[exp][key].shape[0] for exp in self.experiments]
         return steps
     
-    def plot_grid(self, ax):
+    def plot_grid(self, axis):
+        """Add a vertical bar to ``axis`` to mark experiment
+        boundaries."""
         steps = self.num_steps()
         for i in np.array(steps).cumsum():
-            ax.axvline(i, linestyle='-', color='0.7')
+            axis.axvline(i, linestyle='-', color='0.7')
     
-    def plot_readout(self, ax):
+    def plot_readout(self, axis):
+        """Plot the absolute readout weight over time in ``axis``."""
         data = self.stack_data('readout')
-        ax.plot(abs(data).sum(axis=1), 'k', label='Absolute Readout weight')
-        ax.set_xlabel('step')
-        ax.set_ylabel('Absolute Readout weight')
+        axis.plot(abs(data).sum(axis=1), 'k', label='Absolute Readout weight')
+        axis.set_xlabel('step')
+        axis.set_ylabel('Absolute Readout weight')
     
-    def plot_readout_diff(self, ax):
+    def plot_readout_diff(self, axis):
+        """Plot the difference of absolute readout weights in
+        ``axis``."""
         data = self.stack_data('readout')
         data = abs(data).sum(axis=1)
-        ax.plot(data[1:] - data[:-1], 'k', label='Absolute Readout difference')
-        ax.set_xlabel('step')
-        ax.set_ylabel('Absolute Readout difference')
+        axis.plot(data[1:] - data[:-1], 'k', label='Absolute Readout difference')
+        axis.set_xlabel('step')
+        axis.set_ylabel('Absolute Readout difference')
     
-    def plot_reward(self, ax):
+    def plot_reward(self, axis):
+        """Plot the reward over time in ``axis``."""
         data = self.stack_data('reward')
-        ax.plot(data, 'k', label='Reward')
-        ax.set_xlabel('step')
-        ax.set_ylabel('Reward')
+        axis.plot(data, 'k', label='Reward')
+        axis.set_xlabel('step')
+        axis.set_ylabel('Reward')
     
-    def plot_derivative(self, ax):
+    def plot_derivative(self, axis):
+        """Plot the derivative over time in ``axis``."""
         data = self.stack_data('deriv')
-        ax.plot(data, 'k', label='Derivative')
-        ax.set_xlabel('step')
-        ax.set_ylabel('Derivative')
+        axis.plot(data, 'k', label='Derivative')
+        axis.set_xlabel('step')
+        axis.set_ylabel('Derivative')
     
-    def plot_actions(self, ax):
+    def plot_actions(self, axis):
+        """Plot the current (blue) and next action (red) over time in
+        ``axis``."""
         a_curr = self.stack_data('a_curr')
         a_next = self.stack_data('a_next')
-        ax.plot(a_curr, 'b', label='a_curr')
-        ax.plot(a_next, 'r', label='a_next')
-        ax.legend(loc=0)
-        ax.set_xlabel('step')
-        ax.set_ylabel('Action')
+        axis.plot(a_curr, 'b', label='a_curr')
+        axis.plot(a_next, 'r', label='a_next')
+        axis.legend(loc=0)
+        axis.set_xlabel('step')
+        axis.set_ylabel('Action')
     
-    def plot_error(self, ax):
+    def plot_error(self, axis):
+        """Plot the error over time in ``axis``."""
         data = self.stack_data('err')
-        ax.plot(data, 'k', label='error')
-        ax.set_xlabel('step')
-        ax.set_ylabel('TD-Error')
+        axis.plot(data, 'k', label='error')
+        axis.set_xlabel('step')
+        axis.set_ylabel('TD-Error')
     
-    def plot_accumulated_reward(self, ax):
+    def plot_accumulated_reward(self, axis):
+        """Plot the accumulated reward per episode in ``axis``."""
         reward = self.get_data('reward')
         data = [r.sum() for r in reward]
-        ax.plot(data, 'k', label='Accumulated reward')
-        ax.set_xlabel('episode')
-        ax.set_ylabel('Accumulated reward')
+        axis.plot(data, 'k', label='Accumulated reward')
+        axis.set_xlabel('episode')
+        axis.set_ylabel('Accumulated reward')
 
-    def plot_path_return_prediction(self, ax, expno):
+    def plot_path_return_prediction(self, axis, expno):
         """Plot the predicted return of a simulated path.
         
         The return prediction is specific to the path of the experiment
-        *expno*. The plots will be written to *ax*.
+        *expno*. The plots will be written to *axis*.
         
         Five curves are shown:
         
@@ -248,8 +265,8 @@ class Analysis:
         reservoir_dim = x_curr.shape[1]
         N = x_curr.shape[0]
         
-        trg = np.zeros((N,1))
-        for i in range(N-2,-1,-1):
+        trg = np.zeros((N, 1))
+        for i in range(N-2, -1, -1):
             trg[i] = trg[i+1] * gamma[i+1] + reward[i+1]
         
         trg[-1] = trg[-2]
@@ -258,23 +275,23 @@ class Analysis:
         from rc import StabilizedRLS
         
         
-        lr = mdp.nodes.LinearRegressionNode(input_dim=reservoir_dim,output_dim=1)
-        lr.train(x_curr[:-1],trg[:-1])
-        lr.stop_training()
+        lin_reg = mdp.nodes.LinearRegressionNode(input_dim=reservoir_dim, output_dim=1)
+        lin_reg.train(x_curr[:-1], trg[:-1])
+        lin_reg.stop_training()
         
-        olrA = StabilizedRLS(with_bias=False, input_dim=reservoir_dim, output_dim=1, lambda_=0.9)
-        olrB = StabilizedRLS(with_bias=True, input_dim=reservoir_dim, output_dim=1, lambda_=0.9)
+        olr_nb = StabilizedRLS(with_bias=False, input_dim=reservoir_dim, output_dim=1, lambda_=0.9)
+        olr_wb = StabilizedRLS(with_bias=True,  input_dim=reservoir_dim, output_dim=1, lambda_=0.9)
         for i in range(N-1):
-            s = np.atleast_2d(x_curr[i])
-            t = np.atleast_2d(trg[i])
-            olrA.train(s,t)
-            olrB.train(s,t)
+            src = np.atleast_2d(x_curr[i])
+            dst = np.atleast_2d(trg[i])
+            olr_wb.train(src, dst)
+            olr_nb.train(src, dst)
         
-        ax.plot(lr(x_curr), 'b', label='Offline MSE')
-        ax.plot(olrA(x_curr), 'c--', label='Online MSE (no bias)')
-        ax.plot(olrB(x_curr), 'c:', label='Online MSE (bias)')
-        ax.plot(j_curr, 'r', label='Predicted Value')
-        ax.plot(trg, 'k', label='target')
-        ax.legend(loc=0)
-        ax.set_xlabel('step')
-        ax.set_ylabel('return')
+        axis.plot(lin_reg(x_curr), 'b', label='Offline MSE')
+        axis.plot(olr_nb(x_curr), 'c--', label='Online MSE (no bias)')
+        axis.plot(olr_wb(x_curr), 'c:', label='Online MSE (bias)')
+        axis.plot(j_curr, 'r', label='Predicted Value')
+        axis.plot(trg, 'k', label='target')
+        axis.legend(loc=0)
+        axis.set_xlabel('step')
+        axis.set_ylabel('return')
