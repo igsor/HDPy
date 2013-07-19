@@ -317,15 +317,15 @@ class ADHDP(ActorCritic):
         self.reservoir.reset()
         super(ADHDP, self).new_episode()
     
-    def _step(self, s_curr, epoch, reward):
+    def _step(self, s_curr, s_next, reward):
         """Execute one step of the actor and return the next action.
         
         ``s_next``
-            Latest observed state. :py:keyword:`dict`, same as ``epoch``
+            Latest observed state. :py:keyword:`dict`, same as ``s_next``
             of the :py:meth:`__call__`.
         
         ``s_curr``
-            Previous observed state. :py:keyword:`dict`, same as ``epoch``
+            Previous observed state. :py:keyword:`dict`, same as ``s_next``
             of the :py:meth:`__call__`.
         
         ``reward``
@@ -350,7 +350,7 @@ class ADHDP(ActorCritic):
         #a_next = a_next % (2*pi) # FIXME: ESN-ACD comparison
         
         # ESN-critic, second instance: in(k+1) => J(k+1)
-        in_state = self.plant.state_input(epoch, a_next)
+        in_state = self.plant.state_input(s_next, a_next)
         i_next = np.vstack((in_state, a_next)).T
         x_next = self.reservoir(i_next, simulate=True)
         j_next = self.readout(x_next)
@@ -364,7 +364,7 @@ class ADHDP(ActorCritic):
         
         # increment hook
         self._pre_increment_hook(
-            epoch,
+            s_next,
             reward=np.atleast_2d([reward]).T,
             deriv=deriv.T,
             err=err.T,

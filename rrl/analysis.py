@@ -7,7 +7,8 @@ It's assumed that a group represents one episode. There may be several
 groups in a single HDF5 file, which would then be interpreted as several
 runs (episodes) of the same experiment.
 
-Quick plots:
+Quick plots
+~~~~~~~~~~~
 
 - Sum of absolute readout weights: Information about converging
   behaviour of the readout. If the weights grow indefinitely, an
@@ -17,15 +18,16 @@ Quick plots:
 
 - Derivation per action: Action change
 
-- Reward: 
+- Reward: Desired to converte to the maximum (in the long run)
 
 - Accumulated reward per episode: Desired to converge to the maximum
 
-- Neuron activation: 
+- Neuron activation: ?
 
-- Action: 
+- Action: If the policy converges, the action should converge over several episodes
 
-If the controller is working, we should see that:
+If the controller is working, we should see that
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 * If training is executed on always the same sequence of actions,
   the value prediction should become more accurate for earlier
@@ -86,45 +88,53 @@ If the controller is working, we should see that:
   
   ! Not implemented
 
-Plots from papers:
+Plots from papers
+~~~~~~~~~~~~~~~~~
 
 * reward over time; one line per episode, received and predicted
-  
+
+  > When the predicted return (?) is shown, it can be seen that (assuming
+    all works well) it propagates towards earlier timesteps in the episode
+    (assuming several runs with the same or similar action).
 
 * utility distribution estimated by critic at a specific time step
-  
+
+  ? Not sure, how to interpret this (generally)
 
 * change of w_out over time
-  
+
+  > Shows the effect of the critic learning
 
 * utility and prediction (and raw sensor values) over time
+
+  > The papers suggest that the prediction should display the form of the
+    utility a couple of timesteps earlier.
+
+
+Other ideas
+~~~~~~~~~~~
+
+* Show action selection fitness
+
+  > In every step, plot J(a|s), J(a|s_{t+1}). Also indicate a_t and a_{t+1} with vertical bars
   
+  > At least with increasing episode count, the action a_{t+1} should be
+    close to the optimum of J(a|s_{t+1})
 
-* measured and predicted reward over time, one line per episode
-  
+  ? Maybe also annotate or plot the gradient
 
-Other ideas:
-
-* correctness of reward
-* predicted return
-  - At each step
-  - Dependent on the action (maximum?)
-* J, dJ and action, next action
-* J_t vs. J_{t+1}, including action
-* J(s,a)
-* Maybe an 'animation' (characteristics over time) may be informative?
 * Given all paths of an experiment:
+
   - Can compute the return of each path
   - Can average return of a state, given all observed paths
   - Can compare the average return of a state with the TD-predicted return (evaluating the critic for a sequence)
   - Comparison is based on sequences
-* Show action selection fitness:
-  In every step:
-  * plot J(a|s)
-  * indicate a_t
-  * indicate a_{t+1}
-  * plot J(a|s_{t+1})
 
+? Correctness of reward
+
+? Predicted return
+
+? Maybe an 'animation' (characteristics over time) may be informative
 
 
 """
@@ -147,13 +157,14 @@ def gen_query(history):
 class Analysis:
     """Collection of functions to analyze a HDF5 data file at ``pth``.
     """
-    def __init__(self, pth):
+    def __init__(self, pth, grid=False):
         self.f = h5py.File(pth,'r')
         exp = map(int, self.f.keys())
         exp = sorted(exp)
         exp = map(str, exp)
         exp = filter(lambda k: len(self.f[k]) > 0, exp)
         self.experiments = exp
+        self.always_plot_grid = grid
     
     def __del__(self):
         """Close open files."""
@@ -211,12 +222,28 @@ class Analysis:
         
         return axis
     
+    def plot_neuron_activation(self, axis):
+        """Plot the absolute sum of the neuron state (=activation
+        potential) of the current (red) and next (blue) timestep in
+        ``axis``."""
+        x_curr = self.stack_data('x_curr')
+        x_next = self.stack_data('x_next')
+        axis.plot(abs(x_curr).sum(axis=1), 'r', label='Absolute Neuron Activation')
+        axis.plot(abs(x_next).sum(axis=1), 'b', label='Absolute Neuron Activation')
+        axis.set_xlabel('step')
+        axis.set_ylabel('Absolute Neuron Activation')
+        if self.always_plot_grid:
+            self.plot_grid(ax)
+        return ax
+    
     def plot_readout(self, axis):
         """Plot the absolute readout weight over time in ``axis``."""
         data = self.stack_data('readout')
-        axis.plot(abs(data).sum(axis=1), 'k', label='Absolute Readout weight')
+        axis.plot(abs(data).sum(axis=1), 'k', label='Absolute Readout Weights')
         axis.set_xlabel('step')
-        axis.set_ylabel('Absolute Readout weight')
+        axis.set_ylabel('Absolute Readout Weights')
+        if self.always_plot_grid:
+            self.plot_grid(ax)
         return axis
     
     def plot_readout_diff(self, axis):
@@ -227,6 +254,8 @@ class Analysis:
         axis.plot(data[1:] - data[:-1], 'k', label='Absolute Readout difference')
         axis.set_xlabel('step')
         axis.set_ylabel('Absolute Readout difference')
+        if self.always_plot_grid:
+            self.plot_grid(ax)
         return axis
     
     def plot_reward(self, axis):
@@ -235,6 +264,8 @@ class Analysis:
         axis.plot(data, 'k', label='Reward')
         axis.set_xlabel('step')
         axis.set_ylabel('Reward')
+        if self.always_plot_grid:
+            self.plot_grid(ax)
         return axis
     
     def plot_derivative(self, axis):
@@ -243,6 +274,8 @@ class Analysis:
         axis.plot(data, 'k', label='dJ(k)/da')
         axis.set_xlabel('step')
         axis.set_ylabel('Derivative')
+        if self.always_plot_grid:
+            self.plot_grid(ax)
         return axis
     
     def plot_actions(self, axis):
@@ -255,6 +288,8 @@ class Analysis:
         axis.legend(loc=0)
         axis.set_xlabel('step')
         axis.set_ylabel('Action')
+        if self.always_plot_grid:
+            self.plot_grid(ax)
         return axis
     
     def plot_error(self, axis):
@@ -263,6 +298,8 @@ class Analysis:
         axis.plot(data, 'k', label='error')
         axis.set_xlabel('step')
         axis.set_ylabel('TD-Error')
+        if self.always_plot_grid:
+            self.plot_grid(ax)
         return axis
     
     def plot_accumulated_reward(self, axis):
@@ -284,6 +321,8 @@ class Analysis:
         axis.set_xlabel('step')
         axis.set_ylabel('predicted return')
         axis.legend(loc=0)
+        if self.always_plot_grid:
+            self.plot_grid(ax)
         return axis
     
     def plot_path_return_prediction(self, axis, expno):
