@@ -107,7 +107,7 @@ class _ConstParam:
         """Return the constant value."""
         return self._value
 
-class ADHDP(PuPy.PuppyActor):
+class ActorCritic(PuPy.PuppyActor):
     """Actor-critic design.
     
     The Actor-Critic estimates the return function
@@ -157,10 +157,8 @@ class ADHDP(PuPy.PuppyActor):
         See [ESN-ACD]_ for details.
         
     """
-    def __init__(self, reservoir, readout, plant, policy, gamma=1.0, alpha=1.0):
-        super(ADHDP, self).__init__()
-        self.reservoir = reservoir
-        self.readout = readout
+    def __init__(self, plant, policy, gamma=1.0, alpha=1.0):
+        super(ActorCritic, self).__init__()
         self.plant = plant
         self.policy = policy
         self.set_alpha(alpha)
@@ -169,19 +167,14 @@ class ADHDP(PuPy.PuppyActor):
         self.new_episode()
         
         # Check assumptions
-        assert self.reservoir.reset_states == False
-        assert self.reservoir.get_input_dim() == self.policy.action_space_dim() + self.plant.state_space_dim()
-        assert self.readout.beta.shape == (self.reservoir.output_dim+1, 1)
         assert self.policy.initial_action().shape[0] >= 1
         assert self.policy.initial_action().shape[1] == 1
-        assert self.reservoir.get_input_dim() >= self.policy.initial_action().shape[0]
     
     def new_episode(self):
         """Start a new episode of the same experiment. This method can
         also be used to initialize the *ActorCritic*, for example when
         it is loaded from a file.
         """
-        self.reservoir.reset()
         self.num_episode += 1
         self.a_curr = self.policy.initial_action()
         self._motor_action_dim = self.policy.action_space_dim()
@@ -224,59 +217,40 @@ class ADHDP(PuPy.PuppyActor):
         # Generate reinforcement signal U(k), given in(k)
         reward = self.plant.reward(epoch)
         
-        # ESN-critic, first instance: in(k) => J(k)
-        in_state = self.plant.state_input(self.s_curr, self.a_curr)
-        i_curr = np.vstack((in_state, self.a_curr)).T
-        x_curr = self.reservoir(i_curr, simulate=False)
-        j_curr = self.readout(x_curr)
-        
-        # Next action
-        e = (np.ones(x_curr.shape) - x_curr**2).T # Nx1
-        k = e * self.reservoir.w_in[:, -self._motor_action_dim:].toarray() # Nx1 .* NxA => NxA
-        deriv = self.readout.beta[1:].T.dot(k) #  LxA
-        deriv = deriv.T # AxL
-        
-        # gradient training of action (acc. to eq. 10)
-        a_next = self.a_curr + self.alpha(self.num_step) * deriv
-        #from math import pi # FIXME: ESN-ACD comparison
-        #a_next = a_next % (2*pi) # FIXME: ESN-ACD comparison
-        
-        # ESN-critic, second instance: in(k+1) => J(k+1)
-        in_state = self.plant.state_input(epoch, a_next)
-        i_next = np.vstack((in_state, a_next)).T
-        x_next = self.reservoir(i_next, simulate=True)
-        j_next = self.readout(x_next)
-        
-        # TD_error(k) = J(k) - U(k) - gamma * J(k+1)
-        err = reward + self.gamma(self.num_step) * j_next - j_curr
-        
-        # One-step RLS training => Trained ESN
-        self.readout.train(x_curr, e=err)
-        
-        # increment hook
-        self._pre_increment_hook(
-            epoch,
-            reward,
-            deriv,
-            err,
-            (i_curr, x_curr, j_curr, self.a_curr),
-            (i_next, x_next, j_next, a_next)
-            )
+        # do the actual work
+        a_next = self._step(self.s_curr, epoch, reward)
         
         # increment
         self.a_curr = a_next
-        self.s_curr = epoch # TODO: Copy? # FIXME: Sufficient to store in_state for current epoch
+        self.s_curr = epoch
         self.num_step += 1
         
         # return next action
         self.policy.update(a_next)
         return self.policy.get_iterator(time_start_ms, time_end_ms, step_size_ms)
     
-    def _pre_increment_hook(self, epoch, reward, deriv, err, curr, next_):
+    def _step(self, s_curr, s_next, reward):
+        """Execute one step of the actor and return the next action.
+        
+        ``s_curr``
+            Previous observed state. :py:keyword:`dict`, same as ``epoch``
+            of the :py:meth:`__call__`.
+        
+        ``s_next``
+            Latest observed state. :py:keyword:`dict`, same as ``epoch``
+            of the :py:meth:`__call__`.
+        
+        ``reward``
+            Reward of ``s_next``
+        
+        """
+        raise NotImplementedError()
+    
+    def _pre_increment_hook(self, epoch, **kwargs):
         """Template method for subclasses.
         
         Before the actor-critic cycle increments, this method is invoked
-        with all relevant locals of the :py:meth:`ActorCritic.__call__`
+        with all relevant locals of the :py:meth:`ADHDP.__call__`
         method.
         """
         pass
@@ -321,6 +295,94 @@ class ADHDP(PuPy.PuppyActor):
         else:
             self.gamma = _ConstParam(gamma)
 
+class ADHDP(ActorCritic):
+    """
+    """
+    def __init__(self, reservoir, readout, plant, policy, gamma=1.0, alpha=1.0):
+        self.reservoir = reservoir
+        self.readout = readout
+        super(ADHDP, self).__init__(plant, policy, gamma, alpha)
+        
+        # Check assumptions
+        assert self.reservoir.reset_states == False
+        assert self.reservoir.get_input_dim() == self.policy.action_space_dim() + self.plant.state_space_dim()
+        assert self.readout.beta.shape == (self.reservoir.output_dim+1, 1)
+        assert self.reservoir.get_input_dim() >= self.policy.initial_action().shape[0]
+    
+    def new_episode(self):
+        """Start a new episode of the same experiment. This method can
+        also be used to initialize the *ActorCritic*, for example when
+        it is loaded from a file.
+        """
+        self.reservoir.reset()
+        super(ADHDP, self).new_episode()
+    
+    def _step(self, s_curr, epoch, reward):
+        """Execute one step of the actor and return the next action.
+        
+        ``s_next``
+            Latest observed state. :py:keyword:`dict`, same as ``epoch``
+            of the :py:meth:`__call__`.
+        
+        ``s_curr``
+            Previous observed state. :py:keyword:`dict`, same as ``epoch``
+            of the :py:meth:`__call__`.
+        
+        ``reward``
+            Reward of ``s_next``
+        
+        """
+        # ESN-critic, first instance: in(k) => J(k)
+        in_state = self.plant.state_input(s_curr, self.a_curr)
+        i_curr = np.vstack((in_state, self.a_curr)).T
+        x_curr = self.reservoir(i_curr, simulate=False)
+        j_curr = self.readout(x_curr)
+        
+        # Next action
+        e = (np.ones(x_curr.shape) - x_curr**2).T # Nx1
+        k = e * self.reservoir.w_in[:, -self._motor_action_dim:].toarray() # Nx1 .* NxA => NxA
+        deriv = self.readout.beta[1:].T.dot(k) #  LxA
+        deriv = deriv.T # AxL
+        
+        # gradient training of action (acc. to eq. 10)
+        a_next = self.a_curr + self.alpha(self.num_step) * deriv
+        #from math import pi # FIXME: ESN-ACD comparison
+        #a_next = a_next % (2*pi) # FIXME: ESN-ACD comparison
+        
+        # ESN-critic, second instance: in(k+1) => J(k+1)
+        in_state = self.plant.state_input(epoch, a_next)
+        i_next = np.vstack((in_state, a_next)).T
+        x_next = self.reservoir(i_next, simulate=True)
+        j_next = self.readout(x_next)
+        
+        # TD_error(k) = J(k) - U(k) - gamma * J(k+1)
+        err = reward + self.gamma(self.num_step) * j_next - j_curr
+        #err = -err
+        
+        # One-step RLS training => Trained ESN
+        self.readout.train(x_curr, e=err)
+        
+        # increment hook
+        self._pre_increment_hook(
+            epoch,
+            reward=np.atleast_2d([reward]).T,
+            deriv=deriv.T,
+            err=err.T,
+            readout=self.readout.beta.T,
+            gamma=np.atleast_2d([self.gamma(self.num_step)]).T,
+            i_curr=i_curr,
+            x_curr=x_curr,
+            j_curr=j_curr,
+            a_curr=self.a_curr,
+            i_next=i_next,
+            x_next=x_next,
+            j_next=j_next,
+            a_next=a_next
+            )
+        
+        # increment
+        return a_next
+
 class CollectingADHDP(ADHDP):
     """Actor-Critic design with data collector.
     
@@ -333,24 +395,21 @@ class CollectingADHDP(ADHDP):
         self.collector = None
         super(CollectingADHDP, self).__init__(*args, **kwargs)
     
-    def _pre_increment_hook(self, epoch, reward, deriv, err, curr, next_):
-        """Add the *ActorCritic* internals to the epoch and use the
+    def _pre_increment_hook(self, epoch, **kwargs):
+        """Add the *ADHDP* internals to the epoch and use the
         *collector* to save all the data.
         """
-        epoch['reward']  = np.atleast_2d([reward]).T
-        epoch['deriv']   = deriv.T
-        epoch['err']     = err.T
-        epoch['readout'] = self.readout.beta.T
-        epoch['gamma']   = np.atleast_2d([self.gamma(self.num_step)]).T
-        epoch['i_curr'], epoch['x_curr'], epoch['j_curr'], epoch['a_curr'] = curr
-        epoch['i_next'], epoch['x_next'], epoch['j_next'], epoch['a_next'] = next_
-        self.collector(epoch, 0, 1, 1)
+        ep_write = epoch.copy()
+        for key in kwargs:
+            ep_write[key] = kwargs[key]
+        
+        self.collector(ep_write, 0, 1, 1)
     
     def save(self, pth):
         """Save the instance without the *collector*.
         
         .. note::
-            When an instance is reloaded via :py:meth:`ActorCritic.load`
+            When an instance is reloaded via :py:meth:`ADHDP.load`
             a new group will be created in *expfile*.
         
         """
