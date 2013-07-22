@@ -12,7 +12,7 @@ fig.suptitle('Predictor evaluation')
 
 # Simple plot functions
 fig = pylab.figure(2)
-a.plot_readout(fig.add_subplot(321))
+a.plot_readout_sum(fig.add_subplot(321))
 a.plot_reward(fig.add_subplot(322))
 a.plot_derivative(fig.add_subplot(323))
 a.plot_actions(fig.add_subplot(324))

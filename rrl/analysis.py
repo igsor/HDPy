@@ -241,7 +241,24 @@ class Analysis:
             self.plot_grid(axis)
         return ax
     
-    def plot_readout(self, axis):
+    def plot_readout(self, axis, func=lambda i:i):
+        """Plot the readout nodes as individual curves in ``axis``. The
+        ``func`` allows for an operation to applied to the data before
+        plotting. The main intention for this is :py:func:`abs`. Default
+        is the identity."""
+        data = self.stack_data('readout')
+        N,M = data.shape
+        for i in range(M):
+            axis.plot(func(data[:,i]), label='Readout %i'%i)
+        
+        axis.legend(loc=0)
+        axis.set_xlabel('step')
+        axis.set_ylabel('readout weight')
+        if self.always_plot_grid:
+            self.plot_grid(axis)
+        return axis
+    
+    def plot_readout_sum(self, axis):
         """Plot the absolute readout weight over time in ``axis``."""
         data = self.stack_data('readout')
         axis.plot(abs(data).sum(axis=1), 'k', label='Absolute Readout Weights')
@@ -327,6 +344,7 @@ class Analysis:
         reward = self.get_data('reward')
         data = [r.sum() for r in reward]
         axis.plot(data, 'k', label='Accumulated reward')
+        #axis.set_xticks(self.experiments)
         axis.set_xlabel('episode')
         axis.set_ylabel('Accumulated reward')
         return axis
@@ -553,7 +571,7 @@ class Analysis:
 
 def overview(analysis, figure):
     """Plot some characteristics of ``analysis`` in ``figure``."""
-    analysis.plot_readout(figure.add_subplot(321))
+    analysis.plot_readout_sum(figure.add_subplot(321))
     analysis.plot_reward(figure.add_subplot(322))
     analysis.plot_derivative(figure.add_subplot(323))
     analysis.plot_actions(figure.add_subplot(324))
@@ -580,3 +598,4 @@ def node_inspection(analysis, figure, episode, node):
     
     figure.suptitle('Characteristics of node %i at episode %s' % (node, episode))
     return figure
+
