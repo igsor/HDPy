@@ -138,6 +138,10 @@ Other ideas
 
 * Reservoir inputs; Goes together with reservoir output (neuron potential)
 
+  > ``plot_reservoir_input``, ``plot_node_over_episode``
+
+* The ratio between the input and previous state of one reservoir node.
+
 """
 
 import numpy as np
@@ -234,7 +238,7 @@ class Analysis:
         axis.set_xlabel('step')
         axis.set_ylabel('Absolute Neuron Activation')
         if self.always_plot_grid:
-            self.plot_grid(ax)
+            self.plot_grid(axis)
         return ax
     
     def plot_readout(self, axis):
@@ -244,7 +248,7 @@ class Analysis:
         axis.set_xlabel('step')
         axis.set_ylabel('Absolute Readout Weights')
         if self.always_plot_grid:
-            self.plot_grid(ax)
+            self.plot_grid(axis)
         return axis
     
     def plot_readout_diff(self, axis):
@@ -256,7 +260,22 @@ class Analysis:
         axis.set_xlabel('step')
         axis.set_ylabel('Absolute Readout difference')
         if self.always_plot_grid:
-            self.plot_grid(ax)
+            self.plot_grid(axis)
+        return axis
+    
+    def plot_node_weight_over_episode(self, axis, episode):
+        data = self.f[episode]['readout'][:]
+        N,M = data.shape
+        for i in range(M):
+            if i == M-1:
+                lbl = 'Bias'
+            else:
+                lbl = 'Node %i'%i
+            axis.plot(data[:,i], label=lbl)
+        
+        axis.set_xlabel('step')
+        axis.set_ylabel('Node weight')
+        axis.legend(loc=0)
         return axis
     
     def plot_reward(self, axis):
@@ -266,7 +285,7 @@ class Analysis:
         axis.set_xlabel('step')
         axis.set_ylabel('Reward')
         if self.always_plot_grid:
-            self.plot_grid(ax)
+            self.plot_grid(axis)
         return axis
     
     def plot_derivative(self, axis):
@@ -276,7 +295,7 @@ class Analysis:
         axis.set_xlabel('step')
         axis.set_ylabel('Derivative')
         if self.always_plot_grid:
-            self.plot_grid(ax)
+            self.plot_grid(axis)
         return axis
     
     def plot_actions(self, axis):
@@ -290,7 +309,7 @@ class Analysis:
         axis.set_xlabel('step')
         axis.set_ylabel('Action')
         if self.always_plot_grid:
-            self.plot_grid(ax)
+            self.plot_grid(axis)
         return axis
     
     def plot_error(self, axis):
@@ -300,7 +319,7 @@ class Analysis:
         axis.set_xlabel('step')
         axis.set_ylabel('TD-Error')
         if self.always_plot_grid:
-            self.plot_grid(ax)
+            self.plot_grid(axis)
         return axis
     
     def plot_accumulated_reward(self, axis):
@@ -323,7 +342,7 @@ class Analysis:
         axis.set_ylabel('predicted return')
         axis.legend(loc=0)
         if self.always_plot_grid:
-            self.plot_grid(ax)
+            self.plot_grid(axis)
         return axis
     
     def plot_path_return_prediction(self, axis, expno):
@@ -482,8 +501,9 @@ class Analysis:
             raise NotImplementedError()
         
         # plot tanh
-        lo = min(-5, o_input.min())
-        hi = max(5, o_input.max()) 
+        o_input_noninf = o_input[np.isfinite(o_input)]
+        lo = min(-5, o_input_noninf.min())
+        hi = max(5, o_input_noninf.max()) 
         range_x = np.arange(lo, hi, 0.1)
         axis.plot(range_x, np.tanh(range_x), label='tanh', color='0.75')
         
