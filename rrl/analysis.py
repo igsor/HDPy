@@ -136,6 +136,7 @@ Other ideas
 
 ? Maybe an 'animation' (characteristics over time) may be informative
 
+* Reservoir inputs; Goes together with reservoir output (neuron potential)
 
 """
 
@@ -441,3 +442,121 @@ class Analysis:
         axis.set_xlabel('step')
         axis.set_ylabel('TD-Error')
         return axis
+    
+    def plot_reservoir_input(self, axis):
+        """Plot the reservoir input over time in ``axis``. Per input,
+        one line is drawn."""
+        data = self.stack_data('i_curr')
+        N,M = data.shape
+        for i in range(M):
+            axis.plot(data[:,i], label='Input %i'%i)
+        
+        axis.set_xlabel('step')
+        axis.set_ylabel('Input')
+        axis.legend(loc=0)
+        return axis
+    
+    def plot_input_over_episode(self, axis, episode):
+        data = self.f[episode]['i_curr'][:]
+        N,M = data.shape
+        for i in range(M):
+            axis.plot(data[:,i], label='Input %i'%i)
+        
+        axis.set_xlabel('step')
+        axis.set_ylabel('Input')
+        axis.legend(loc=0)
+        return axis
+    
+    def plot_node_over_episode(self, axis, episode, node):
+        """Plot the reservoir input and output of ``node`` on a tanh
+        shape over one ``episode`` in ``axis``. If ``node`` is None,
+        all nodes are plotted. If ``axis`` is a list, each node is
+        plotted in its own axis."""
+        
+        assert episode in self.experiments
+        
+        o_output = self.f[episode]['x_curr'][:,node]
+        o_input  = np.arctanh(o_output)
+        
+        if node is None:
+            raise NotImplementedError()
+        
+        # plot tanh
+        lo = min(-5, o_input.min())
+        hi = max(5, o_input.max()) 
+        range_x = np.arange(lo, hi, 0.1)
+        axis.plot(range_x, np.tanh(range_x), label='tanh', color='0.75')
+        
+        # plot points
+        axis.plot(o_input, o_output, 'b*', label='samples')
+        axis.set_xlabel('node input')
+        axis.set_ylabel('node output')
+        return axis
+    
+    def plot_node_over_episode_time_input(self, axis, episode, node):
+        """Plot the time over input of ``node`` in ``axis``. Only
+        ``episode`` is considered."""
+        assert episode in self.experiments
+        
+        o_output = self.f[episode]['x_curr'][:,node]
+        o_input  = np.arctanh(o_output)
+        
+        if node is None:
+            raise NotImplementedError()
+        
+        #o_time = range(o_input.shape[0]-1, -1, -1)
+        #yticks = range(o_input.shape[0])
+        #axis.set_yticks(yticks)
+        o_time = range(o_input.shape[0])
+        axis.plot(o_input, o_time, 'k')
+        axis.set_xlabel('node input')
+        axis.set_ylabel('time')
+        return axis
+    
+    def plot_node_over_episode_time_output(self, axis, episode, node):
+        """Plot the output of ``node`` over time in ``axis``. Only
+        ``episode`` is considered."""
+        assert episode in self.experiments
+        
+        o_output = self.f[episode]['x_curr'][:,node]
+        o_input  = np.arctanh(o_output)
+        
+        if node is None:
+            raise NotImplementedError()
+        
+        o_time = range(o_output.shape[0])
+        axis.plot(o_time, o_output, 'k')
+        axis.set_xlabel('time')
+        axis.set_ylabel('node output')
+        return axis
+
+
+def overview(analysis, figure):
+    """Plot some characteristics of ``analysis`` in ``figure``."""
+    analysis.plot_readout(figure.add_subplot(321))
+    analysis.plot_reward(figure.add_subplot(322))
+    analysis.plot_derivative(figure.add_subplot(323))
+    analysis.plot_actions(figure.add_subplot(324))
+    analysis.plot_error(figure.add_subplot(325))
+    analysis.plot_accumulated_reward(figure.add_subplot(326))
+    figure.suptitle('Some overview characteristics')
+    return figure
+
+def node_inspection(analysis, figure, episode, node):
+    """Plot input/output of reservoir node ``node`` at ``episode``
+    according to ``analysis`` in ``figure``."""
+    
+    # plots
+    ax_main = analysis.plot_node_over_episode(figure.add_subplot(221), episode, node)
+    ax_out = analysis.plot_node_over_episode_time_output(figure.add_subplot(222), episode, node)
+    ax_in = analysis.plot_node_over_episode_time_input(figure.add_subplot(223), episode, node)
+    ax_ep_input = analysis.plot_input_over_episode(figure.add_subplot(224), episode)
+    
+    # equal axis 
+    [xmin, xmax, ymin, ymax] = ax_main.axis()
+    
+    ax_in.axis(xmin=xmin, xmax=xmax) # keep y axis
+    ax_out.axis(ymin=ymin, ymax=ymax) # keep x axis
+    
+    figure.suptitle('Characteristics of node %i at episode %s' % (node, episode))
+    return figure
