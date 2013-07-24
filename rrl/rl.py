@@ -357,7 +357,6 @@ class ADHDP(ActorCritic):
         
         # TD_error(k) = J(k) - U(k) - gamma * J(k+1)
         err = reward + self.gamma(self.num_step) * j_next - j_curr
-        #err = -err
         
         # One-step RLS training => Trained ESN
         self.readout.train(x_curr, e=err)
