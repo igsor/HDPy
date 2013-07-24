@@ -199,7 +199,7 @@ class ActorCritic(PuPy.PuppyActor):
             return self.policy.get_iterator(time_start_ms, time_end_ms, step_size_ms)
         
         """
-        if self.num_step < 3: # FIXME: Initialization
+        if self.num_step < 3:
             self.num_step += 1
             self.s_curr = epoch
             self._pre_increment_hook(epoch)
@@ -430,6 +430,8 @@ class CollectingADHDP(ADHDP):
             actor=None,
             expfile=self.expfile,
             headers={
+                # FIXME: Store complete reservoir or at least include the bias
+                # FIXME: Doesn't work with too large reservoirs (>80 nodes)?
                 'r_weights': self.reservoir.w.todense(),
                 'r_input'  : self.reservoir.w_in.todense()
                 }

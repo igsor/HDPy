@@ -4,6 +4,7 @@ ACD plants
 
 """
 from rl import Plant
+import numpy as np
 
 class SpeedReward(Plant):
     """A :py:class:`Plant` with focus on the speed of the robot.
