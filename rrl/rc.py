@@ -429,6 +429,11 @@ class PlainRLS:
         Forgetting factor. Controlls how much the training focuses
         on recent samples (see [FB98]_ for details).
         (default 1.0, corresponds to offline learning)
+        
+        "Roughly speaking :math:`\\frac{1}{1-\lambda}` is a measure of the
+        *memory* of the algorithm. The case of :math:`\lambda = 1`
+        corresponds to *infinite memory*." [FB98]_
+        
     
     """
     def __init__(self, input_dim, output_dim, with_bias=True, lambda_=1.0):

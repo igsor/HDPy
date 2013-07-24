@@ -191,24 +191,20 @@ class ActorCritic(PuPy.PuppyActor):
             Detailed description of the algorithm.
         
         """
+        if time_start_ms == 0:
+            # Initialization
+            self.num_step += 1
+            self.s_curr = epoch
+            self._pre_increment_hook(epoch)
+            return self.policy.get_iterator(time_start_ms, time_end_ms, step_size_ms)
+        
+        """
         if self.num_step < 3: # FIXME: Initialization
             self.num_step += 1
             self.s_curr = epoch
-            """ # FIXME: ESN-ACD comparison
-            # phony history
-            i = np.random.normal(size=(1, self.reservoir.get_input_dim()))
-            x = np.random.normal(size=(1, self.reservoir.get_output_dim()))
-            j = np.random.normal(size=(1,1))
-            self._pre_increment_hook(
-                epoch,
-                np.random.normal(size=(1,1)),
-                np.random.normal(size=(1,self._motor_action_dim)),
-                np.random.normal(size=(1,1)),
-                (i, x, j, self.a_curr),
-                (i, x, j, self.a_curr)
-                )
-            #"""
+            self._pre_increment_hook(epoch)
             return self.policy.get_iterator(time_start_ms, time_end_ms, step_size_ms)
+        """
         
         # extern through the robot:
         # take action (a_curr = a_next in the previous run)
