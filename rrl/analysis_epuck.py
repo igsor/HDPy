@@ -72,7 +72,7 @@ def plot_epuck_snapshot(axis, robot, critic, trajectory, sample_actions, init_st
         traj_chosen = [None] * len(trajectory)
     
     robot_radius = 0.1
-    robot_color = (0.0, 0.0, 0.0, 0.0)
+    robot_color = (0.0, 0.0, 0.0, 0.0) # white
     ray_len = robot_radius + 0.01
     alpha = 1.0
     
@@ -102,6 +102,7 @@ def plot_epuck_snapshot(axis, robot, critic, trajectory, sample_actions, init_st
         for action_eval in sample_actions:
             predicted_return = critic(s_curr, action_eval, simulate=True)
             predicted_return = predicted_return[0, 0]
+            
             #FIXME: Ray length and color
             col = predicted_return >= 0 and 'b' or 'r'
             #col = (red, 0.0, 1.0 - red, 1.0)

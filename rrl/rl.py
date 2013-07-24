@@ -220,7 +220,7 @@ class ActorCritic(PuPy.PuppyActor):
         # To be consistent with other work, I go with time n.
         
         # do the actual work
-        a_next = self._step(self.s_curr, epoch, reward)
+        a_next = self._step(self.s_curr, epoch, self.a_curr, reward)
         
         # increment
         self.a_curr = a_next
@@ -231,7 +231,7 @@ class ActorCritic(PuPy.PuppyActor):
         self.policy.update(a_next)
         return self.policy.get_iterator(time_start_ms, time_end_ms, step_size_ms)
     
-    def _step(self, s_curr, s_next, reward):
+    def _step(self, s_curr, s_next, a_curr, reward):
         """Execute one step of the actor and return the next action.
         
         ``s_curr``
@@ -256,6 +256,15 @@ class ActorCritic(PuPy.PuppyActor):
         method.
         """
         pass
+    
+    def _next_action_hook(self, a_next):
+        """Postprocessing hook, after the next action ``a_next`` was
+        proposed by the algorithm. Must return the possibly altered
+        next action in the same format."""
+        #from math import pi
+        #a_next = np.random.uniform(-pi/2.0, pi/2.0, size=self.a_curr.shape)
+        #a_next = a_next % (2*pi)
+        return a_next
     
     def save(self, pth):
         """Store the current instance in a file at ``pth``.
@@ -319,7 +328,7 @@ class ADHDP(ActorCritic):
         self.reservoir.reset()
         super(ADHDP, self).new_episode()
     
-    def _step(self, s_curr, s_next, reward):
+    def _step(self, s_curr, s_next, a_curr, reward):
         """Execute one step of the actor and return the next action.
         
         ``s_next``
@@ -335,8 +344,8 @@ class ADHDP(ActorCritic):
         
         """
         # ESN-critic, first instance: in(k) => J(k)
-        in_state = self.plant.state_input(s_curr, self.a_curr)
-        i_curr = np.vstack((in_state, self.a_curr)).T
+        in_state = self.plant.state_input(s_curr, a_curr)
+        i_curr = np.vstack((in_state, a_curr)).T
         x_curr = self.reservoir(i_curr, simulate=False)
         j_curr = self.readout(x_curr)
         
@@ -347,10 +356,8 @@ class ADHDP(ActorCritic):
         deriv = deriv.T # AxL
         
         # gradient training of action (acc. to eq. 10)
-        a_next = self.a_curr + self.alpha(self.num_step) * deriv
-        #from math import pi
-        #a_next = np.random.uniform(-pi/2.0, pi/2.0, size=self.a_curr.shape)
-        #a_next = a_next % (2*pi)
+        a_next = a_curr + self.alpha(self.num_step) * deriv
+        a_next = self._next_action_hook(a_next)
         
         # ESN-critic, second instance: in(k+1) => J(k+1)
         in_state = self.plant.state_input(s_next, a_next)
@@ -375,7 +382,7 @@ class ADHDP(ActorCritic):
             i_curr=i_curr,
             x_curr=x_curr,
             j_curr=j_curr,
-            a_curr=self.a_curr,
+            a_curr=a_curr,
             i_next=i_next,
             x_next=x_next,
             j_next=j_next,
