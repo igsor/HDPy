@@ -211,7 +211,13 @@ class ActorCritic(PuPy.PuppyActor):
         # observe sensors values produced by the action (a_curr = previous a_next)
         
         # Generate reinforcement signal U(k), given in(k)
-        reward = self.plant.reward(epoch)
+        #reward = self.plant.reward(epoch)
+        reward = self.plant.reward(self.s_curr)
+        # It's not clear, which reward should be the input to the critic:
+        # While the ACD papers imply the reward of time step n, the book
+        # by Sutton/Barto indicate the reward as being from the next
+        # state, n+1. Experiments indicate that it doesn't really matter.
+        # To be consistent with other work, I go with time n.
         
         # do the actual work
         a_next = self._step(self.s_curr, epoch, reward)
@@ -342,8 +348,9 @@ class ADHDP(ActorCritic):
         
         # gradient training of action (acc. to eq. 10)
         a_next = self.a_curr + self.alpha(self.num_step) * deriv
-        #from math import pi # FIXME: ESN-ACD comparison
-        #a_next = a_next % (2*pi) # FIXME: ESN-ACD comparison
+        #from math import pi
+        #a_next = np.random.uniform(-pi/2.0, pi/2.0, size=self.a_curr.shape)
+        #a_next = a_next % (2*pi)
         
         # ESN-critic, second instance: in(k+1) => J(k+1)
         in_state = self.plant.state_input(s_next, a_next)
@@ -431,7 +438,8 @@ class CollectingADHDP(ADHDP):
             expfile=self.expfile,
             headers={
                 # FIXME: Store complete reservoir or at least include the bias
-                # FIXME: Doesn't work with too large reservoirs (>80 nodes)?
+                # FIXME: Doesn't work with too large reservoirs (>80 nodes)? This is because of the size limit of HDF5 headers
+                #        Could be stored as dataset...
                 'r_weights': self.reservoir.w.todense(),
                 'r_input'  : self.reservoir.w_in.todense()
                 }

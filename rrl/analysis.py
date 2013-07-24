@@ -610,7 +610,7 @@ def overview(analysis, figure):
     analysis.plot_actions(figure.add_subplot(324))
     analysis.plot_error(figure.add_subplot(325))
     analysis.plot_accumulated_reward(figure.add_subplot(326))
-    figure.suptitle('Some overview characteristics')
+    #figure.suptitle('Some overview characteristics')
     return figure
 
 def node_inspection(analysis, figure, episode, node):

@@ -574,3 +574,43 @@ class StabilizedRLS(PlainRLS):
     def __repr__(self):
         return 'StabilizedRLS(with_bias=%r, input_dim=%i, output_dim=%i, lambda_=%f)' % (self.with_bias, self.input_dim, self.output_dim, self.lambda_)
 
+def reservoir_memory(reservoir, max_settling_time=10000):
+    """Measure the memory capacity of a ``reservoir``. Make sure, the
+    reservoir is initialized. The settling time is measured, which is
+    the number of steps it takes until the reservoir has converged after
+    some non-zero input.
+    """
+    res_eval = reservoir.copy()
+    res_eval.reset_states = True
+    ip = np.zeros((max_settling_time,reservoir.get_input_dim()))
+    ip[0] += 1.0
+    ret = res_eval(ip)
+    hist = (abs(ret[1:,:] - ret[:-1,:]) < 1e-5).sum(axis=1)
+    settling_time = hist.argmax()
+    return settling_time
+
+
+def query_reservoir_memory(reservoir, steps=1000, max_settling_time=10000):
+    res_eval = reservoir.copy()
+    res_eval.reset_states = True
+    rad = map(lambda i: 1.0*i/steps, range(1,steps+1))
+    rad = map(float, rad)
+    ip = np.zeros((max_settling_time,res_eval.get_input_dim()))
+    ip[0] += 1.0
+    data = []
+    for r0,r1 in zip([res_eval.spectral_radius] + rad, rad):
+        res_eval.w *= r1/r0
+        res_eval.spectral_radius = r1
+        ret = res_eval(ip)
+        hist = (abs(ret[1:,:] - ret[:-1,:]) < 1e-5).sum(axis=1)
+        settling_time = hist.argmax()
+        data.append((r1, settling_time))
+    
+    data.sort(key=lambda (i, j): j)
+    
+    def query(min_steps):
+        for rad, steps in data:
+            if steps >= min_steps:
+                return rad, steps
+    
+    return query
