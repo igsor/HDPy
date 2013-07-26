@@ -443,13 +443,13 @@ class CollectingADHDP(ADHDP):
         self.collector = PuPy.PuppyCollector(
             actor=None,
             expfile=self.expfile,
-            headers={
-                # FIXME: Store complete reservoir or at least include the bias
-                # FIXME: Doesn't work with too large reservoirs (>80 nodes)? This is because of the size limit of HDF5 headers
-                #        Could be stored as dataset...
-                'r_weights': self.reservoir.w.todense(),
-                'r_input'  : self.reservoir.w_in.todense()
-                }
+            #headers={
+            #    # FIXME: Store complete reservoir or at least include the bias
+            #    # FIXME: Doesn't work with too large reservoirs (>80 nodes)? This is because of the size limit of HDF5 headers
+            #    #        Could be stored as dataset though...
+            #    'r_weights': self.reservoir.w.todense(),
+            #    'r_input'  : self.reservoir.w_in.todense()
+            #    }
         )
     
     def __del__(self):
