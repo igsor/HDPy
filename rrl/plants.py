@@ -36,6 +36,9 @@ class LineFollower(Plant):
     the distance to a line in the xy plane. The line is described by
     its ``origin`` and the ``direction``.
     
+    .. todo::
+        Average over multiple samples of the epoch
+    
     """
     def __init__(self, origin, direction):
         super(LineFollower, self).__init__(state_space_dim=2)
@@ -78,6 +81,9 @@ class LineFollower(Plant):
 class TargetLocation(Plant):
     """A :py:class:`Plant` which gives negative reward proportional to
     the distance to point ``target`` in the xy plane.
+    
+    .. todo::
+        Average over multiple samples of the epoch
     """
     def __init__(self, target):
         super(TargetLocation, self).__init__(state_space_dim=2)
@@ -108,4 +114,5 @@ class TargetLocation(Plant):
         #(target - point)
         diff = self.target - point
         return -np.linalg.norm(diff)
+
 

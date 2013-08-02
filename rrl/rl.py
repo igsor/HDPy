@@ -390,6 +390,7 @@ class ADHDP(ActorCritic):
             deriv=deriv.T,
             err=err.T,
             readout=self.readout.beta.T,
+            #psiInv=self.readout._psiInv.reshape((1, self.readout._psiInv.shape[0]**2)),
             gamma=np.atleast_2d([self.gamma(self.num_step)]).T,
             i_curr=i_curr,
             x_curr=x_curr,
