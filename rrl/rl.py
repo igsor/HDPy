@@ -317,7 +317,8 @@ class ADHDP(ActorCritic):
         # Check assumptions
         assert self.reservoir.reset_states == False
         assert self.reservoir.get_input_dim() == self.policy.action_space_dim() + self.plant.state_space_dim()
-        assert self.readout.beta.shape == (self.reservoir.output_dim+1, 1)
+        assert self.readout.beta.shape == (self.reservoir.output_dim + 1, 1)
+        #assert self.readout.beta.shape == (self.reservoir.output_dim + self.policy.action_space_dim() + self.plant.state_space_dim() + 1, 1) # FIXME: Input/Output ESN Model
         assert self.reservoir.get_input_dim() >= self.policy.initial_action().shape[0]
     
     def new_episode(self):
@@ -347,12 +348,16 @@ class ADHDP(ActorCritic):
         in_state = self.plant.state_input(s_curr, a_curr)
         i_curr = np.vstack((in_state, a_curr)).T
         x_curr = self.reservoir(i_curr, simulate=False)
+        #o_curr = np.hstack((x_curr, i_curr)) # FIXME: Input/Output ESN Model
+        #j_curr = self.readout(o_curr) # FIXME: Input/Output ESN Model
         j_curr = self.readout(x_curr)
         
         # Next action
         e = (np.ones(x_curr.shape) - x_curr**2).T # Nx1
         k = e * self.reservoir.w_in[:, -self._motor_action_dim:].toarray() # Nx1 .* NxA => NxA
         deriv = self.readout.beta[1:].T.dot(k) #  LxA
+        #deriv = self.readout.beta[1:-i_curr.shape[1]].T.dot(k) #  LxA  # FIXME: Input/Output ESN Model
+        #deriv += self.readout.beta[-self._motor_action_dim:].T # FIXME: Input/Output ESN Model
         deriv = deriv.T # AxL
         
         # gradient training of action (acc. to eq. 10)
@@ -363,13 +368,16 @@ class ADHDP(ActorCritic):
         in_state = self.plant.state_input(s_next, a_next)
         i_next = np.vstack((in_state, a_next)).T
         x_next = self.reservoir(i_next, simulate=True)
+        #o_next = np.hstack((x_next, i_next)) # FIXME: Input/Output ESN Model
+        #j_next = self.readout(o_next) # FIXME: Input/Output ESN Model
         j_next = self.readout(x_next)
         
         # TD_error(k) = J(k) - U(k) - gamma * J(k+1)
         err = reward + self.gamma(self.num_step) * j_next - j_curr
         
         # One-step RLS training => Trained ESN
-        self.readout.train(x_curr, e=err)
+        self.readout.train(x_curr, e=err) 
+        #self.readout.train(o_curr, e=err) # FIXME: Input/Output ESN Model
         
         # increment hook
         self._pre_increment_hook(

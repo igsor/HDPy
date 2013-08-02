@@ -655,6 +655,8 @@ def critic(plant, reservoir, readout):
         in_state = plant.state_input(state, action)
         i_curr = np.vstack((in_state, action)).T
         x_curr = reservoir(i_curr, simulate=simulate)
+        #o_curr = np.hstack((x_curr, i_curr)) # FIXME: Input/Output ESN Model
+        #j_curr = readout(o_curr) # FIXME: Input/Output ESN Model
         j_curr = readout(x_curr)
         return j_curr
     
