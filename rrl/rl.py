@@ -402,6 +402,11 @@ class CollectingADHDP(ADHDP):
     def __init__(self, expfile, *args, **kwargs):
         self.expfile = expfile
         self.collector = None
+        
+        self.headers = None
+        if 'additional_headers' in kwargs:
+            self.headers = kwargs.pop('additional_headers')
+        
         super(CollectingADHDP, self).__init__(*args, **kwargs)
     
     def _pre_increment_hook(self, epoch, **kwargs):
@@ -443,6 +448,7 @@ class CollectingADHDP(ADHDP):
         self.collector = PuPy.PuppyCollector(
             actor=None,
             expfile=self.expfile,
+            headers=self.headers
             #headers={
             #    # FIXME: Store complete reservoir or at least include the bias
             #    # FIXME: Doesn't work with too large reservoirs (>80 nodes)? This is because of the size limit of HDF5 headers
