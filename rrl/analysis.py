@@ -305,26 +305,15 @@ class Analysis:
         """Plot the difference of absolute readout weights in
         ``axis``."""
         data = self.stack_data('readout')
-        data = abs(data).sum(axis=1)
-        axis.plot(data[1:] - data[:-1], 'k', label='Readout difference')
+        diff = data[1:] - data[:-1]
+        diff = diff.sum(axis=1)**2
+        axis.plot(diff, 'k', label='Readout difference')
         axis.set_xlabel('step')
         axis.set_ylabel('Readout difference')
         if self.always_plot_grid:
             self.plot_grid(axis)
         return axis
-    
-    def plot_abs_readout_diff(self, axis):
-        """Plot the absolute difference of absolute readout weights in
-        ``axis``."""
-        data = self.stack_data('readout')
-        data = abs(data).sum(axis=1)
-        axis.plot(abs(data[1:] - data[:-1]), 'k', label='Absolute Readout difference')
-        axis.set_xlabel('step')
-        axis.set_ylabel('Absolute Readout difference')
-        if self.always_plot_grid:
-            self.plot_grid(axis)
-        return axis
-    
+        
     def plot_node_weight_over_episode(self, axis, episode):
         """Plot the readout weights of a single ``episode`` in ``axis``."""
         assert episode in self.experiments
