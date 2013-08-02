@@ -211,8 +211,8 @@ class ActorCritic(PuPy.PuppyActor):
         # observe sensors values produced by the action (a_curr = previous a_next)
         
         # Generate reinforcement signal U(k), given in(k)
-        reward = self.plant.reward(epoch)
-        #reward = self.plant.reward(self.s_curr)
+        #reward = self.plant.reward(epoch)
+        reward = self.plant.reward(self.s_curr)
         # It's not clear, which reward should be the input to the critic:
         # While the ACD papers imply the reward of time step n, the book
         # by Sutton/Barto indicate the reward as being from the next
