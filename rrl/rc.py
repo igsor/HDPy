@@ -666,6 +666,7 @@ def find_radius_for_mc(reservoir, num_steps, tol=1.0, max_settling_time=10000, t
     settling_time = hist.argmax()
     
     # loop
+    prev_settling_time = float('-inf')
     while abs(num_steps - settling_time) > tol and num_iter >= 0:
         
         if settling_time < num_steps:
