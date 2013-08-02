@@ -445,6 +445,7 @@ class PlainRLS:
             input_dim += 1
         self.beta = np.zeros((input_dim, self.output_dim))
         self._psiInv = np.eye(input_dim, input_dim) * 10000.0
+        self._stop_training = False
 
     def train(self, x, d=None, e=None):
         """Train the regression on one or more samples.
@@ -459,6 +460,9 @@ class PlainRLS:
             Sample error terms. Array of size (K, output_dim)
         
         """
+        if self._stop_training:
+            return
+        
         if self.with_bias:
             x = self._add_constant(x)
         for n in range(x.shape[0]):
@@ -527,6 +531,9 @@ class PlainRLS:
     
     def __repr__(self):
         return 'PlainRLS(with_bias=%r, input_dim=%i, output_dim=%i, lambda_=%f)' % (self.with_bias, self.input_dim, self.output_dim, self.lambda_)
+    
+    def stop_training(self):
+        self._stop_training = True
 
 class StabilizedRLS(PlainRLS):
     """Compute online least-square, multivariate linear regression.
@@ -550,6 +557,9 @@ class StabilizedRLS(PlainRLS):
             Sample error terms. Array of size (K, output_dim)
         
         """
+        if self._stop_training:
+            return
+        
         if self.with_bias:
             x = self._add_constant(x)
         for n in range(x.shape[0]):

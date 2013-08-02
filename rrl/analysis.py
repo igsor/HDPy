@@ -382,6 +382,16 @@ class Analysis:
         axis.set_ylabel('Accumulated reward')
         return axis
     
+    def plot_mean_reward(self, axis):
+        """Plot the accumulated reward per episode in ``axis``."""
+        reward = self.get_data('reward')
+        data = [r.mean() for r in reward]
+        axis.plot(data, 'k', label='Accumulated reward')
+        #axis.set_xticks(self.experiments)
+        axis.set_xlabel('episode')
+        axis.set_ylabel('Accumulated reward')
+        return axis
+    
     def plot_return_prediction(self, axis):
         """Plot the predicted return of the current (red) and next
         (blue) state/action pair in ``axis``."""
