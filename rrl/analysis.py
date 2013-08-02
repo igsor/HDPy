@@ -172,6 +172,7 @@ Other ideas
 
 import numpy as np
 import h5py
+from math import pi
 
 def gen_query(history):
     """To generate the old *query* function.
@@ -189,6 +190,7 @@ class Analysis:
     """Collection of functions to analyze a HDF5 data file at ``pth``.
     """
     def __init__(self, pth, grid=False):
+        self.pth = pth
         self.f = h5py.File(pth,'r')
         exp = map(int, self.f.keys())
         exp = sorted(exp)
@@ -623,7 +625,6 @@ class Analysis:
         axis.set_ylabel('node output')
         return axis
 
-
 def overview(analysis, figure):
     """Plot some characteristics of ``analysis`` in ``figure``."""
     analysis.plot_readout_sum(figure.add_subplot(321))
@@ -674,3 +675,13 @@ def critic(plant, reservoir, readout):
     
     return critic_fu
 
+def plot_value_over_action(critic, state, axis, a_range=np.arange(0.0, 2*pi, 0.01)):
+    """Given a trained ``critic``, plot the expected return as function
+    of the action, given a ``state`` into ``axis``. Assuming 1-d action
+    (otherwise, it becomes messy to plot).
+    """
+    exp_return = np.vstack([critic(state, action, simulate=True) for action in a_range])
+    axis.plot(a_range, exp_return, label='J(a|s)')
+    axis.set_xlabel('action')
+    axis.set_ylabel('Expected return')
+    return axis
