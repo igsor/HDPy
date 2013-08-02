@@ -98,6 +98,10 @@ class Policy(object):
         if self._action_space_dim is None:
             raise NotImplementedError()
         return self._action_space_dim
+    
+    def reset(self):
+        """Undo any policy updates."""
+        raise NotImplementedError()
 
 class _ConstParam:
     """Stub for wrapping constant values into an executable function."""
@@ -157,7 +161,7 @@ class ActorCritic(PuPy.PuppyActor):
         See [ESN-ACD]_ for details.
         
     """
-    def __init__(self, plant, policy, gamma=1.0, alpha=1.0):
+    def __init__(self, plant, policy, gamma=1.0, alpha=1.0, init_steps=1):
         super(ActorCritic, self).__init__()
         self.plant = plant
         self.policy = policy
@@ -165,6 +169,7 @@ class ActorCritic(PuPy.PuppyActor):
         self.set_gamma(gamma)
         self.num_episode = 0
         self.new_episode()
+        self._init_steps = init_steps
         
         # Check assumptions
         assert self.policy.initial_action().shape[0] >= 1
@@ -191,8 +196,7 @@ class ActorCritic(PuPy.PuppyActor):
             Detailed description of the algorithm.
         
         """
-        if time_start_ms == 0:
-            # Initialization
+        if self.num_step <= self._init_steps:
             self.num_step += 1
             self.s_curr = epoch
             self._pre_increment_hook(epoch)
@@ -309,10 +313,10 @@ class ActorCritic(PuPy.PuppyActor):
 class ADHDP(ActorCritic):
     """
     """
-    def __init__(self, reservoir, readout, plant, policy, gamma=1.0, alpha=1.0):
+    def __init__(self, reservoir, readout, *args, **kwargs):
         self.reservoir = reservoir
         self.readout = readout
-        super(ADHDP, self).__init__(plant, policy, gamma, alpha)
+        super(ADHDP, self).__init__(*args, **kwargs)
         
         # Check assumptions
         assert self.reservoir.reset_states == False

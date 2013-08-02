@@ -36,12 +36,16 @@ class GaitPolicy(Policy):
     def __init__(self, gait, action_space_dim=None):
         super(GaitPolicy, self).__init__(action_space_dim)
         self.gait = gait
+        self.gait_orig = gait.copy()
     
     def get_iterator(self, time_start_ms, time_end_ms, step_size_ms):
         """Return an iterator for the *motor_target* sequence.
         """
         return self.gait.iter(time_start_ms, step_size_ms)
 
+    def reset(self):
+        """Reset the gait to the original values."""
+        self.gait = self.gait_orig.copy()
 
 
 ## All legs

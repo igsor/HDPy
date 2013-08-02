@@ -656,29 +656,15 @@ def find_radius_for_mc(reservoir, num_steps, tol=1.0, max_settling_time=10000, t
     step_input[0] += 1.0
     
     # initial loop values
-    rad_lo, rad_hi = 0.0, 1.0
-    res_eval.w *= 0.5 / res_eval.spectral_radius
-    rad = res_eval.spectral_radius = 0.5
-    
-    # initial settling time
-    ret = res_eval(step_input)
-    hist = (abs(ret[1:, :] - ret[:-1, :]) < 1e-5).sum(axis=1)
-    settling_time = hist.argmax()
+    rad_lo, rad_hi, rad = 0.0, 1.0, 0.5
     
     # loop
-    prev_settling_time = float('-inf')
-    while abs(num_steps - settling_time) > tol and num_iter >= 0:
-        
-        if settling_time < num_steps:
-            rad_new = rad + (rad_hi - rad)/2.0
-            rad_lo = rad
-        else:
-            rad_new = rad - (rad - rad_lo)/2.0
-            rad_hi = rad
+    settling_time = float('inf')
+    while True:
         
         # set up new reservoir
-        res_eval.w *= rad_new / rad
-        res_eval.spectral_radius = rad_new
+        res_eval.w *= rad / res_eval.spectral_radius
+        res_eval.spectral_radius = rad
         
         # evaluate MC
         ret = res_eval(step_input)
@@ -686,14 +672,20 @@ def find_radius_for_mc(reservoir, num_steps, tol=1.0, max_settling_time=10000, t
         prev_settling_time = settling_time
         settling_time = hist.argmax()
         
-        if abs(settling_time - prev_settling_time) < tol_settling:
+        if settling_time < num_steps:
+            rad_lo = rad
+            rad = rad + (rad_hi - rad)/2.0
+        else:
+            rad_hi = rad
+            rad = rad - (rad - rad_lo)/2.0
+        
+        if abs(num_steps - settling_time) > tol:
             break
+            
+        if num_iter < 0 or abs(settling_time - prev_settling_time) < tol_settling:
+            raise Exception('No solution found')
         
         # continue
-        rad = rad_new
         num_iter -= 1
-    
-    if num_iter < 0 or abs(settling_time - prev_settling_time) < tol_settling:
-        raise Exception('No solution found')
     
     return rad
