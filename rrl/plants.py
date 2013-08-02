@@ -12,7 +12,7 @@ class SpeedReward(Plant):
     def __init__(self):
         super(SpeedReward, self).__init__(state_space_dim=2)
     
-    def state_input(self, state, action):
+    def state_input(self, state):
         """Return the latest *GPS* (x,y) values.
         """
         sio =  np.atleast_2d([

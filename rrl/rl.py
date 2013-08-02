@@ -211,8 +211,8 @@ class ActorCritic(PuPy.PuppyActor):
         # observe sensors values produced by the action (a_curr = previous a_next)
         
         # Generate reinforcement signal U(k), given in(k)
-        #reward = self.plant.reward(epoch)
-        reward = self.plant.reward(self.s_curr)
+        reward = self.plant.reward(epoch)
+        #reward = self.plant.reward(self.s_curr)
         # It's not clear, which reward should be the input to the critic:
         # While the ACD papers imply the reward of time step n, the book
         # by Sutton/Barto indicate the reward as being from the next
@@ -317,7 +317,7 @@ class ADHDP(ActorCritic):
         # Check assumptions
         assert self.reservoir.reset_states == False
         assert self.reservoir.get_input_dim() == self.policy.action_space_dim() + self.plant.state_space_dim()
-        assert self.readout.beta.shape == (self.reservoir.output_dim + 1, 1)
+        #assert self.readout.beta.shape == (self.reservoir.output_dim + 1, 1)
         #assert self.readout.beta.shape == (self.reservoir.output_dim + self.policy.action_space_dim() + self.plant.state_space_dim() + 1, 1) # FIXME: Input/Output ESN Model
         assert self.reservoir.get_input_dim() >= self.policy.initial_action().shape[0]
     
@@ -345,7 +345,7 @@ class ADHDP(ActorCritic):
         
         """
         # ESN-critic, first instance: in(k) => J(k)
-        in_state = self.plant.state_input(s_curr, a_curr)
+        in_state = self.plant.state_input(s_curr)
         i_curr = np.vstack((in_state, a_curr)).T
         x_curr = self.reservoir(i_curr, simulate=False)
         #o_curr = np.hstack((x_curr, i_curr)) # FIXME: Input/Output ESN Model
@@ -365,7 +365,7 @@ class ADHDP(ActorCritic):
         a_next = self._next_action_hook(a_next)
         
         # ESN-critic, second instance: in(k+1) => J(k+1)
-        in_state = self.plant.state_input(s_next, a_next)
+        in_state = self.plant.state_input(s_next)
         i_next = np.vstack((in_state, a_next)).T
         x_next = self.reservoir(i_next, simulate=True)
         #o_next = np.hstack((x_next, i_next)) # FIXME: Input/Output ESN Model

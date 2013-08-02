@@ -562,6 +562,7 @@ class StabilizedRLS(PlainRLS):
         
         if self.with_bias:
             x = self._add_constant(x)
+        
         for n in range(x.shape[0]):
             # preliminaries
             xn = np.atleast_2d(x[n]).T
@@ -579,7 +580,9 @@ class StabilizedRLS(PlainRLS):
             tri = np.tril(self._psiInv)
             tri -= np.tril(k*u.T)
             tri /= self.lambda_
-            self._psiInv = tri + tri.T - np.diag(tri.diagonal())
+            #self._psiInv = tri + tri.T - np.diag(tri.diagonal())
+            # FIXME: (numpy bug) tri.diagonal() introduces a memory leak
+            self._psiInv = np.tril(tri,-1).T + tri
     
     def __repr__(self):
         return 'StabilizedRLS(with_bias=%r, input_dim=%i, output_dim=%i, lambda_=%f)' % (self.with_bias, self.input_dim, self.output_dim, self.lambda_)
