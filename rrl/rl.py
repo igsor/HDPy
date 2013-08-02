@@ -186,6 +186,11 @@ class ActorCritic(PuPy.PuppyActor):
         self.s_curr = dict()
         self.num_step = 0
     
+    def init_episode(self, epoch, time_start_ms, time_end_ms, step_size_ms):
+        self.s_curr = epoch
+        self._pre_increment_hook(epoch)
+        return self.policy.get_iterator(time_start_ms, time_end_ms, step_size_ms)
+    
     def __call__(self, epoch, time_start_ms, time_end_ms, step_size_ms):
         """One round in the actor-critic cycle. The current observations
         are given in *epoch* and the timing information in the rest of
@@ -198,9 +203,7 @@ class ActorCritic(PuPy.PuppyActor):
         """
         if self.num_step <= self._init_steps:
             self.num_step += 1
-            self.s_curr = epoch
-            self._pre_increment_hook(epoch)
-            return self.policy.get_iterator(time_start_ms, time_end_ms, step_size_ms)
+            return self.init_episode(epoch, time_start_ms, time_end_ms, step_size_ms)
         
         """
         if self.num_step < 3:

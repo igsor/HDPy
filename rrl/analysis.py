@@ -217,6 +217,16 @@ class Analysis:
         """Return a list of all data belonging to ``key``."""
         return [self.f[exp][key][:] for exp in self.experiments]
     
+    def __getitem__(self, key):
+        return self.get_episode(key)
+    
+    def __len__(self):
+        return len(self.experiments)
+    
+    def get_episode(self, num):
+        assert num in self.experiments
+        return self.f[num]
+    
     def get_history(self):
         """Return the old ``history`` structure from the HDF5 data file.
         

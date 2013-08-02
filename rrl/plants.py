@@ -13,23 +13,25 @@ class SpeedReward(Plant):
         super(SpeedReward, self).__init__(state_space_dim=2)
     
     def state_input(self, state):
-        """Return the latest *GPS* (x,y) values.
+        """Return the location, sampled from the *GPS* (x,y) values.
+        The sample is an average over the last 10 GPS coordinates.
         """
         sio =  np.atleast_2d([
-            state['puppyGPS_x'][-1],
-            state['puppyGPS_y'][-1]
+            state['puppyGPS_x'][-10:].mean(),
+            state['puppyGPS_y'][-10:].mean()
         ]).T
         return sio
     
     def reward(self, epoch):
         """Return the covered distance and -1.0 if the robot tumbled.
+        The speed measurement is taken from the 100th to the last sample.
         """
-        if (epoch['accelerometer_z'] < 1.0).sum() > 80:
+        if (epoch['accelerometer_z'][-100:] < 1.0).sum() > 80:
             return -1.0
         
         x = epoch['puppyGPS_x']
         y = epoch['puppyGPS_y']
-        return np.linalg.norm(np.array([x[-1] - x[0], y[-1] - y[0]]))
+        return np.linalg.norm(np.array([x[-1] - x[-100], y[-1] - y[-100]]))
 
 class LineFollower(Plant):
     """A :py:class:`Plant` which gives negative reward proportional to
