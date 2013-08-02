@@ -582,7 +582,7 @@ class StabilizedRLS(PlainRLS):
             tri /= self.lambda_
             #self._psiInv = tri + tri.T - np.diag(tri.diagonal())
             # FIXME: (numpy bug) tri.diagonal() introduces a memory leak
-            self._psiInv = np.tril(tri,-1).T + tri
+            self._psiInv = np.tril(tri, -1).T + tri
     
     def __repr__(self):
         return 'StabilizedRLS(with_bias=%r, input_dim=%i, output_dim=%i, lambda_=%f)' % (self.with_bias, self.input_dim, self.output_dim, self.lambda_)
@@ -595,27 +595,29 @@ def reservoir_memory(reservoir, max_settling_time=10000):
     """
     res_eval = reservoir.copy()
     res_eval.reset_states = True
-    ip = np.zeros((max_settling_time,reservoir.get_input_dim()))
-    ip[0] += 1.0
-    ret = res_eval(ip)
-    hist = (abs(ret[1:,:] - ret[:-1,:]) < 1e-5).sum(axis=1)
+    step_input = np.zeros((max_settling_time, reservoir.get_input_dim()))
+    step_input[0] += 1.0
+    ret = res_eval(step_input)
+    hist = (abs(ret[1:, :] - ret[:-1, :]) < 1e-5).sum(axis=1)
     settling_time = hist.argmax()
     return settling_time
 
 
 def query_reservoir_memory(reservoir, steps=1000, max_settling_time=10000):
+    """
+    """
     res_eval = reservoir.copy()
     res_eval.reset_states = True
-    rad = map(lambda i: 1.0*i/steps, range(1,steps+1))
+    rad = map(lambda i: 1.0*i/steps, range(1, steps+1))
     rad = map(float, rad)
-    ip = np.zeros((max_settling_time,res_eval.get_input_dim()))
-    ip[0] += 1.0
+    step_input = np.zeros((max_settling_time, res_eval.get_input_dim()))
+    step_input[0] += 1.0
     data = []
-    for r0,r1 in zip([res_eval.spectral_radius] + rad, rad):
+    for r0, r1 in zip([res_eval.spectral_radius] + rad, rad):
         res_eval.w *= r1/r0
         res_eval.spectral_radius = r1
-        ret = res_eval(ip)
-        hist = (abs(ret[1:,:] - ret[:-1,:]) < 1e-5).sum(axis=1)
+        ret = res_eval(step_input)
+        hist = (abs(ret[1:, :] - ret[:-1, :]) < 1e-5).sum(axis=1)
         settling_time = hist.argmax()
         data.append((r1, settling_time))
     
@@ -627,3 +629,70 @@ def query_reservoir_memory(reservoir, steps=1000, max_settling_time=10000):
                 return rad, steps
     
     return query
+
+def find_radius_for_mc(reservoir, num_steps, tol=1.0, max_settling_time=10000, tol_settling=0.5, num_iter=100):
+    """Find a spectral radius for ``reservoir`` such that the step
+    response time is ``num_steps`` with tolerance ``tol``.
+    
+    This implementation linearizes the memory capacity function locally
+    and uses binary search to approach the target value. If you look
+    for a single value (not the whole characteristics), this function
+    is usually faster than :py:func:`query_reservoir_memory`.
+    
+    ``max_settling_time`` sets the maximum time after which the
+    reservoir should have settled.
+    
+    ``tol_settling`` and ``num_iter`` are search abortion criteria which
+    break, if the settling time doesn't change too much or too many
+    iterations have been run. If any of the criteria is met, an
+    Exception is thrown.
+    
+    """
+    assert max_settling_time > num_steps + tol
+    assert tol_settling < tol
+    res_eval = reservoir.copy()
+    res_eval.reset_states = True
+    step_input = np.zeros((max_settling_time, res_eval.get_input_dim()))
+    step_input[0] += 1.0
+    
+    # initial loop values
+    rad_lo, rad_hi = 0.0, 1.0
+    res_eval.w *= 0.5 / res_eval.spectral_radius
+    rad = res_eval.spectral_radius = 0.5
+    
+    # initial settling time
+    ret = res_eval(step_input)
+    hist = (abs(ret[1:, :] - ret[:-1, :]) < 1e-5).sum(axis=1)
+    settling_time = hist.argmax()
+    
+    # loop
+    while abs(num_steps - settling_time) > tol and num_iter >= 0:
+        
+        if settling_time < num_steps:
+            rad_new = rad + (rad_hi - rad)/2.0
+            rad_lo = rad
+        else:
+            rad_new = rad - (rad - rad_lo)/2.0
+            rad_hi = rad
+        
+        # set up new reservoir
+        res_eval.w *= rad_new / rad
+        res_eval.spectral_radius = rad_new
+        
+        # evaluate MC
+        ret = res_eval(step_input)
+        hist = (abs(ret[1:, :] - ret[:-1, :]) < 1e-5).sum(axis=1)
+        prev_settling_time = settling_time
+        settling_time = hist.argmax()
+        
+        if abs(settling_time - prev_settling_time) < tol_settling:
+            break
+        
+        # continue
+        rad = rad_new
+        num_iter -= 1
+    
+    if num_iter < 0 or abs(settling_time - prev_settling_time) < tol_settling:
+        raise Exception('No solution found')
+    
+    return rad
