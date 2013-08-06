@@ -430,11 +430,11 @@ class ADHDP(ActorCritic):
             i_curr=i_curr,
             x_curr=x_curr,
             j_curr=j_curr,
-            a_curr=a_curr,
+            a_curr=a_curr.T,
             i_next=i_next,
             x_next=x_next,
             j_next=j_next,
-            a_next=a_next
+            a_next=a_next.T
             )
         
         # increment

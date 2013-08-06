@@ -271,8 +271,9 @@ class Analysis:
         ``axis``."""
         x_curr = self.stack_data('x_curr')
         x_next = self.stack_data('x_next')
-        axis.plot(abs(x_curr).sum(axis=1), 'r', label='Absolute Neuron Activation')
-        axis.plot(abs(x_next).sum(axis=1), 'b', label='Absolute Neuron Activation')
+        N = x_curr.shape[1]
+        axis.plot(abs(x_curr).sum(axis=1)/N, 'r', label='Absolute Neuron Activation')
+        axis.plot(abs(x_next).sum(axis=1)/N, 'b', label='Absolute Neuron Activation')
         axis.set_xlabel('step')
         axis.set_ylabel('Absolute Neuron Activation')
         if self.always_plot_grid:

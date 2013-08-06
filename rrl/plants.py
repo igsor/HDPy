@@ -65,8 +65,8 @@ class LineFollower(Plant):
         """Return the latest *GPS* (x,y) values.
         """
         sio =  np.atleast_2d([
-            self.normalization.normalize_value('puppyGPS_x', state['puppyGPS_x'][-1]),
-            self.normalization.normalize_value('puppyGPS_y', state['puppyGPS_y'][-1])
+            self.normalization.normalize_value('puppyGPS_x', state['puppyGPS_x'][-10:]).mean(),
+            self.normalization.normalize_value('puppyGPS_y', state['puppyGPS_y'][-10:]).mean()
         ]).T
         return sio
     
@@ -74,6 +74,9 @@ class LineFollower(Plant):
         """Return the distance between the current robot location and
         the line.
         """
+        if (epoch['accelerometer_z'][-100:] < 1.0).sum() > 80: # FIXME: Normalization
+            return 0.0
+        
         x = epoch['puppyGPS_x'][-1]
         y = epoch['puppyGPS_y'][-1]
         point = np.atleast_2d([x,y]).T
@@ -81,7 +84,7 @@ class LineFollower(Plant):
         #(origin - point) - (<origin - point, dir>) * dir
         diff = self.origin - point
         proj = diff - self.direction.T.dot(diff).dot(self.direction.T).T
-        return -np.linalg.norm(proj)
+        return np.tanh(1.0/np.linalg.norm(proj))
 
 class TargetLocation(Plant):
     """A :py:class:`Plant` which gives negative reward proportional to
@@ -103,8 +106,8 @@ class TargetLocation(Plant):
         """Return the latest *GPS* (x,y) values.
         """
         sio =  np.atleast_2d([
-            self.normalization.normalize_value('puppyGPS_x', state['puppyGPS_x'][-1]),
-            self.normalization.normalize_value('puppyGPS_y', state['puppyGPS_y'][-1])
+            self.normalization.normalize_value('puppyGPS_x', state['puppyGPS_x'][-10:]).mean(),
+            self.normalization.normalize_value('puppyGPS_y', state['puppyGPS_y'][-10:]).mean()
         ]).T
         return sio
     
@@ -112,12 +115,15 @@ class TargetLocation(Plant):
         """Return the distance between the current robot location and
         the target point.
         """
+        if (epoch['accelerometer_z'][-100:] < 1.0).sum() > 80: # FIXME: Normalization
+            return 0.0
+        
         x = epoch['puppyGPS_x'][-1]
         y = epoch['puppyGPS_y'][-1]
         point = np.atleast_2d([x,y]).T
         
         #(target - point)
         diff = self.target - point
-        return -np.linalg.norm(diff)
+        return np.tanh(1.0/np.linalg.norm(diff))
 
 
