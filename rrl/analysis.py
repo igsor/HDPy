@@ -195,7 +195,7 @@ class Analysis:
         exp = map(int, self.f.keys())
         exp = sorted(exp)
         exp = map(str, exp)
-        exp = filter(lambda k: len(self.f[k]) > 40, exp)
+        exp = filter(lambda k: len(self.f[k]) > 0, exp) # normalization fails, if not >0
         self.experiments = exp
         self.always_plot_grid = grid
     
