@@ -17,8 +17,8 @@ class SpeedReward(Plant):
         The sample is an average over the last 10 GPS coordinates.
         """
         sio =  np.atleast_2d([
-            state['puppyGPS_x'][-10:].mean(),
-            state['puppyGPS_y'][-10:].mean()
+            self.normalization.normalize_value('puppyGPS_x', state['puppyGPS_x'][-10:]).mean(),
+            self.normalization.normalize_value('puppyGPS_y', state['puppyGPS_y'][-10:]).mean()
         ]).T
         return sio
     
@@ -26,7 +26,10 @@ class SpeedReward(Plant):
         """Return the covered distance and -1.0 if the robot tumbled.
         The speed measurement is taken from the 100th to the last sample.
         """
-        if (epoch['accelerometer_z'][-100:] < 1.0).sum() > 80:
+        #acc_z = epoch['accelerometer_z'][-100:] * 86.346093474890296 - 13.893742994128598 # unit interval
+        #acc_z = epoch['accelerometer_z'][-100:] * 3.9537216197680531 + 9.1285160984449654 # zero mean, unit variance
+        #if (acc_z < 1.0).sum() > 80: # FIXME: Normalization
+        if (epoch['accelerometer_z'][-100:] < 1.0).sum() > 80: # FIXME: Normalization
             return -1.0
         
         x = epoch['puppyGPS_x']
@@ -62,8 +65,8 @@ class LineFollower(Plant):
         """Return the latest *GPS* (x,y) values.
         """
         sio =  np.atleast_2d([
-            state['puppyGPS_x'][-1],
-            state['puppyGPS_y'][-1]
+            self.normalization.normalize_value('puppyGPS_x', state['puppyGPS_x'][-1]),
+            self.normalization.normalize_value('puppyGPS_y', state['puppyGPS_y'][-1])
         ]).T
         return sio
     
@@ -100,8 +103,8 @@ class TargetLocation(Plant):
         """Return the latest *GPS* (x,y) values.
         """
         sio =  np.atleast_2d([
-            state['puppyGPS_x'][-1],
-            state['puppyGPS_y'][-1]
+            self.normalization.normalize_value('puppyGPS_x', state['puppyGPS_x'][-1]),
+            self.normalization.normalize_value('puppyGPS_y', state['puppyGPS_y'][-1])
         ]).T
         return sio
     

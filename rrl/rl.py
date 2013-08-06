@@ -7,15 +7,23 @@ import PuPy
 import numpy as np
 import cPickle as pickle
 
+class PhonyNormalization(PuPy.Normalization):
+    """Empty normalization."""
+    def __init__(self):
+        super(PhonyNormalization, self).__init__(None)
+
 class Plant(object):
     """A template for Actor-Critic *plants*. The *Plant* describes the
     interaction of the Actor-Critic with the environment. Given a robot
     which follows a certain *Policy*, the environment generates rewards
     and robot states.
     
+    An additional instance to :py:class:`PuPy.Normalization` may be 
+    supplied in ``norm`` for normalizing sensor values.
     """
-    def __init__(self, state_space_dim=None):
+    def __init__(self, state_space_dim=None, norm=None):
         self._state_space_dim = state_space_dim
+        self.set_normalization(norm)
     
     def state_input(self, state, action):
         """Return the state-part of the critic input
@@ -50,6 +58,12 @@ class Plant(object):
         if self._state_space_dim is None:
             raise NotImplementedError()
         return self._state_space_dim
+    
+    def set_normalization(self, norm):
+        """Set the normalization instance to ``norm``."""
+        if norm is None:
+            norm = PhonyNormalization()
+        self.normalization = norm
 
 class Policy(object):
     """A template for Actor-Critic *policies*. The *Policy* defines how
@@ -57,9 +71,12 @@ class Policy(object):
     continously receives action updates from the *Critic* which it has
     to digest.
     
+    An additional instance to :py:class:`PuPy.Normalization` may be 
+    supplied in ``norm`` for normalizing sensor values.
     """
-    def __init__(self, action_space_dim=None):
+    def __init__(self, action_space_dim=None, norm=None):
         self._action_space_dim = action_space_dim
+        self.set_normalization(norm)
     
     def initial_action(self):
         """Return the initial action. A valid action must be returned
@@ -102,6 +119,13 @@ class Policy(object):
     def reset(self):
         """Undo any policy updates."""
         raise NotImplementedError()
+    
+    def set_normalization(self, norm):
+        """Set the normalization instance to ``norm``."""
+        if norm is None:
+            norm = PhonyNormalization()
+        self.normalization = norm
+
 
 class _ConstParam:
     """Stub for wrapping constant values into an executable function."""
@@ -160,11 +184,17 @@ class ActorCritic(PuPy.PuppyActor):
         
         See [ESN-ACD]_ for details.
         
+    ``norm``
+        A :py:class:`PuPy.Normalization` for normalization purposes.
+    
     """
-    def __init__(self, plant, policy, gamma=1.0, alpha=1.0, init_steps=1):
+    def __init__(self, plant, policy, gamma=1.0, alpha=1.0, init_steps=1, norm=None):
         super(ActorCritic, self).__init__()
         self.plant = plant
         self.policy = policy
+        self.normalizer = norm
+        self.plant.set_normalization(self.normalizer)
+        self.policy.set_normalization(self.normalizer)
         self.set_alpha(alpha)
         self.set_gamma(gamma)
         self.num_episode = 0
@@ -353,6 +383,7 @@ class ADHDP(ActorCritic):
         """
         # ESN-critic, first instance: in(k) => J(k)
         in_state = self.plant.state_input(s_curr)
+        a_curr = self.normalizer.normalize_value('a_curr', a_curr)
         i_curr = np.vstack((in_state, a_curr)).T
         x_curr = self.reservoir(i_curr, simulate=False)
         #o_curr = np.hstack((x_curr, i_curr)) # FIXME: Input/Output ESN Model
@@ -373,6 +404,7 @@ class ADHDP(ActorCritic):
         
         # ESN-critic, second instance: in(k+1) => J(k+1)
         in_state = self.plant.state_input(s_next)
+        a_next = self.normalizer.normalize_value('a_next', a_next)
         i_next = np.vstack((in_state, a_next)).T
         x_next = self.reservoir(i_next, simulate=True)
         #o_next = np.hstack((x_next, i_next)) # FIXME: Input/Output ESN Model
