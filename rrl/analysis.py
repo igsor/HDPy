@@ -195,7 +195,7 @@ class Analysis:
         exp = map(int, self.f.keys())
         exp = sorted(exp)
         exp = map(str, exp)
-        exp = filter(lambda k: len(self.f[k]) > 0, exp)
+        exp = filter(lambda k: len(self.f[k]) > 40, exp)
         self.experiments = exp
         self.always_plot_grid = grid
     
@@ -242,6 +242,9 @@ class Analysis:
         
         return history
     
+    def episode_len(self):
+        return [len(self.f[e]['reward']) for e in self.experiments]
+    
     def stack_data(self, key):
         """Return data related to ``key`` of all experiments in a single
         array."""
@@ -256,10 +259,10 @@ class Analysis:
         steps = [self.f[exp][key].shape[0] for exp in self.experiments]
         return steps
     
-    def plot_grid(self, axis):
+    def plot_grid(self, axis, key=None):
         """Add a vertical bar to ``axis`` to mark experiment
         boundaries."""
-        steps = self.num_steps()
+        steps = self.num_steps(key)
         for i in np.array(steps).cumsum():
             axis.axvline(i, linestyle='-', color='0.7')
         

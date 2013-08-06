@@ -8,10 +8,15 @@ import numpy as np
 class PuppyHDP(CollectingADHDP):
     """ADHDP subtype for simulations using Puppy in webots.
     
-    This class adds some code considering restarts of Puppy.
+    This class adds some code considering restarts of Puppy. It adds
+    an optional argument ``tumbled_reward``. The reward will be forced
+    to this value after the supervisor detected tumbling. If
+    :py:keyword:`None` (the default) is used, the reward remains
+    unchanged.
+    
     """
     def __init__(self, *args, **kwargs):
-        self._tumbled_reward = kwargs.pop('tumbled_reward', 0.0)
+        self._tumbled_reward = kwargs.pop('tumbled_reward', None)
         self.has_tumbled = False
         self.supervisor_tumbled_notice = 0
         super(PuppyHDP, self).__init__(*args, **kwargs)
@@ -47,7 +52,8 @@ class PuppyHDP(CollectingADHDP):
         
         if self.supervisor_tumbled_notice > 0:
             if self.supervisor_tumbled_notice > 1:
-                reward = self._tumbled_reward
+                if self._tumbled_reward is not None:
+                    reward = self._tumbled_reward
                 self.has_tumbled = True
             self.supervisor_tumbled_notice += 1
         

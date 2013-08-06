@@ -74,8 +74,8 @@ class LineFollower(Plant):
         """Return the distance between the current robot location and
         the line.
         """
-        if (epoch['accelerometer_z'][-100:] < 1.0).sum() > 80: # FIXME: Normalization
-            return 0.0
+        #if (epoch['accelerometer_z'][-100:] < 1.0).sum() > 80: # FIXME: Normalization
+        #    return 0.0
         
         x = epoch['puppyGPS_x'][-1]
         y = epoch['puppyGPS_y'][-1]
@@ -84,7 +84,11 @@ class LineFollower(Plant):
         #(origin - point) - (<origin - point, dir>) * dir
         diff = self.origin - point
         proj = diff - self.direction.T.dot(diff).dot(self.direction.T).T
-        return np.tanh(1.0/np.linalg.norm(proj))
+        #return np.tanh(1.0/np.linalg.norm(proj))
+        
+        reward = -np.linalg.norm(proj)
+        reward += np.random.normal(scale=0.01, size=reward.shape)
+        return reward
 
 class TargetLocation(Plant):
     """A :py:class:`Plant` which gives negative reward proportional to
