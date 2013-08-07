@@ -131,7 +131,7 @@ class _ConstParam:
     """Stub for wrapping constant values into an executable function."""
     def __init__(self, value):
         self._value = value
-    def __call__(self, time):
+    def __call__(self, time0, time1):
         """Return the constant value."""
         return self._value
 
@@ -412,7 +412,7 @@ class ADHDP(ActorCritic):
         j_next = self.readout(x_next)
         
         # TD_error(k) = J(k) - U(k) - gamma * J(k+1)
-        err = reward + self.gamma(self.num_step) * j_next - j_curr
+        err = reward + self.gamma(self.num_episode, self.num_step) * j_next - j_curr
         
         # One-step RLS training => Trained ESN
         self.readout.train(x_curr, e=err) 
@@ -426,7 +426,7 @@ class ADHDP(ActorCritic):
             err=err.T,
             readout=self.readout.beta.T,
             #psiInv=self.readout._psiInv.reshape((1, self.readout._psiInv.shape[0]**2)),
-            gamma=np.atleast_2d([self.gamma(self.num_step)]).T,
+            gamma=np.atleast_2d([self.gamma(self.num_episode, self.num_step)]).T,
             i_curr=i_curr,
             x_curr=x_curr,
             j_curr=j_curr,
