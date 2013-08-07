@@ -131,7 +131,7 @@ class _ConstParam:
     """Stub for wrapping constant values into an executable function."""
     def __init__(self, value):
         self._value = value
-    def __call__(self, time0, time1):
+    def __call__(self, time0=None, time1=None):
         """Return the constant value."""
         return self._value
 
@@ -383,8 +383,8 @@ class ADHDP(ActorCritic):
         """
         # ESN-critic, first instance: in(k) => J(k)
         in_state = self.plant.state_input(s_curr)
-        a_curr = self.normalizer.normalize_value('a_curr', a_curr)
-        i_curr = np.vstack((in_state, a_curr)).T
+        a_curr_nrm = self.normalizer.normalize_value('a_curr', a_curr)
+        i_curr = np.vstack((in_state, a_curr_nrm)).T
         x_curr = self.reservoir(i_curr, simulate=False)
         #o_curr = np.hstack((x_curr, i_curr)) # FIXME: Input/Output ESN Model
         #j_curr = self.readout(o_curr) # FIXME: Input/Output ESN Model
@@ -399,13 +399,13 @@ class ADHDP(ActorCritic):
         deriv = deriv.T # AxL
         
         # gradient training of action (acc. to eq. 10)
-        a_next = a_curr + self.alpha(self.num_step) * deriv
+        a_next = a_curr + self.alpha(self.num_step) * deriv # FIXME: Denormalization of deriv (scale*deriv)
         a_next = self._next_action_hook(a_next)
         
         # ESN-critic, second instance: in(k+1) => J(k+1)
         in_state = self.plant.state_input(s_next)
-        a_next = self.normalizer.normalize_value('a_next', a_next)
-        i_next = np.vstack((in_state, a_next)).T
+        a_next_nrm = self.normalizer.normalize_value('a_next', a_next)
+        i_next = np.vstack((in_state, a_next_nrm)).T
         x_next = self.reservoir(i_next, simulate=True)
         #o_next = np.hstack((x_next, i_next)) # FIXME: Input/Output ESN Model
         #j_next = self.readout(o_next) # FIXME: Input/Output ESN Model
