@@ -45,10 +45,11 @@ class LineFollower(Plant):
         Average over multiple samples of the epoch
     
     """
-    def __init__(self, origin, direction):
+    def __init__(self, origin, direction, reward_noise=0.01):
         super(LineFollower, self).__init__(state_space_dim=2)
         self.origin = np.atleast_2d(origin)
         self.direction = np.atleast_2d(direction)
+        self.reward_noise = reward_noise
         
         if self.origin.shape[0] < self.origin.shape[1]:
             self.origin = self.origin.T
@@ -87,7 +88,7 @@ class LineFollower(Plant):
         #return np.tanh(1.0/np.linalg.norm(proj))
         
         reward = -np.linalg.norm(proj)
-        reward += np.random.normal(scale=0.01, size=reward.shape)
+        reward += np.random.normal(scale=self.reward_noise, size=reward.shape)
         return reward
 
 class TargetLocation(Plant):
@@ -97,9 +98,10 @@ class TargetLocation(Plant):
     .. todo::
         Average over multiple samples of the epoch
     """
-    def __init__(self, target):
+    def __init__(self, target, reward_noise=0.01):
         super(TargetLocation, self).__init__(state_space_dim=2)
         self.target = np.atleast_2d(target)
+        self.reward_noise = reward_noise
         
         if self.target.shape[0] < self.target.shape[1]:
             self.target = self.target.T
@@ -128,6 +130,8 @@ class TargetLocation(Plant):
         
         #(target - point)
         diff = self.target - point
-        return np.tanh(1.0/np.linalg.norm(diff))
+        reward = -np.linalg.norm(diff)
+        reward += np.random.normal(scale=self.reward_noise, size=reward.shape)
+        return reward
 
 
