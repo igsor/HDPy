@@ -52,6 +52,18 @@ def puppy_plot_linetarget(axis, origin=(2.0, 0.0), direction=(1.0, 1.0), range_=
     axis.plot(line_x, line_y, 'k', label='Target')
     return axis
 
-def puppy_plot_locationtarget():
-    pass
+def puppy_plot_locationtarget(axis, target=(4.0, 4.0), distance=0.5, **kwargs):
+    """Plot the ``target`` location with a sphere of radius ``distance``
+    into ``axis`` to mark the target location. ``kwargs`` will be passed
+    to all :py:mod:`pylab` calls."""
+    linewidth = kwargs.pop('linewidth', 2)
+    color = kwargs.pop('facecolor', 'k')
+    fill = kwargs.pop('fill', False)
+    lbl = kwargs.pop('label', '')
+    axis.plot([target[0]], [target[1]], 'kD', **kwargs)
+    if distance > 0.0:
+        trg_field = pylab.Circle(target, distance, fill=fill, facecolor=color, linewidth=linewidth, label=lbl, **kwargs)
+        axis.add_artist(trg_field)
+
+    return axis
 

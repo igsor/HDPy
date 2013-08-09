@@ -40,10 +40,6 @@ class LineFollower(Plant):
     """A :py:class:`Plant` which gives negative reward proportional to
     the distance to a line in the xy plane. The line is described by
     its ``origin`` and the ``direction``.
-    
-    .. todo::
-        Average over multiple samples of the epoch
-    
     """
     def __init__(self, origin, direction, reward_noise=0.01):
         super(LineFollower, self).__init__(state_space_dim=2)
@@ -93,14 +89,13 @@ class LineFollower(Plant):
 
 class TargetLocation(Plant):
     """A :py:class:`Plant` which gives negative reward proportional to
-    the distance to point ``target`` in the xy plane.
-    
-    .. todo::
-        Average over multiple samples of the epoch
+    the distance to point ``target`` in the xy plane. If the robot is
+    closer than ``radius`` to the target, the reward will be 0.0.
     """
-    def __init__(self, target, reward_noise=0.01):
+    def __init__(self, target, radius=0.0, reward_noise=0.01):
         super(TargetLocation, self).__init__(state_space_dim=2)
         self.target = np.atleast_2d(target)
+        self.radius = radius
         self.reward_noise = reward_noise
         
         if self.target.shape[0] < self.target.shape[1]:
@@ -120,17 +115,25 @@ class TargetLocation(Plant):
     def reward(self, epoch):
         """Return the distance between the current robot location and
         the target point.
+        
+        .. todo::
+            Average location over multiple samples of the epoch.
         """
-        if (epoch['accelerometer_z'][-100:] < 1.0).sum() > 80: # FIXME: Normalization
-            return 0.0
+        #if (epoch['accelerometer_z'][-100:] < 1.0).sum() > 80: # FIXME: Normalization
+        #    return 0.0
         
         x = epoch['puppyGPS_x'][-1]
         y = epoch['puppyGPS_y'][-1]
         point = np.atleast_2d([x,y]).T
         
+        
         #(target - point)
         diff = self.target - point
-        reward = -np.linalg.norm(diff)
+        dist = np.linalg.norm(diff)
+        
+        reward = -dist
+        if dist < self.radius:
+            reward = 0.0
         reward += np.random.normal(scale=self.reward_noise, size=reward.shape)
         return reward
 
