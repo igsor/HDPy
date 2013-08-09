@@ -409,16 +409,23 @@ class Analysis:
         axis.set_ylabel('Accumulated reward')
         return axis
     
-    def plot_return_prediction(self, axis):
+    def plot_return_prediction(self, axis, plot=('j_curr', 'j_next')):
         """Plot the predicted return of the current (red) and next
-        (blue) state/action pair in ``axis``."""
-        j_curr = self.stack_data('j_curr')
-        j_next = self.stack_data('j_next')
-        axis.plot(j_curr, 'r', label='j_curr')
-        axis.plot(j_next, 'b', label='j_next')
+        (blue) state/action pair in ``axis``. ``plot`` defines which
+        of the two predicted return are plotted."""
+        if 'j_curr' in plot:
+            j_curr = self.stack_data('j_curr')
+            axis.plot(j_curr, 'r', label='j_curr')
+        
+        if 'j_next' in plot:
+            j_next = self.stack_data('j_next')
+            axis.plot(j_next, 'b', label='j_next')
+        
         axis.set_xlabel('step')
         axis.set_ylabel('predicted return')
-        axis.legend(loc=0)
+        if type(plot) != type('') and len(plot) > 1:
+            axis.legend(loc=0)
+        
         if self.always_plot_grid:
             self.plot_grid(axis)
         return axis
@@ -551,6 +558,14 @@ class Analysis:
         axis.set_xlabel('step')
         axis.set_ylabel('Input')
         axis.legend(loc=0)
+        return axis
+    
+    def plot_input(self, axis):
+        """Plot the reservoir input in ``axis``."""
+        data = self.stack_data('i_curr')
+        axis.plot(data, label='Input')
+        axis.set_xlabel('step')
+        axis.set_ylabel('Input')
         return axis
     
     def plot_input_over_episode(self, axis, episode):

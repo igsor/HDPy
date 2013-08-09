@@ -6,7 +6,7 @@ import pylab
 from math import cos, sin, pi
 
 
-def plot_all_trajectories(analysis, axis, key='loc'):
+def epuck_plot_all_trajectories(analysis, axis, key='loc'):
     """Plot trajectories of all episodes in ``analysis`` in the same
     plot ``axis``. The later an episode, the darker its trajectory is
     displayed. The trajectory data must be stored as ``key`` (default
@@ -31,7 +31,7 @@ def _plot_line(axis, origin, angle, size_hi, size_lo=0.0, **kwargs):
     trg = (origin[0] + cos(angle) * size_hi, origin[1] + sin(angle) * size_hi)
     axis.plot((src[0], trg[0]), (src[1], trg[1]), **kwargs)
 
-def plot_epuck_snapshot(axis, robot, critic, trajectory, sample_actions, init_steps=1, traj_chosen=None):
+def epuck_plot_snapshot(axis, robot, critic, trajectory, sample_actions, init_steps=1, traj_chosen=None):
     """Plot a snapshot of an *ePuck* experiment. The plot shows an
     example trajectory of the ``robot``, together with the expected
     return - i.e. evaluation of the ``critic`` at each state for some

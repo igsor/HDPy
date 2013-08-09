@@ -7,11 +7,6 @@ import PuPy
 import numpy as np
 import cPickle as pickle
 
-class PhonyNormalization(PuPy.Normalization):
-    """Empty normalization."""
-    def __init__(self):
-        super(PhonyNormalization, self).__init__(None)
-
 class Plant(object):
     """A template for Actor-Critic *plants*. The *Plant* describes the
     interaction of the Actor-Critic with the environment. Given a robot
@@ -62,7 +57,7 @@ class Plant(object):
     def set_normalization(self, norm):
         """Set the normalization instance to ``norm``."""
         if norm is None:
-            norm = PhonyNormalization()
+            norm = PuPy.Normalization()
         self.normalization = norm
 
 class Policy(object):
@@ -123,9 +118,8 @@ class Policy(object):
     def set_normalization(self, norm):
         """Set the normalization instance to ``norm``."""
         if norm is None:
-            norm = PhonyNormalization()
+            norm = PuPy.Normalization()
         self.normalization = norm
-
 
 class _ConstParam:
     """Stub for wrapping constant values into an executable function."""
@@ -186,12 +180,17 @@ class ActorCritic(PuPy.PuppyActor):
         
     ``norm``
         A :py:class:`PuPy.Normalization` for normalization purposes.
+        Note that the parameters for *a_curr* and *a_next* should be
+        exchangable, since it's really the same kind of 'sensor'.
     
     """
     def __init__(self, plant, policy, gamma=1.0, alpha=1.0, init_steps=1, norm=None):
         super(ActorCritic, self).__init__()
         self.plant = plant
         self.policy = policy
+        if norm is None:
+            norm = PuPy.Normalization()
+        
         self.normalizer = norm
         self.plant.set_normalization(self.normalizer)
         self.policy.set_normalization(self.normalizer)
@@ -366,6 +365,29 @@ class ADHDP(ActorCritic):
         self.reservoir.reset()
         super(ADHDP, self).new_episode()
     
+    def _critic_eval(self, state, action, simulate, action_name='a_curr'):
+        """Evaluate the critic at ``state`` and ``action``."""
+        in_state = self.plant.state_input(state)
+        action_nrm = self.normalizer.normalize_value(action_name, action)
+        r_input = np.vstack((in_state, action_nrm)).T
+        r_state = self.reservoir(r_input, simulate=simulate)
+        #o_input = np.hstack((r_state, r_input)) # FIXME: Input/Output ESN Model
+        #j_curr = self.readout(o_input) # FIXME: Input/Output ESN Model
+        j_curr = self.readout(r_state)
+        return r_input, r_state, j_curr
+    
+    def _critic_deriv(self, r_state):
+        """Return the critic's derivative at ``r_state``."""
+        e = (np.ones(r_state.shape) - r_state**2).T # Nx1
+        k = e * self.reservoir.w_in[:, -self._motor_action_dim:].toarray() # Nx1 .* NxA => NxA
+        deriv = self.readout.beta[1:].T.dot(k) #  LxA
+        #deriv = self.readout.beta[1:-i_curr.shape[1]].T.dot(k) #  LxA  # FIXME: Input/Output ESN Model
+        #deriv += self.readout.beta[-self._motor_action_dim:].T # FIXME: Input/Output ESN Model
+        deriv = deriv.T # AxL
+        scale = self.normalizer.get('a_curr')[1]
+        deriv *= scale
+        return deriv
+    
     def _step(self, s_curr, s_next, a_curr, reward):
         """Execute one step of the actor and return the next action.
         
@@ -382,34 +404,17 @@ class ADHDP(ActorCritic):
         
         """
         # ESN-critic, first instance: in(k) => J(k)
-        in_state = self.plant.state_input(s_curr)
-        a_curr_nrm = self.normalizer.normalize_value('a_curr', a_curr)
-        i_curr = np.vstack((in_state, a_curr_nrm)).T
-        x_curr = self.reservoir(i_curr, simulate=False)
-        #o_curr = np.hstack((x_curr, i_curr)) # FIXME: Input/Output ESN Model
-        #j_curr = self.readout(o_curr) # FIXME: Input/Output ESN Model
-        j_curr = self.readout(x_curr)
+        i_curr, x_curr, j_curr = self._critic_eval(s_curr, a_curr, simulate=False, action_name='a_curr')
         
         # Next action
-        e = (np.ones(x_curr.shape) - x_curr**2).T # Nx1
-        k = e * self.reservoir.w_in[:, -self._motor_action_dim:].toarray() # Nx1 .* NxA => NxA
-        deriv = self.readout.beta[1:].T.dot(k) #  LxA
-        #deriv = self.readout.beta[1:-i_curr.shape[1]].T.dot(k) #  LxA  # FIXME: Input/Output ESN Model
-        #deriv += self.readout.beta[-self._motor_action_dim:].T # FIXME: Input/Output ESN Model
-        deriv = deriv.T # AxL
+        deriv = self._critic_deriv(x_curr)
         
         # gradient training of action (acc. to eq. 10)
         a_next = a_curr + self.alpha(self.num_step) * deriv # FIXME: Denormalization of deriv (scale*deriv)
         a_next = self._next_action_hook(a_next)
         
         # ESN-critic, second instance: in(k+1) => J(k+1)
-        in_state = self.plant.state_input(s_next)
-        a_next_nrm = self.normalizer.normalize_value('a_next', a_next)
-        i_next = np.vstack((in_state, a_next_nrm)).T
-        x_next = self.reservoir(i_next, simulate=True)
-        #o_next = np.hstack((x_next, i_next)) # FIXME: Input/Output ESN Model
-        #j_next = self.readout(o_next) # FIXME: Input/Output ESN Model
-        j_next = self.readout(x_next)
+        i_next, x_next, j_next = self._critic_eval(s_next, a_next, simulate=True, action_name='a_next')
         
         # TD_error(k) = J(k) - U(k) - gamma * J(k+1)
         err = reward + self.gamma(self.num_episode, self.num_step) * j_next - j_curr

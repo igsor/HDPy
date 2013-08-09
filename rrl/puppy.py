@@ -73,18 +73,20 @@ class PuppyHDP(CollectingADHDP):
             Due to this, the critic is already updated in the initial
             trajectory.
         """
-        if self.num_step > 1:
-            in_state = self.plant.state_input(epoch)
-            a_curr = self.normalizer.normalize_value('a_curr', self.a_curr)
-            i_curr = np.vstack((in_state, a_curr)).T
+        if self.num_step > 2:
+            in_state = self.plant.state_input(self.s_curr)
+            a_curr_nrm = self.normalizer.normalize_value('a_curr', self.a_curr)
+            i_curr = np.vstack((in_state, a_curr_nrm)).T
             x_curr = self.reservoir(i_curr, simulate=False)
             self._pre_increment_hook(
                 epoch,
                 x_curr=x_curr,
                 i_curr=i_curr,
-                a_next=a_curr.T,
-                a_curr=a_curr.T,
+                a_next=self.a_curr.T,
+                a_curr=self.a_curr.T,
             )
-            self.s_curr = epoch
         
+        self.s_curr = epoch
         return self.policy.get_iterator(time_start_ms, time_end_ms, step_size_ms)
+
+
