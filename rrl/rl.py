@@ -369,7 +369,7 @@ class ADHDP(ActorCritic):
         """Evaluate the critic at ``state`` and ``action``."""
         in_state = self.plant.state_input(state)
         action_nrm = self.normalizer.normalize_value(action_name, action)
-        in_state += np.random.normal(scale=0.05, size=in_state.shape)
+        #in_state += np.random.normal(scale=0.05, size=in_state.shape)
         r_input = np.vstack((in_state, action_nrm)).T
         r_state = self.reservoir(r_input, simulate=simulate)
         #o_input = np.hstack((r_state, r_input)) # FIXME: Input/Output ESN Model
