@@ -398,6 +398,16 @@ class Analysis:
             self.plot_grid(axis)
         return axis
     
+    def plot_absolute_error(self, axis):
+        """Plot the absolute error over time in ``axis``."""
+        data = abs(self.stack_data('err'))
+        axis.plot(data, 'k', label='error')
+        axis.set_xlabel('step')
+        axis.set_ylabel('TD-error')
+        if self.always_plot_grid:
+            self.plot_grid(axis)
+        return axis
+    
     def plot_error(self, axis):
         """Plot the error over time in ``axis``."""
         data = self.stack_data('err')
