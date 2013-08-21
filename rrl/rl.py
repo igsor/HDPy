@@ -386,7 +386,7 @@ class ADHDP(ActorCritic):
         #deriv += self.readout.beta[-self._motor_action_dim:].T # FIXME: Input/Output ESN Model
         deriv = deriv.T # AxL
         scale = self.normalizer.get('a_curr')[1]
-        deriv /= scale # Derivative denormalization
+        deriv *= scale # Derivative denormalization
         return deriv
     
     def _step(self, s_curr, s_next, a_curr, reward):

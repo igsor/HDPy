@@ -704,6 +704,7 @@ def critic(plant, reservoir, readout):
         ``simulate`` = :py:keyword:`True`, the output is computed but
         the reservoir not updated."""
         in_state = plant.state_input(state)
+        # TODO: normalize action
         i_curr = np.vstack((in_state, action)).T
         x_curr = reservoir(i_curr, simulate=simulate)
         #o_curr = np.hstack((x_curr, i_curr)) # FIXME: Input/Output ESN Model

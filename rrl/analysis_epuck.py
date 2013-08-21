@@ -15,9 +15,15 @@ def epuck_plot_all_trajectories(analysis, axis, key='loc'):
     """
     data = analysis.get_data(key)
     N = len(data)-1.0
-    for idx, episode in enumerate(data):
-        col = 0.75 - (0.75 * (idx - 1))/N
-        axis.plot(episode[:, 0], episode[:, 1], color=str(col), label=str(idx))
+    if N == 0.0:
+        for idx, episode in enumerate(data):
+            col = 0.0
+            axis.plot(episode[:, 0], episode[:, 1], color=str(col), label=str(idx))
+    else:
+        for idx, episode in enumerate(data):
+            #col = 0.75 - (0.75 * (idx - 1))/N
+            col = 0.75 * (1.0 - float(idx) / N)
+            axis.plot(episode[:, 0], episode[:, 1], color=str(col), label=str(idx))
     
     return axis
 
@@ -94,9 +100,10 @@ def epuck_plot_snapshot(axis, robot, critic, trajectory, sample_actions, init_st
     robot_color = (0.0, 0.0, 0.0, 0.0) # white
     ray_len = robot_radius + 0.05
     
-    robot.reset()
+    #robot.reset()
     for i in range(init_steps): # initialize
-        robot.take_action(0.0)
+        #robot.take_action(0.0)
+        robot.take_action(robot.pose)
         # FIXME: init critic?
     
     rays = []
@@ -109,33 +116,39 @@ def epuck_plot_snapshot(axis, robot, critic, trajectory, sample_actions, init_st
         # plot the robot
         loc_robot = s_curr['loc'][0]
         pose = s_curr['pose'][0, 0]
-        rob = pylab.Circle(loc_robot, robot_radius, fill=True, facecolor=robot_color)
-        axis.add_artist(rob)
-        # plot the robot orientation
-        _plot_line(axis, loc_robot, pose, robot_radius, color='k')
+        if num_step % 2 == 0:
+            rob = pylab.Circle(loc_robot, robot_radius, fill=True, facecolor=robot_color)
+            axis.add_artist(rob)
+            # plot the robot orientation
+            _plot_line(axis, loc_robot, pose, robot_radius, color='k')
         
-        if action_chosen is not None:
-            _plot_line(axis, loc_robot, pose+action_chosen, robot_radius+0.1, robot_radius, color='k', linewidth='2')
+        #if action_chosen is not None:
+        #    _plot_line(axis, loc_robot, pose+action_chosen, robot_radius+0.1, robot_radius, color='k', linewidth='2')
         
-        # evaluate the critic on the actions
-        p_returns = []
-        for action_eval in sample_actions:
-            predicted_return = critic(s_curr, action_eval, simulate=True)
-            predicted_return = predicted_return[0, 0]
-            p_returns.append((action_eval, predicted_return))
+        if num_step % 2 == 0:
+            # evaluate the critic on the actions
+            p_returns = []
+            #print ""
+            for action_eval in sample_actions:
+                predicted_return = critic(s_curr, action_eval, simulate=True)
+                predicted_return = predicted_return[0, 0]
+                p_returns.append((action_eval, predicted_return))
+                #print action_eval, predicted_return
+                
+            # normalize returns
+            r_offset = min([return_ for (action, return_) in p_returns])
+            r_scale = max([return_ for (action, return_) in p_returns]) - r_offset
             
-        # normalize returns
-        r_offset = min([return_ for (action, return_) in p_returns])
-        r_scale = max([return_ for (action, return_) in p_returns]) - r_offset
-        
-        for action_eval, predicted_return in p_returns:
-            length = ray_len + 0.1 * (predicted_return - r_offset) / r_scale
-            #length = ray_len + abs(predicted_return)
-            rays.append((loc_robot, (pose+action_eval) % (2*pi), length, predicted_return))
+            for action_eval, predicted_return in p_returns:
+                length = ray_len + 0.1 * (predicted_return - r_offset) / r_scale
+                #length = ray_len + abs(predicted_return)
+                #rays.append((loc_robot, (pose+action_eval) % (2*pi), length, predicted_return))
+                rays.append((loc_robot, (action_eval) % (2*pi), length, predicted_return))
 
         if num_step in inspected_steps:
             fig_inspected = pylab.figure()
-            epuck_plot_value_over_action(critic, s_curr, fig_inspected.add_subplot(111), a_range=np.arange(-pi/2.0, pi/2.0, 0.01))
+            #epuck_plot_value_over_action(critic, s_curr, fig_inspected.add_subplot(111), a_range=np.arange(-pi/2.0, pi/2.0, 0.01))
+            epuck_plot_value_over_action(critic, s_curr, fig_inspected.add_subplot(111), a_range=np.arange(-2.0*pi, 2.0*pi, 0.01))
             fig_inspected.suptitle('Expected return in after %i steps (%s)' % (num_step, str(loc_robot)))
         
         # advance critic
@@ -155,7 +168,7 @@ def epuck_plot_snapshot(axis, robot, critic, trajectory, sample_actions, init_st
         col = pylab.cm.hot(nrm_return)
         
         # plot ray
-        _plot_line(axis, loc, ori, size_hi=length, size_lo=robot_radius, color=col, linewidth=4)
+        _plot_line(axis, loc, ori, size_hi=length+0.03, size_lo=robot_radius+0.03, color=col, linewidth=4)
     
     return axis
 
