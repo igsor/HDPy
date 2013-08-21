@@ -445,6 +445,37 @@ class ADHDP(ActorCritic):
         
         # increment
         return a_next
+    
+    def init_episode(self, epoch, time_start_ms, time_end_ms, step_size_ms):
+        """Initial behaviour (after reset)
+        
+        .. note::
+            Assuming identical initial trajectories, the initial state
+            is the same - and thus doesn't matter.
+            Non-identical initial trajectories will result in
+            non-identical behaviour, therefore the initial state should
+            be different (initial state w.r.t. start of learning).
+            Due to this, the critic is already updated in the initial
+            trajectory.
+        """
+        if self.num_step > 1:
+            in_state = self.plant.state_input(self.s_curr)
+            a_curr_nrm = self.normalizer.normalize_value('a_curr', self.a_curr)
+            i_curr = np.vstack((in_state, a_curr_nrm)).T
+            x_curr = self.reservoir(i_curr, simulate=False)
+            self._pre_increment_hook(
+                epoch,
+                x_curr=x_curr,
+                i_curr=i_curr,
+                a_next=self.a_curr.T,
+                a_curr=self.a_curr.T,
+            )
+        
+        self.s_curr = epoch
+        return self.policy.get_iterator(time_start_ms, time_end_ms, step_size_ms)
+
+
+
 
 class CollectingADHDP(ADHDP):
     """Actor-Critic design with data collector.
