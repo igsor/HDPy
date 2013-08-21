@@ -298,36 +298,54 @@ class Analysis:
             
             axis.plot(func(data[:, i]), label=lbl)
         
-        axis.legend(loc=0)
+        #axis.legend(loc=0)
         axis.set_xlabel('step')
         axis.set_ylabel('readout weight')
         if self.always_plot_grid:
             self.plot_grid(axis)
         return axis
     
-    def plot_readout_sum(self, axis):
+    def plot_readout_sum(self, axis, **kwargs):
         """Plot the absolute readout weight over time in ``axis``."""
         data = self.stack_data('readout')
-        axis.plot(abs(data).sum(axis=1), 'k', label='Absolute Readout Weights')
+        color = kwargs.pop('color', 'k')
+        axis.plot(abs(data).sum(axis=1), color=color, **kwargs)
         axis.set_xlabel('step')
-        axis.set_ylabel('Absolute Readout Weights')
+        axis.set_ylabel('Sum of absolute readout weights')
         if self.always_plot_grid:
             self.plot_grid(axis)
         return axis
     
-    def plot_readout_diff(self, axis):
+    def plot_readout_diff(self, axis, **kwargs):
         """Plot the difference of absolute readout weights in
         ``axis``."""
         data = self.stack_data('readout')
         diff = data[1:] - data[:-1]
         diff = diff.sum(axis=1)**2
-        axis.plot(diff, 'k', label='Readout difference')
+        color = kwargs.pop('color','k')
+        axis.plot(diff, color=color, label='Readout difference', **kwargs)
         axis.set_xlabel('step')
         axis.set_ylabel('Readout difference')
         if self.always_plot_grid:
             self.plot_grid(axis)
         return axis
+    
+    def plot_cumulative_readout_diff(self, axis, **kwargs):
+        """Plot the cumulative difference of absolute readout weights in
+        ``axis``."""
+        data = self.stack_data('readout')
+        diff = data[1:] - data[:-1]
+        diff = diff.sum(axis=1)**2
+        roc = diff.cumsum() / diff.sum()
         
+        color = kwargs.pop('color', 'k')
+        axis.plot(roc, color=color, **kwargs)
+        axis.set_ylabel('Cumulative readout weight distance')
+        axis.set_xlabel('step')
+        if self.always_plot_grid:
+            self.plot_grid(axis)
+        return axis
+    
     def plot_node_weight_over_episode(self, axis, episode):
         """Plot the readout weights of a single ``episode`` in ``axis``."""
         assert episode in self.experiments
@@ -345,10 +363,11 @@ class Analysis:
         axis.legend(loc=0)
         return axis
     
-    def plot_reward(self, axis):
+    def plot_reward(self, axis, **kwargs):
         """Plot the reward over time in ``axis``."""
         data = self.stack_data('reward')
-        axis.plot(data, 'k', label='Reward')
+        color = kwargs.pop('color', 'k')
+        axis.plot(data, color=color, **kwargs)
         axis.set_xlabel('step')
         axis.set_ylabel('Reward')
         if self.always_plot_grid:
@@ -384,16 +403,17 @@ class Analysis:
         data = self.stack_data('err')
         axis.plot(data, 'k', label='error')
         axis.set_xlabel('step')
-        axis.set_ylabel('TD-Error')
+        axis.set_ylabel('TD-error')
         if self.always_plot_grid:
             self.plot_grid(axis)
         return axis
     
-    def plot_accumulated_reward(self, axis):
+    def plot_accumulated_reward(self, axis, **kwargs):
         """Plot the accumulated reward per episode in ``axis``."""
         reward = self.get_data('reward')
         data = [r.sum() for r in reward]
-        axis.plot(data, 'k', label='Accumulated reward')
+        color = kwargs.pop('color', 'k')
+        axis.plot(data, color=color, **kwargs)
         #axis.set_xticks(self.experiments)
         axis.set_xlabel('episode')
         axis.set_ylabel('Accumulated reward')

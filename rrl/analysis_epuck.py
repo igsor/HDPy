@@ -92,14 +92,14 @@ def epuck_plot_snapshot(axis, robot, critic, trajectory, sample_actions, init_st
     
     robot_radius = 0.1
     robot_color = (0.0, 0.0, 0.0, 0.0) # white
-    ray_len = robot_radius + 0.01
-    alpha = 1.0
+    ray_len = robot_radius + 0.05
     
     robot.reset()
     for i in range(init_steps): # initialize
         robot.take_action(0.0)
         # FIXME: init critic?
     
+    rays = []
     for num_step, (action_ex, action_chosen) in enumerate(zip(trajectory, traj_chosen)):
         
         # execute action, get the robot into the next state
@@ -118,21 +118,21 @@ def epuck_plot_snapshot(axis, robot, critic, trajectory, sample_actions, init_st
             _plot_line(axis, loc_robot, pose+action_chosen, robot_radius+0.1, robot_radius, color='k', linewidth='2')
         
         # evaluate the critic on the actions
+        p_returns = []
         for action_eval in sample_actions:
             predicted_return = critic(s_curr, action_eval, simulate=True)
             predicted_return = predicted_return[0, 0]
+            p_returns.append((action_eval, predicted_return))
             
-            #FIXME: Ray length and color
-            col = predicted_return >= 0 and 'b' or 'r'
-            #col = (red, 0.0, 1.0 - red, 1.0)
-            #red = abs(max(-10, predicted_return)) / 20.0 + 0.5
-            #return = -1 => red = 0.5
-            #length = ray_len + log(1.0+abs(predicted_return))/20.0
-            length = ray_len + abs(predicted_return)
-            # plot ray
-            _plot_line(axis, loc_robot, (pose+alpha*action_eval) % (2*pi), size_hi=length, size_lo=robot_radius, color=col)
-            #print predicted_return
+        # normalize returns
+        r_offset = min([return_ for (action, return_) in p_returns])
+        r_scale = max([return_ for (action, return_) in p_returns]) - r_offset
         
+        for action_eval, predicted_return in p_returns:
+            #length = ray_len + 0.2 * (predicted_return - r_offset) / r_scale
+            length = ray_len + abs(predicted_return)
+            rays.append((loc_robot, (pose+action_eval) % (2*pi), length, predicted_return))
+
         if num_step in inspected_steps:
             fig_inspected = pylab.figure()
             epuck_plot_value_over_action(critic, s_curr, fig_inspected.add_subplot(111), a_range=np.arange(-pi/2.0, pi/2.0, 0.01))
@@ -143,7 +143,34 @@ def epuck_plot_snapshot(axis, robot, critic, trajectory, sample_actions, init_st
         
         if collided:
             break
-
+    
+    # normalize returns
+    r_offset = min([predicted_return for (loc, ori, length, predicted_return) in rays])
+    r_scale = max([predicted_return for (loc, ori, length, predicted_return) in rays]) - r_offset
+    
+    # plot rays
+    for (loc, ori, length, predicted_return) in rays:
+        nrm_return = (predicted_return - r_offset) / r_scale
+        
+        red, green, blue = (0.0, 0.0, 0.0)
+        if nrm_return <= 0.5:
+            red = nrm_return * 2.0
+        if nrm_return >= 0.5:
+            green = 1.0 - 2.0 * (1.0 - nrm_return)
+        if 0.25 <= nrm_return and nrm_return <= 0.75:
+            blue = 1.0 - 2.0 * (0.75 - nrm_return)
+        
+        #red = 1.0 - nrm_return
+        #blue = nrm_return
+        #col = (red, 0.0, blue, 1.0)
+        #col = (red, green, blue, 1.0)
+        col = predicted_return > 0 and 'b' or 'r'
+        
+        # plot ray
+        _plot_line(axis, loc, ori, size_hi=length, size_lo=robot_radius, color=col)
+        
+    
+    
     return axis
 
 
