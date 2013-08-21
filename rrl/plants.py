@@ -137,4 +137,67 @@ class TargetLocation(Plant):
         reward += np.random.normal(scale=self.reward_noise, size=reward.shape)
         return reward
 
+class LandmarksTarLoc(Plant):
+    """A :py:class:`Plant` which gives negative reward proportional to
+    the distance to point ``target`` in the xy plane. If the robot is
+    closer than ``radius`` to the target, the reward will be 0.0.
+    The state is composed of the distance to predefined landmarks.
+    """
+    def __init__(self, target, landmarks, radius=0.0, reward_noise=0.01):
+        super(LandmarksTarLoc, self).__init__(state_space_dim=len(landmarks))
+        self.target = np.atleast_2d(target)
+        self.radius = radius
+        self.reward_noise = reward_noise
+        
+        self.landmarks = []
+        
+        for mark in landmarks:
+            mark = np.atleast_2d(mark)
+            if mark.shape[0] < mark.shape[1]:
+                mark = mark.T
+            self.landmarks.append(mark)
+        
+        if self.target.shape[0] < self.target.shape[1]:
+            self.target = self.target.T
+            
+        assert self.target.shape == (2,1)
+    
+    def state_input(self, state):
+        """Return the distance to the landmarks.
+        """
+        sio =  np.atleast_2d([
+            state['puppyGPS_x'][-10:].mean(),
+            state['puppyGPS_y'][-10:].mean()
+        ]).T
+        
+        dist = [np.linalg.norm(sio - mark) for mark in self.landmarks]
+        dist = np.atleast_2d(dist).T
+        dist = self.normalization.normalize_value('landmark_dist', dist)
+        return dist
+    
+    def reward(self, epoch):
+        """Return the distance between the current robot location and
+        the target point.
+        
+        .. todo::
+            Average location over multiple samples of the epoch.
+        """
+        #if (epoch['accelerometer_z'][-100:] < 1.0).sum() > 80: # FIXME: Normalization
+        #    return 0.0
+        
+        x = epoch['puppyGPS_x'][-1]
+        y = epoch['puppyGPS_y'][-1]
+        point = np.atleast_2d([x,y]).T
+        
+        
+        #(target - point)
+        diff = self.target - point
+        dist = np.linalg.norm(diff)
+        
+        reward = -dist
+        if dist < self.radius:
+            reward = 0.0
+        reward += np.random.normal(scale=self.reward_noise, size=reward.shape)
+        return reward
+
 

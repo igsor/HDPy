@@ -129,8 +129,8 @@ def epuck_plot_snapshot(axis, robot, critic, trajectory, sample_actions, init_st
         r_scale = max([return_ for (action, return_) in p_returns]) - r_offset
         
         for action_eval, predicted_return in p_returns:
-            #length = ray_len + 0.2 * (predicted_return - r_offset) / r_scale
-            length = ray_len + abs(predicted_return)
+            length = ray_len + 0.1 * (predicted_return - r_offset) / r_scale
+            #length = ray_len + abs(predicted_return)
             rays.append((loc_robot, (pose+action_eval) % (2*pi), length, predicted_return))
 
         if num_step in inspected_steps:
@@ -160,14 +160,16 @@ def epuck_plot_snapshot(axis, robot, critic, trajectory, sample_actions, init_st
         if 0.25 <= nrm_return and nrm_return <= 0.75:
             blue = 1.0 - 2.0 * (0.75 - nrm_return)
         
-        #red = 1.0 - nrm_return
-        #blue = nrm_return
-        #col = (red, 0.0, blue, 1.0)
+        red = 1.0 - nrm_return
+        #green = nrm_return
+        blue = nrm_return
+        #col = (red, green, 0.0, 1.0)
+        col = (red, 0.0, blue, 1.0)
         #col = (red, green, blue, 1.0)
-        col = predicted_return > 0 and 'b' or 'r'
+        #col = predicted_return > 0 and 'b' or 'r'
         
         # plot ray
-        _plot_line(axis, loc, ori, size_hi=length, size_lo=robot_radius, color=col)
+        _plot_line(axis, loc, ori, size_hi=length, size_lo=robot_radius, color=col, linewidth=4)
         
     
     

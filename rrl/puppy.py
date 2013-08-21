@@ -54,10 +54,23 @@ class PuppyHDP(CollectingADHDP):
             if self.supervisor_tumbled_notice > 1:
                 if self._tumbled_reward is not None:
                     reward = self._tumbled_reward
+                
+                reward /= (1.0 - self.gamma(self.num_episode, self.num_step))
+                # geometric series to incorporate future rewards
+                # note that with this, its err = r/(1-gamma) - J * (1-gamma)
+                # but should be err = r/(1-gamma) - J
+                # thus, there's an difference of J*gamma
+                # could, for example solve this by temporarily set gamma = 0.0
                 self.has_tumbled = True
+                old_gamma = self.gamma
+                self.set_gamma(0.0)
             self.supervisor_tumbled_notice += 1
         
         a_next = super(PuppyHDP, self)._step(s_curr, s_next, a_curr, reward)
+        
+        if self.supervisor_tumbled_notice > 2:
+            self.gamma = old_gamma
+        
         print reward, a_curr.T, a_next.T
         return a_next
     
