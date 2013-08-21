@@ -151,27 +151,11 @@ def epuck_plot_snapshot(axis, robot, critic, trajectory, sample_actions, init_st
     # plot rays
     for (loc, ori, length, predicted_return) in rays:
         nrm_return = (predicted_return - r_offset) / r_scale
-        
-        red, green, blue = (0.0, 0.0, 0.0)
-        if nrm_return <= 0.5:
-            red = nrm_return * 2.0
-        if nrm_return >= 0.5:
-            green = 1.0 - 2.0 * (1.0 - nrm_return)
-        if 0.25 <= nrm_return and nrm_return <= 0.75:
-            blue = 1.0 - 2.0 * (0.75 - nrm_return)
-        
-        red = 1.0 - nrm_return
-        #green = nrm_return
-        blue = nrm_return
-        #col = (red, green, 0.0, 1.0)
-        col = (red, 0.0, blue, 1.0)
-        #col = (red, green, blue, 1.0)
-        #col = predicted_return > 0 and 'b' or 'r'
+        nrm_return *= 0.7
+        col = pylab.cm.hot(nrm_return)
         
         # plot ray
         _plot_line(axis, loc, ori, size_hi=length, size_lo=robot_radius, color=col, linewidth=4)
-        
-    
     
     return axis
 
