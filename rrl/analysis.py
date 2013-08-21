@@ -189,13 +189,13 @@ def gen_query(history):
 class Analysis:
     """Collection of functions to analyze a HDF5 data file at ``pth``.
     """
-    def __init__(self, pth, grid=False):
+    def __init__(self, pth, grid=False, min_key_length=0):
         self.pth = pth
         self.f = h5py.File(pth,'r')
         exp = map(int, self.f.keys())
         exp = sorted(exp)
         exp = map(str, exp)
-        exp = filter(lambda k: len(self.f[k]) > 0, exp) # normalization fails, if not >0
+        exp = filter(lambda k: len(self.f[k]) > min_key_length, exp) # normalization fails, if not >0
         self.experiments = exp
         self.always_plot_grid = grid
     
@@ -513,7 +513,7 @@ class Analysis:
             olr_wb.train(src, dst)
             olr_nb.train(src, dst)
         
-        axis.plot(lin_reg(x_curr), 'b', label='Offline MSE')
+        #axis.plot(lin_reg(x_curr), 'b', label='Offline MSE')
         axis.plot(olr_nb(x_curr), 'c--', label='Online MSE (no bias)')
         axis.plot(olr_wb(x_curr), 'c:', label='Online MSE (bias)')
         axis.plot(j_curr, 'r', label='Predicted Value')
