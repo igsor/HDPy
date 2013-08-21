@@ -372,7 +372,7 @@ class Analysis:
         a_next = self.stack_data('a_next')
         axis.plot(a_curr, 'b', label='a_curr')
         axis.plot(a_next, 'r', label='a_next')
-        axis.legend(loc=0)
+        #axis.legend(loc=0)
         axis.set_xlabel('step')
         axis.set_ylabel('Action')
         if self.always_plot_grid:
@@ -692,14 +692,3 @@ def critic(plant, reservoir, readout):
         return j_curr
     
     return critic_fu
-
-def plot_value_over_action(critic, state, axis, a_range=np.arange(0.0, 2*pi, 0.01)):
-    """Given a trained ``critic``, plot the expected return as function
-    of the action, given a ``state`` into ``axis``. Assuming 1-d action
-    (otherwise, it becomes messy to plot).
-    """
-    exp_return = np.vstack([critic(state, action, simulate=True) for action in a_range])
-    axis.plot(a_range, exp_return, label='J(a|s)')
-    axis.set_xlabel('action')
-    axis.set_ylabel('Expected return')
-    return axis

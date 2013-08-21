@@ -4,7 +4,7 @@ Analysis tools, specific for the *epuck* experiment.
 
 import pylab
 from math import cos, sin, pi
-
+import numpy as np
 
 def epuck_plot_all_trajectories(analysis, axis, key='loc'):
     """Plot trajectories of all episodes in ``analysis`` in the same
@@ -31,7 +31,19 @@ def _plot_line(axis, origin, angle, size_hi, size_lo=0.0, **kwargs):
     trg = (origin[0] + cos(angle) * size_hi, origin[1] + sin(angle) * size_hi)
     axis.plot((src[0], trg[0]), (src[1], trg[1]), **kwargs)
 
-def epuck_plot_snapshot(axis, robot, critic, trajectory, sample_actions, init_steps=1, traj_chosen=None):
+def epuck_plot_value_over_action(critic, state, axis, a_range=np.arange(0.0, 2*pi, 0.01)):
+    """Given a trained ``critic``, plot the expected return as function
+    of the action, given a ``state`` into ``axis``. Assuming 1-d action
+    (otherwise, it becomes messy to plot).
+    """
+    exp_return = np.vstack([critic(state, action%(2*pi), simulate=True) for action in a_range])
+    #axis.plot([action%(2*pi) for action in a_range], exp_return, label='J(a|s)')
+    axis.plot(a_range, exp_return, label='J(a|s)')
+    axis.set_xlabel('action')
+    axis.set_ylabel('Expected return')
+    return axis
+
+def epuck_plot_snapshot(axis, robot, critic, trajectory, sample_actions, init_steps=1, traj_chosen=None, inspected_steps=None):
     """Plot a snapshot of an *ePuck* experiment. The plot shows an
     example trajectory of the ``robot``, together with the expected
     return - i.e. evaluation of the ``critic`` at each state for some
@@ -65,11 +77,18 @@ def epuck_plot_snapshot(axis, robot, critic, trajectory, sample_actions, init_st
         :py:keyword:`None`, it will be ignored. If not, it must be a
         list at least as long as ``trajectory``. 
     
+    ``inspected_steps``
+        List of step numbers, for which the expected return is plotted
+        over the action, given the state at the respective step.
+    
     """
     if traj_chosen is not None:
         assert len(traj_chosen) >= len(trajectory)
     else:
         traj_chosen = [None] * len(trajectory)
+    
+    if inspected_steps is None:
+        inspected_steps = []
     
     robot_radius = 0.1
     robot_color = (0.0, 0.0, 0.0, 0.0) # white
@@ -81,7 +100,7 @@ def epuck_plot_snapshot(axis, robot, critic, trajectory, sample_actions, init_st
         robot.take_action(0.0)
         # FIXME: init critic?
     
-    for action_ex, action_chosen in zip(trajectory, traj_chosen):
+    for num_step, (action_ex, action_chosen) in enumerate(zip(trajectory, traj_chosen)):
         
         # execute action, get the robot into the next state
         collided = robot.take_action(action_ex)
@@ -114,6 +133,10 @@ def epuck_plot_snapshot(axis, robot, critic, trajectory, sample_actions, init_st
             _plot_line(axis, loc_robot, (pose+alpha*action_eval) % (2*pi), size_hi=length, size_lo=robot_radius, color=col)
             #print predicted_return
         
+        if num_step in inspected_steps:
+            fig_inspected = pylab.figure()
+            epuck_plot_value_over_action(critic, s_curr, fig_inspected.add_subplot(111), a_range=np.arange(-pi/2.0, pi/2.0, 0.01))
+            fig_inspected.suptitle('Expected return in after %i steps (%s)' % (num_step, str(loc_robot)))
         
         # advance critic
         critic(s_curr, action_ex, simulate=False)

@@ -410,7 +410,7 @@ class ADHDP(ActorCritic):
         deriv = self._critic_deriv(x_curr)
         
         # gradient training of action (acc. to eq. 10)
-        a_next = a_curr + self.alpha(self.num_step) * deriv # FIXME: Denormalization of deriv (scale*deriv)
+        a_next = a_curr + self.alpha(self.num_episode, self.num_step) * deriv # FIXME: Denormalization of deriv (scale*deriv)
         a_next = self._next_action_hook(a_next)
         
         # ESN-critic, second instance: in(k+1) => J(k+1)
