@@ -3,6 +3,7 @@ Analysis tools, specific for the *Puppy* experiment.
 """
 
 import pylab
+import h5py
 import numpy as np
 
 def puppy_plot_trajectory(analysis, axis, episode, step_width=1, **kwargs):
@@ -67,3 +68,74 @@ def puppy_plot_locationtarget(axis, target=(4.0, 4.0), distance=0.5, **kwargs):
 
     return axis
 
+sensor_names = ['trg0','trg1','trg2','trg3','accelerometer_x','accelerometer_y','accelerometer_z','compass_x','compass_y','compass_z','gyro_x','gyro_y','gyro_z','hip0','hip1','hip2','hip3','knee0','knee1','knee2','knee3','puppyGPS_x','puppyGPS_y','puppyGPS_z','touch0','touch0','touch1','touch2','touch3']
+
+def puppy_offline_playback(pth_data, critic, samples_per_action, ms_per_step):
+    """Simulate an experiment run for the critic by using offline data.
+    The data has to be collected in webots, using the respective
+    robot and supervisor. Note that the behaviour of the simulation
+    should match what's expected by the critic. The critic is fed the
+    sensor data, in order. Of course, it can't react to it since
+    the next action is predefined.
+    
+    Additional to the sensor fields, the 'tumbling' dataset is expected
+    which indicates, if and when the robot has tumbled. It is used such
+    that the respective signals can be sent to the critic.
+    
+    The critic won't store any sensory data again.
+    
+    ``pth_data``
+        Path to the datafile with the sensory information (HDF5).
+    
+    ``critic``
+        PuppyHDP instance.
+    
+    ``samples_per_action``
+        Number of samples per control step. Must correspond to the data.
+    
+    ``ms_per_step``
+        Sensor sampling period.
+    
+    """
+    # Open data file, get valid experiments
+    f = h5py.File(pth_data,'r')
+    storages = map(str, sorted(map(int, f.keys())))
+    storages = filter(lambda s: len(f[s]) > 0, storages)
+    
+    # Prepare critic, avoid storing epoch data twice
+    critic._pre_increment_hook_orig = critic._pre_increment_hook
+    def pre_increment_hook(epoch, **kwargs):
+        critic._pre_increment_hook_orig(dict(), **kwargs)
+    
+    critic._pre_increment_hook = pre_increment_hook
+    
+    # Main loop, feed data to the critic
+    for episode in storages:
+        
+        data_grp = f[episode]
+        N = data_grp['trg0'].shape[0]
+        assert N % samples_per_action == 0
+        
+        if 'tumbled' in data_grp:
+            tumbled_grace_start = data_grp['tumbled'][0]
+        else:
+            tumbled_grace_start = -1
+        
+        for num_iter in np.arange(0, N, samples_per_action):
+            
+            # get data
+            time_start_ms = num_iter * ms_per_step
+            time_end_ms = (num_iter + samples_per_action) * ms_per_step
+            time_step_ms = ms_per_step * samples_per_action
+            chunk = dict([(k, data_grp[k][num_iter:(num_iter+samples_per_action)]) for k in sensor_names])
+            
+            # send messages
+            if num_iter == tumbled_grace_start*samples_per_action:
+                critic.event_handler(None, dict(), tumbled_grace_start*samples_per_action, 'tumbled_grace_start')
+            
+            # update critic
+            critic(chunk, time_start_ms, time_end_ms, time_step_ms)
+        
+        critic.event_handler(None, dict(), ms_per_step * N, 'reset')
+        
+    critic._pre_increment_hook = critic._pre_increment_hook_orig

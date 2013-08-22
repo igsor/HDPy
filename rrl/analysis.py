@@ -173,6 +173,7 @@ Other ideas
 import numpy as np
 import h5py
 from math import pi
+import inout
 
 def gen_query(history):
     """To generate the old *query* function.
@@ -190,8 +191,12 @@ class Analysis:
     """Collection of functions to analyze a HDF5 data file at ``pth``.
     """
     def __init__(self, pth, grid=False, min_key_length=0):
-        self.pth = pth
-        self.f = h5py.File(pth,'r')
+        if isinstance(pth, inout.DataMerge):
+            self.pth = pth.pth0
+            self.f = pth
+        else:
+            self.pth = pth
+            self.f = h5py.File(pth,'r')
         exp = map(int, self.f.keys())
         exp = sorted(exp)
         exp = map(str, exp)
