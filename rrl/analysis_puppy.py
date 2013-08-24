@@ -102,51 +102,66 @@ def puppy_offline_playback(pth_data, critic, samples_per_action, ms_per_step):
     storages = map(str, sorted(map(int, f.keys())))
     storages = filter(lambda s: len(f[s]) > 0, storages)
     
-    # Prepare critic, avoid storing epoch data twice
+    # Prepare critic; redirect hooks to avoid storing epoch data twice
+    # and feed the actions
     next_action = None
     critic._pre_increment_hook_orig = critic._pre_increment_hook
     critic._next_action_hook_orig = critic._next_action_hook
+    
     def pre_increment_hook(epoch, **kwargs):
         critic._pre_increment_hook_orig(dict(), **kwargs)
     def next_action_hook(a_next):
+        #print "(next)", a_next.T, next_action.T
         return next_action
     
     critic._next_action_hook = next_action_hook
     critic._pre_increment_hook = pre_increment_hook
     
     # Main loop, feed data to the critic
-    for episode in storages:
+    time_step_ms = ms_per_step * samples_per_action
+    for episode_idx, episode in enumerate(storages):
         
         data_grp = f[episode]
         N = data_grp['trg0'].shape[0]
         assert N % samples_per_action == 0
         
+        # get tumbled infos
         if 'tumbled' in data_grp:
-            tumbled_grace_start = data_grp['tumbled'][0]
+            time_tumbled = data_grp['tumbled'][0] * samples_per_action
         else:
-            tumbled_grace_start = -1
+            time_tumbled = -1
         
-        # initial call
-        critic.a_curr = np.atleast_2d(data_grp['a_curr'][0]).T
-        next_action = np.atleast_2d(data_grp['a_next'][0]).T
+        # initial, empty call
+        if 'empty_initial_step' in data_grp:
+            print "Simulation was started/reverted"
+            time_start_ms = 0
+            critic(dict(), time_start_ms, time_start_ms + samples_per_action, ms_per_step)
+            time_tumbled -= samples_per_action
         
+        # loop through data, incrementally feed the critic
         for num_iter in np.arange(0, N, samples_per_action):
+            # next action
             next_action = np.atleast_2d(data_grp['a_next'][num_iter/samples_per_action]).T
             
             # get data
-            time_start_ms = num_iter * ms_per_step
-            time_end_ms = (num_iter + samples_per_action) * ms_per_step
-            time_step_ms = ms_per_step * samples_per_action
+            time_start_ms += time_step_ms
+            time_end_ms = time_start_ms + time_step_ms
             chunk = dict([(k, data_grp[k][num_iter:(num_iter+samples_per_action)]) for k in sensor_names])
             
-            # send messages
-            if num_iter == tumbled_grace_start*samples_per_action:
-                critic.event_handler(None, dict(), tumbled_grace_start*samples_per_action, 'tumbled_grace_start')
+            # send tumbled message
+            if num_iter == time_tumbled:
+                critic.event_handler(None, dict(), time_tumbled, 'tumbled_grace_start')
             
             # update critic
             critic(chunk, time_start_ms, time_end_ms, time_step_ms)
         
-        critic.event_handler(None, dict(), ms_per_step * N, 'reset')
+        # send reset after episode has finished
+        if episode_idx < len(storages) - 1:
+            critic.event_handler(None, dict(), ms_per_step * N, 'reset')
     
+    # cleanup
     critic._pre_increment_hook = critic._pre_increment_hook_orig
     critic._next_action_hook = critic._next_action_hook_orig
+    del critic._pre_increment_hook_orig
+    del critic._next_action_hook_orig
+
