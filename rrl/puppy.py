@@ -2,7 +2,7 @@
 HDP code for Puppy experiments
 
 """
-from rl import CollectingADHDP
+from rl import CollectingADHDP, Plant
 import numpy as np
 
 class PuppyHDP(CollectingADHDP):
@@ -71,7 +71,7 @@ class PuppyHDP(CollectingADHDP):
         if self.supervisor_tumbled_notice > 2:
             self.gamma = old_gamma
         
-        print reward, a_curr.T, a_next.T
+        print self.num_step, reward, a_curr.T, a_next.T, s_next['puppyGPS_x'][-1]
         return a_next
     
     def init_episode(self, epoch, time_start_ms, time_end_ms, step_size_ms):
@@ -102,4 +102,85 @@ class PuppyHDP(CollectingADHDP):
         self.s_curr = epoch
         return self.policy.get_iterator(time_start_ms, time_end_ms, step_size_ms)
 
+
+class OfflineCollector(CollectingADHDP):
+    def __init__(self, *args, **kwargs):
+        class Phony:
+            reset_states = False
+            def get_input_dim(self):
+                return kwargs['policy'].action_space_dim()
+            def reset(self):
+                pass
+        
+        kwargs['plant'] = Plant(state_space_dim=0)
+        kwargs['reservoir'] = Phony()
+        kwargs['readout'] = None
+        self.supervisor_tumbled_notice = 0
+        super(OfflineCollector, self).__init__(*args, **kwargs)
+    
+    def new_episode(self):
+        """After restarting, reset the tumbled values and start the
+        new episode.
+        """
+        super(OfflineCollector, self).new_episode()
+        self.supervisor_tumbled_notice = 0
+    
+    def __call__(self, epoch, time_start_ms, time_end_ms, step_size_ms):
+        if len(epoch) == 0:
+            # the very first initial epoch of the first episode
+            return self.policy.get_iterator(time_start_ms, time_end_ms, step_size_ms)
+        
+        if self.num_step <= self._init_steps:
+            a_next = self.a_curr
+        else:
+            a_next = self._next_action_hook(self.a_curr)
+        
+        if self.supervisor_tumbled_notice > 0:
+            if self.supervisor_tumbled_notice > 2:
+                a_next = np.zeros(shape=self.a_curr.shape)
+            self.supervisor_tumbled_notice += 1
+        
+        if self.num_step <= self._init_steps:
+            print "(init)", a_next.T, self.num_step
+        elif self.supervisor_tumbled_notice > 2:
+            print time_start_ms, self.a_curr.T, self.num_step
+        else:
+            print time_start_ms, self.a_curr.T, self.num_step
+        
+        self._pre_increment_hook(
+            epoch,
+            a_curr=self.a_curr.T,
+            a_next=a_next.T
+        )
+        
+        self.a_curr = a_next
+        self.num_step += 1
+        
+        self.policy.update(a_next)
+        return self.policy.get_iterator(time_start_ms, time_end_ms, step_size_ms)
+    
+    def event_handler(self, robot, epoch, current_time, msg):
+        """Handle messages from the supervisor. Messages are expected
+        when the robot has tumbled and thus the robot has to be reset.
+        """
+        # msg is 'reset', 'out_of_arena', 'tumbled_grace_start' or 'tumbled'
+        # for msg==reset, the robot is reset immediately
+        # msg==tumbled_grace_start marks the start of the grace period of the tumbled robot
+        if msg == 'tumbled_grace_start':
+            print "Tumbling received", self.num_step
+            self.supervisor_tumbled_notice = 1
+            self._pre_increment_hook(dict(), tumbled=np.array([self.num_step]))
+        
+        if msg == 'reset':
+            print "Reset received", self.num_step
+            self.policy.reset()
+            self.new_episode()
+    
+    def _next_action_hook(self, a_next):
+        a_next = np.zeros(self.a_curr.shape)
+        while (a_next < 0.2).any() or (a_next > 2.0).any() or ((a_next > 1.0).any() and a_next.ptp() > 0.4): # Prohibit too small or large amplitudes
+            #a_next = self.a_curr + np.random.uniform(-0.2, 0.2, size=self.a_curr.shape)
+            a_next = self.a_curr + np.random.normal(0.0, 0.15, size=self.a_curr.shape)
+        
+        return a_next
 

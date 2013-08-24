@@ -103,10 +103,15 @@ def puppy_offline_playback(pth_data, critic, samples_per_action, ms_per_step):
     storages = filter(lambda s: len(f[s]) > 0, storages)
     
     # Prepare critic, avoid storing epoch data twice
+    next_action = None
     critic._pre_increment_hook_orig = critic._pre_increment_hook
+    critic._next_action_hook_orig = critic._next_action_hook
     def pre_increment_hook(epoch, **kwargs):
         critic._pre_increment_hook_orig(dict(), **kwargs)
+    def next_action_hook(a_next):
+        return next_action
     
+    critic._next_action_hook = next_action_hook
     critic._pre_increment_hook = pre_increment_hook
     
     # Main loop, feed data to the critic
@@ -121,7 +126,12 @@ def puppy_offline_playback(pth_data, critic, samples_per_action, ms_per_step):
         else:
             tumbled_grace_start = -1
         
+        # initial call
+        critic.a_curr = np.atleast_2d(data_grp['a_curr'][0]).T
+        next_action = np.atleast_2d(data_grp['a_next'][0]).T
+        
         for num_iter in np.arange(0, N, samples_per_action):
+            next_action = np.atleast_2d(data_grp['a_next'][num_iter/samples_per_action]).T
             
             # get data
             time_start_ms = num_iter * ms_per_step
@@ -137,5 +147,6 @@ def puppy_offline_playback(pth_data, critic, samples_per_action, ms_per_step):
             critic(chunk, time_start_ms, time_end_ms, time_step_ms)
         
         critic.event_handler(None, dict(), ms_per_step * N, 'reset')
-        
+    
     critic._pre_increment_hook = critic._pre_increment_hook_orig
+    critic._next_action_hook = critic._next_action_hook_orig
