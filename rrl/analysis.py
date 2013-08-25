@@ -250,6 +250,17 @@ class Analysis:
     def episode_len(self):
         return [len(self.f[e]['reward']) for e in self.experiments]
     
+    def plot_episode_len(self, axis, **kwargs):
+        """Plot the length of the episodes in ``axis``."""
+        data = self.episode_len()
+        color = kwargs.pop('color', 'k')
+        axis.plot(data, color=color, **kwargs)
+        axis.set_xlabel('episode')
+        axis.set_ylabel('number of steps')
+        if self.always_plot_grid:
+            self.plot_grid(axis)
+        return axis
+    
     def stack_data(self, key):
         """Return data related to ``key`` of all experiments in a single
         array."""

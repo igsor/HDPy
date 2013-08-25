@@ -8,7 +8,7 @@ At some point, some of this code might be merged back to Oger.
 
 import Oger
 import mdp
-#import warnings
+import warnings
 import numpy as np
 import scipy.sparse
 
@@ -136,6 +136,7 @@ class SparseReservoirNode(Oger.nodes.ReservoirNode):
         # if self.reset_states is true, initialize to zero,
         # otherwise initialize to the last time-step of the previous execute call (for freerun)
         if self.reset_states:
+            warnings.warn("Reservoir states are reset - is this a bug?")
             self.initial_state = np.zeros((1, self.output_dim))
         else:
             self.initial_state = np.atleast_2d(self.states[-1, :])
@@ -634,7 +635,7 @@ class PlainRLS:
             # preliminaries
             xn = np.atleast_2d(x[n]).T
             u = self._psiInv.dot(xn)
-            k = 1.0 / (self.lambda_ + xn.T.dot(u)) * u
+            k = u / (self.lambda_ + xn.T.dot(u))
             # error
             if e is None:
                 dn = np.atleast_2d(d[n]).T

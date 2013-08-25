@@ -6,6 +6,7 @@ includes the Actor-Critic-Design.
 import PuPy
 import numpy as np
 import cPickle as pickle
+from math import pi
 
 class Plant(object):
     """A template for Actor-Critic *plants*. The *Plant* describes the
@@ -129,6 +130,26 @@ class _ConstParam:
         """Return the constant value."""
         return self._value
 
+class ConstMomentum:
+    def __init__(self, value):
+        self._value = value
+        assert 0 <= self._value and self._value <= 1
+    def __call__(self, a_curr, a_next, time0=None, time1=None):
+        return self._value * a_curr + (1.0 - self._value) * a_next
+
+class RadialMomentum:
+    def __init__(self, value):
+        self._value = value
+        assert 0 <= self._value and self._value <= 1
+    def __call__(self, a_curr, a_next, time0=None, time1=None):
+        phi0 = a_curr % (2*pi)
+        phi1 = a_next % (2*pi)
+        z0 = np.exp(phi0*1j)
+        z1 = np.exp(phi1*1j)
+        zr = self._value * z0 + (1.0 - self._value) * z1
+        return np.angle(zr) % (2*pi)
+
+
 class ActorCritic(PuPy.PuppyActor):
     """Actor-critic design.
     
@@ -184,7 +205,7 @@ class ActorCritic(PuPy.PuppyActor):
         exchangable, since it's really the same kind of 'sensor'.
     
     """
-    def __init__(self, plant, policy, gamma=1.0, alpha=1.0, init_steps=1, norm=None):
+    def __init__(self, plant, policy, gamma=1.0, alpha=1.0, init_steps=1, norm=None, momentum=0.0):
         super(ActorCritic, self).__init__()
         self.plant = plant
         self.policy = policy
@@ -196,6 +217,7 @@ class ActorCritic(PuPy.PuppyActor):
         self.policy.set_normalization(self.normalizer)
         self.set_alpha(alpha)
         self.set_gamma(gamma)
+        self.set_momentum(momentum)
         self.num_episode = 0
         self.new_episode()
         self._init_steps = init_steps
@@ -341,6 +363,15 @@ class ActorCritic(PuPy.PuppyActor):
             self.gamma = gamma
         else:
             self.gamma = _ConstParam(gamma)
+    
+    def set_momentum(self, momentum):
+        """Define a value for ``momentum``. May be either a constant or
+        a function of the time.
+        """
+        if callable(momentum):
+            self.momentum = momentum
+        else:
+            self.momentum = ConstMomentum(momentum)
 
 class ADHDP(ActorCritic):
     """
@@ -411,7 +442,9 @@ class ADHDP(ActorCritic):
         deriv = self._critic_deriv(x_curr)
         
         # gradient training of action (acc. to eq. 10)
-        a_next = a_curr + self.alpha(self.num_episode, self.num_step) * deriv # FIXME: Denormalization of deriv (scale*deriv)
+        #a_next = a_curr + self.alpha(self.num_episode, self.num_step) * deriv
+        a_next = a_curr + self.alpha(self.num_episode, self.num_step) * deriv
+        a_next = self.momentum(a_curr, a_next, self.num_episode, self.num_step)
         a_next = self._next_action_hook(a_next)
         
         # ESN-critic, second instance: in(k+1) => J(k+1)
@@ -421,7 +454,9 @@ class ADHDP(ActorCritic):
         err = reward + self.gamma(self.num_episode, self.num_step) * j_next - j_curr
         
         # One-step RLS training => Trained ESN
-        self.readout.train(x_curr, e=err) 
+        self.readout.train(x_curr, e=err)
+        #trg = reward + self.gamma(self.num_episode, self.num_step) * j_next
+        #self.readout.train(x_curr, d=trg)
         #self.readout.train(o_curr, e=err) # FIXME: Input/Output ESN Model
         
         # increment hook
