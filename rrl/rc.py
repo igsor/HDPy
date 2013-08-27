@@ -11,6 +11,7 @@ import mdp
 import warnings
 import numpy as np
 import scipy.sparse
+from math import exp
 
 ## RESERVOIR BASE CLASS ##
 
@@ -752,6 +753,69 @@ class StabilizedRLS(PlainRLS):
     
     def __repr__(self):
         return 'StabilizedRLS(with_bias=%r, input_dim=%i, output_dim=%i, lambda_=%f)' % (self.with_bias, self.input_dim, self.output_dim, self.lambda_)
+
+class ConvergingRLS(StabilizedRLS):
+    def __init__(self, *args, **kwargs):
+        self.num_iter = 0
+        super(ConvergingRLS, self).__init__(*args, **kwargs)
+    
+    """Compute online least-square, multivariate linear regression.
+    
+    Identical to :py:class:`PlainRLS`, except that the internal matrices
+    are computed on the lower triangular part. This ensures symmetrical
+    matrices even with floating point operations. If unsure, use this
+    implementation instead of :py:class:`PlainRLS`.
+    
+    """
+    def train(self, x, d=None, e=None):
+        """Train the regression on one or more samples.
+        
+        ``x``
+            Input samples. Array of size (K, input_dim)
+        
+        ``d``
+            Sample target. Array of size (K, output_dim)
+        
+        ``e``
+            Sample error terms. Array of size (K, output_dim)
+        
+        """
+        if self._stop_training:
+            return
+        
+        if self.with_bias:
+            x = self._add_constant(x)
+        
+        for n in range(x.shape[0]):
+            # preliminaries
+            xn = np.atleast_2d(x[n]).T
+            u = self._psiInv.dot(xn)
+            k = 1.0 / (self.lambda_ + xn.T.dot(u)) * u
+            # error
+            if e is None:
+                dn = np.atleast_2d(d[n]).T
+                y = self.beta.T.dot(xn)
+                en = dn - y
+            else:
+                en = np.atleast_2d(e[n]).T
+            # update
+            self.beta += self.rate(self.num_iter) * k.dot(en.T)
+            tri = np.tril(self._psiInv)
+            tri -= np.tril(k*u.T)
+            tri /= self.lambda_
+            #self._psiInv = tri + tri.T - np.diag(tri.diagonal())
+            # FIXME: (numpy bug) tri.diagonal() introduces a memory leak
+            self._psiInv = np.tril(tri, -1).T + tri
+            self.num_iter += 1
+    
+    def rate(self, time):
+        return exp(-time/10000.0)
+    
+    def __repr__(self):
+        return 'ConvergingRLS(with_bias=%r, input_dim=%i, output_dim=%i, lambda_=%f)' % (self.with_bias, self.input_dim, self.output_dim, self.lambda_)
+
+
+## RESERVOIR MEMORY MEASUREMENT ##
 
 def reservoir_memory(reservoir, max_settling_time=10000):
     """Measure the memory capacity of a ``reservoir``. Make sure, the
