@@ -68,6 +68,15 @@ def puppy_plot_locationtarget(axis, target=(4.0, 4.0), distance=0.5, **kwargs):
 
     return axis
 
+def puppy_plot_landmarks(axis, landmarks, **kwargs):
+    """Plot markers at ``landmark`` locations in ``axis``."""
+    color = kwargs.pop('color', 'k')
+    lbl = kwargs.pop('label', '')
+    marker = kwargs.pop('marker','^')
+    for x,y in landmarks:
+        axis.plot([x],[y], marker=marker, color=color)
+    return axis
+
 sensor_names = ['trg0','trg1','trg2','trg3','accelerometer_x','accelerometer_y','accelerometer_z','compass_x','compass_y','compass_z','gyro_x','gyro_y','gyro_z','hip0','hip1','hip2','hip3','knee0','knee1','knee2','knee3','puppyGPS_x','puppyGPS_y','puppyGPS_z','touch0','touch0','touch1','touch2','touch3']
 
 def puppy_offline_playback(pth_data, critic, samples_per_action, ms_per_step):
@@ -132,7 +141,7 @@ def puppy_offline_playback(pth_data, critic, samples_per_action, ms_per_step):
             time_tumbled = -1
         
         # initial, empty call
-        if 'empty_initial_step' in data_grp:
+        if 'init_step' in data_grp:
             print "Simulation was started/reverted"
             time_start_ms = 0
             critic(dict(), time_start_ms, time_start_ms + samples_per_action, ms_per_step)

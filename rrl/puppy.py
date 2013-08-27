@@ -133,7 +133,8 @@ class OfflineCollector(CollectingADHDP):
             # the very first initial epoch of the first episode
             # this case occurs when the simulation starts or after it is reverted
             self.num_step += 1
-            self._pre_increment_hook(dict(), empty_initial_step=np.array([1]))
+            #self._pre_increment_hook(dict(), empty_initial_step=np.array([1]))
+            self._pre_increment_hook(dict(), init_step=np.array([self.num_step]))
             return self.policy.get_iterator(time_start_ms, time_end_ms, step_size_ms)
         
         # Determine next action
@@ -157,7 +158,7 @@ class OfflineCollector(CollectingADHDP):
         elif self.supervisor_tumbled_notice > 2:
             print time_start_ms, self.a_curr.T, self.num_step
         else:
-            print time_start_ms, self.a_curr.T
+            print time_start_ms, self.a_curr.T, epoch['puppyGPS_x'][-1]
         
         self._pre_increment_hook(
             epoch,

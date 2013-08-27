@@ -565,7 +565,7 @@ class OnlineLinearRegression(mdp.Node): # FIXME: Does not work properly
         """
         return np.concatenate((np.ones((x.shape[0], 1), dtype=self.dtype), x), axis=1)
 
-class PlainRLS:
+class PlainRLS(object):
     """Compute online least-square, multivariate linear regression.
     
     The interface is based on :py:class:`OnlineLinearRegression` with
@@ -767,7 +767,6 @@ def reservoir_memory(reservoir, max_settling_time=10000):
     hist = (abs(ret[1:, :] - ret[:-1, :]) < 1e-5).sum(axis=1)
     settling_time = hist.argmax()
     return settling_time
-
 
 def query_reservoir_memory(reservoir, steps=1000, max_settling_time=10000):
     """

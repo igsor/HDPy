@@ -1,18 +1,18 @@
 
 import h5py
 
-def remove_init_only_groups(pth, init_steps, reorder=False):
+def remove_init_only_groups(pth, init_steps):
     """Remove groups from HDF5 data files, which
     
     a) Are empty (0 members)
     b) Have collected less than ``init_steps`` epochs
     
-    If ``reorder``, the experiments are rearranged such that the
-    experiment indices are in the range [0,N], without missing ones.
-    No order of the experiments is guaranteed.
-    
     """
-    f = h5py.File(pth,'a')
+    if isinstance(pth, str):
+        f = h5py.File(pth,'a')
+    else:
+        f = pth
+    
     all_keys = f.keys()
     remove_zero = [k for k in all_keys if len(f[k]) == 0]
     remove_short = [k for k in all_keys if len(f[k]) > 0 and f[k]['a_curr'].shape[0] < init_steps]
@@ -23,23 +23,35 @@ def remove_init_only_groups(pth, init_steps, reorder=False):
     
     print "Removed", (len(remove_zero) + len(remove_short)), "groups"
     
-    if reorder:
-        # keys must be ascending
-        old_keys = map(str, sorted(map(int, f.keys())))
-        for new_key, old_key in enumerate(old_keys):
-            new_key = str(new_key)
-            if new_key != old_key:
-                if new_key not in f.keys():
-                    print old_key, "->", new_key
-                    f[new_key] = f[old_key]
-                    del f[old_key]
-                else:
-                    print "Cannot move", old_key, "to", new_key, "(new key exists)"
-        
-    
-    f.close()
+    return f
 
-def h5_merge(pth0, pth1):
+def h5_reorder(pth):
+    """
+    Rearrange the experiments in ``pth`` such that the experiment
+    indices are in the range [0,N], without missing ones.
+    No order of the experiments is guaranteed.
+    
+    """
+    if isinstance(pth, str):
+        f = h5py.File(pth,'a')
+    else:
+        f = pth
+    
+    # keys must be ascending
+    old_keys = map(str, sorted(map(int, f.keys())))
+    for new_key, old_key in enumerate(old_keys):
+        new_key = str(new_key)
+        if new_key != old_key:
+            if new_key not in f.keys():
+                print old_key, "->", new_key
+                f[new_key] = f[old_key]
+                del f[old_key]
+            else:
+                print "Cannot move", old_key, "to", new_key, "(new key exists)"
+    
+    return f
+
+def h5_merge_datasets(pth0, pth1, trg=None):
     """
     
     .. todo::
@@ -47,6 +59,59 @@ def h5_merge(pth0, pth1):
     
     """
     raise NotImplementedError()
+
+def h5_merge_experiments(pth0, pth1, trg=None):
+    """Merge groups of the HDF5 files ``pth0`` and ``pth1``. If ``trg``
+    is given, a new file will be created. Otherwise the data is merged
+    into ``pth0``.
+    
+    """
+    f1 = h5py.File(pth1, 'r')
+    
+    if trg is None:
+        f_trg = f0 = h5py.File(pth0, 'a')
+        
+    else:
+        f_trg = h5py.File(trg, 'w')
+        f0 = h5py.File(pth0, 'r')
+        # Copy groups of file0 to trg
+        for k in f0.keys():
+            f0.copy(k, f_trg)
+    
+    groups_0 = map(int, f0.keys())
+    groups_1 = map(int, f1.keys())
+    
+    # Copy groups of file1 to trg
+    offset = 1 + max(groups_0) - min(groups_1)
+    for k in groups_1:
+        src = str(k)
+        dst = str(k + offset)
+        f1.copy(src, f_trg, name=dst)
+    
+    return f_trg
+
+def remove_boundary_groups(pth):
+    """Remove the first and last experiment with respect to webots
+    restart/revert in ``pth``. The boundaries are determined through
+    the *init_step* group. This method is to save possibly corrupted
+    experimental data files, due to webots' memory issues. To work
+    properly, the groups must not be altered before this method, e.g.
+    by :py:func:`remove_init_only_groups`.
+    """
+    if isinstance(pth, str):
+        f = h5py.File(pth,'a')
+    else:
+        f = pth
+    
+    keys = sorted(map(int, f.keys()))
+    restarts = [k for k in keys if 'init_step' in f[str(k)]]
+    restarts += [k-1 for k in restarts if k > 0]
+    restarts += [keys[-1]]
+    restarts = set(sorted(restarts))
+    for k in restarts:
+        del f[str(k)]
+    
+    return f
 
 class DataMerge:
     """
@@ -82,6 +147,12 @@ class DataMerge:
     def close(self):
         self.f0.close()
         self.f1.close()
+    
+    def attributes(self, key):
+        assert key in self.keys_common
+        attrs0 = h5py.AttributeManager(self.f0[key])
+        attrs1 = h5py.AttributeManager(self.f1[key])
+        return attrs0, attrs1
 
 class DataMergeGroup:
     """
@@ -111,3 +182,7 @@ class DataMergeGroup:
     def keys(self):
         return self.grp0.keys() + self.grp1.keys()
     
+    def attributes(self):
+        attrs0 = h5py.AttributeManager(self.grp0)
+        attrs1 = h5py.AttributeManager(self.grp1)
+        return attrs0, attrs1
