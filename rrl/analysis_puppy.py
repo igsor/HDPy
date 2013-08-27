@@ -79,7 +79,7 @@ def puppy_plot_landmarks(axis, landmarks, **kwargs):
 
 sensor_names = ['trg0','trg1','trg2','trg3','accelerometer_x','accelerometer_y','accelerometer_z','compass_x','compass_y','compass_z','gyro_x','gyro_y','gyro_z','hip0','hip1','hip2','hip3','knee0','knee1','knee2','knee3','puppyGPS_x','puppyGPS_y','puppyGPS_z','touch0','touch0','touch1','touch2','touch3']
 
-def puppy_offline_playback(pth_data, critic, samples_per_action, ms_per_step):
+def puppy_offline_playback(pth_data, critic, samples_per_action, ms_per_step, episode_start=None, episode_stop=None):
     """Simulate an experiment run for the critic by using offline data.
     The data has to be collected in webots, using the respective
     robot and supervisor. Note that the behaviour of the simulation
@@ -105,11 +105,25 @@ def puppy_offline_playback(pth_data, critic, samples_per_action, ms_per_step):
     ``ms_per_step``
         Sensor sampling period.
     
+    ``episode_start``
+        Defines a lower limit on the episode number. Passed as int,
+        is with respect to the episode index, not its identifier.
+    
+    ``episode_stop``
+        Defines an upper limit on the episode number. Passed as int,
+        is with respect to the episode index, not its identifier.
+    
     """
     # Open data file, get valid experiments
     f = h5py.File(pth_data,'r')
     storages = map(str, sorted(map(int, f.keys())))
     storages = filter(lambda s: len(f[s]) > 0, storages)
+    
+    if episode_stop is not None:
+        storages = storages[:episode_stop]
+    
+    if episode_start is not None:
+        storages = storages[episode_start:]
     
     # Prepare critic; redirect hooks to avoid storing epoch data twice
     # and feed the actions

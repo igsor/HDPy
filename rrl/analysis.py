@@ -174,6 +174,7 @@ import numpy as np
 import h5py
 from math import pi
 import inout
+import warnings
 
 def gen_query(history):
     """To generate the old *query* function.
@@ -223,6 +224,10 @@ class Analysis:
         return [self.f[exp][key][:] for exp in self.experiments]
     
     def __getitem__(self, key):
+        if isinstance(key, int):
+            warnings.warn("Warning: access by int is w.r.t the experiment not the group")
+            key = self.experiments[key]
+        
         return self.get_episode(key)
     
     def __len__(self):
