@@ -24,6 +24,4 @@ Inheritance
 
 .. inheritance-diagram::
     rrl.PuppyHDP
-    
-    
-    
+

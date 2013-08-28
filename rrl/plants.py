@@ -200,7 +200,10 @@ class LandmarksTarLoc(Plant):
         reward = -dist
         if dist < self.radius:
             reward = 0.0
-        reward += np.random.normal(scale=self.reward_noise, size=reward.shape)
+        
+        if self.reward_noise > 0.0:
+            reward += np.random.normal(scale=self.reward_noise, size=reward.shape)
+        
         return reward
 
 
