@@ -197,7 +197,7 @@ class Analysis:
             self.f = pth
         else:
             self.pth = pth
-            self.f = h5py.File(pth,'r')
+            self.f = h5py.File(pth, 'r')
         exp = map(int, self.f.keys())
         exp = sorted(exp)
         exp = map(str, exp)
@@ -724,19 +724,28 @@ def node_inspection(analysis, figure, episode, node):
     figure.suptitle('Characteristics of node %i at episode %s' % (node, episode))
     return figure
 
-def critic(plant, reservoir, readout):
+def critic(plant, reservoir, readout, norm=None):
     """Use the simulation parts to set up a simpler to use critic.
     The critic is a function of the *state* and *action*. Furthermore,
     it takes *simulate* as argument to control if the reservoir state
     is actually advanced."""
+    if norm is None:
+        import PuPy
+        norm = PuPy.Normalization()
+    else:
+        plant.set_normalization(norm)
+    
+    if 'a_curr' not in norm:
+        norm.set('a_curr', 0.0, 1.0)
+    
     def critic_fu(state, action, simulate):
         """Return the expected return according to the *critic* with
         input ``state`` and ``action``. If
         ``simulate`` = :py:keyword:`True`, the output is computed but
         the reservoir not updated."""
         in_state = plant.state_input(state)
-        # TODO: normalize action
-        i_curr = np.vstack((in_state, action)).T
+        action_nrm = norm.normalize_value('a_curr', action)
+        i_curr = np.vstack((in_state, action_nrm)).T
         x_curr = reservoir(i_curr, simulate=simulate)
         #o_curr = np.hstack((x_curr, i_curr)) # FIXME: Input/Output ESN Model
         #j_curr = readout(o_curr) # FIXME: Input/Output ESN Model

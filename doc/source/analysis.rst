@@ -18,3 +18,12 @@ Reference
 
 .. autofunction:: gen_query
 
+
+Inheritance
+-----------
+
+.. inheritance-diagram::
+    rrl.PuppyHDP
+    
+    
+    

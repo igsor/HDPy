@@ -5,6 +5,9 @@ Analysis tools, specific for the *Puppy* experiment.
 import pylab
 import h5py
 import numpy as np
+import itertools
+
+sensor_names = ['trg0','trg1','trg2','trg3','accelerometer_x','accelerometer_y','accelerometer_z','compass_x','compass_y','compass_z','gyro_x','gyro_y','gyro_z','hip0','hip1','hip2','hip3','knee0','knee1','knee2','knee3','puppyGPS_x','puppyGPS_y','puppyGPS_z','touch0','touch0','touch1','touch2','touch3']
 
 def puppy_plot_trajectory(analysis, axis, episode, step_width=1, **kwargs):
     """Plot the trajectory of an episode
@@ -77,9 +80,7 @@ def puppy_plot_landmarks(axis, landmarks, **kwargs):
         axis.plot([x],[y], marker=marker, color=color)
     return axis
 
-sensor_names = ['trg0','trg1','trg2','trg3','accelerometer_x','accelerometer_y','accelerometer_z','compass_x','compass_y','compass_z','gyro_x','gyro_y','gyro_z','hip0','hip1','hip2','hip3','knee0','knee1','knee2','knee3','puppyGPS_x','puppyGPS_y','puppyGPS_z','touch0','touch0','touch1','touch2','touch3']
-
-def puppy_offline_playback(pth_data, critic, samples_per_action, ms_per_step, episode_start=None, episode_stop=None):
+def puppy_offline_playback(pth_data, critic, samples_per_action, ms_per_step, episode_start=None, episode_end=None):
     """Simulate an experiment run for the critic by using offline data.
     The data has to be collected in webots, using the respective
     robot and supervisor. Note that the behaviour of the simulation
@@ -119,11 +120,13 @@ def puppy_offline_playback(pth_data, critic, samples_per_action, ms_per_step, ep
     storages = map(str, sorted(map(int, f.keys())))
     storages = filter(lambda s: len(f[s]) > 0, storages)
     
-    if episode_stop is not None:
-        storages = storages[:episode_stop]
+    if episode_end is not None:
+        storages = storages[:episode_end]
     
     if episode_start is not None:
         storages = storages[episode_start:]
+    
+    assert len(storages) > 0
     
     # Prepare critic; redirect hooks to avoid storing epoch data twice
     # and feed the actions
@@ -142,6 +145,7 @@ def puppy_offline_playback(pth_data, critic, samples_per_action, ms_per_step, ep
     
     # Main loop, feed data to the critic
     time_step_ms = ms_per_step * samples_per_action
+    time_start_ms = 0
     for episode_idx, episode in enumerate(storages):
         
         data_grp = f[episode]
@@ -188,3 +192,46 @@ def puppy_offline_playback(pth_data, critic, samples_per_action, ms_per_step, ep
     del critic._pre_increment_hook_orig
     del critic._next_action_hook_orig
 
+def puppy_plot_action(analysis, episode, critic, inspect_epochs, actions_range_x, actions_range_y, step_width):
+    """
+    
+    .. todo::
+        offset in case of offline data?
+    
+    .. todo::
+        implementation unfinished, untested, undocumented
+    
+    """
+    raise NotImplementedError()
+    grp = analysis[episode_idx]
+    for trg_epoch in inspect_epochs:
+        reservoir.reset()
+        reservoir.states = np.atleast_2d(grp['x_curr'][trg_epoch-1,:])
+
+        # evaluate actions
+        # Note: epoch is one step ahead (of a_curr, same time as to a_next)!
+        s_curr = dict([(sensor,grp[sensor][step_width*(trg_epoch-1):trg_epoch*step_width]) for sensor in sensor_names])
+        in_state = plant.state_input(s_curr)
+        a_ret = np.zeros((len(actions_range_x), len(actions_range_y)))
+
+        actions_iter = itertools.product(range(len(actions_range_x)), range(len(actions_range_y)))
+        for idx_x, idx_y in actions_iter:
+            action_candidate = np.atleast_2d((actions_range_x[idx_x], actions_range_y[idx_y])).T
+            i_curr, x_curr, j_curr = critic(s_curr, action_candidate)
+            a_ret[idx_x, idx_y] = j_curr[0, 0]
+
+        # plot results
+        fig = pylab.figure()
+        pylab.gray()
+        # In the image, the y-axis is the rows, the x-axis the columns of the matrix
+        # Having index (0,0) in the left/bottom corner: origin='lower'
+        pylab.plot((0, len(actions_range_x)-1), (0, len(actions_range_y)-1), 'b')
+        pylab.imshow(a_ret, origin='lower')
+        pylab.colorbar()
+        pylab.xticks(range(len(actions_range_y)), actions_range_y)
+        pylab.yticks(range(len(actions_range_x)), actions_range_x)
+        pylab.title('Expected Return per action at epoch ' + str(trg_epoch))
+        pylab.xlabel('Amplitude right legs') # cols are idx_y, right legs
+        pylab.ylabel('Amplitude left legs') # rows are idx_x, left legs
+    
+    return fig

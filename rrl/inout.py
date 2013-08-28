@@ -9,7 +9,7 @@ def remove_init_only_groups(pth, init_steps):
     
     """
     if isinstance(pth, str):
-        f = h5py.File(pth,'a')
+        f = h5py.File(pth, 'a')
     else:
         f = pth
     
@@ -33,7 +33,7 @@ def h5_reorder(pth):
     
     """
     if isinstance(pth, str):
-        f = h5py.File(pth,'a')
+        f = h5py.File(pth, 'a')
     else:
         f = pth
     
@@ -99,7 +99,7 @@ def remove_boundary_groups(pth):
     by :py:func:`remove_init_only_groups`.
     """
     if isinstance(pth, str):
-        f = h5py.File(pth,'a')
+        f = h5py.File(pth, 'a')
     else:
         f = pth
     
