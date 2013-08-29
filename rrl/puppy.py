@@ -73,7 +73,7 @@ class PuppyHDP(CollectingADHDP):
         if self.supervisor_tumbled_notice > 2:
             self.gamma = old_gamma
         
-        print self.num_step, reward, a_curr.T, a_next.T, s_next['puppyGPS_x'][-1]
+        #print self.num_step, reward, a_curr.T, a_next.T, s_next['puppyGPS_x'][-1]
         return a_next
     
     def init_episode(self, epoch, time_start_ms, time_end_ms, step_size_ms):

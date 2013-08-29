@@ -22,7 +22,7 @@ def puppy_plot_trajectory(analysis, axis, episode, step_width=1, **kwargs):
     label = kwargs.pop('label', 'Trajectory')
     axis.plot(gps_x, gps_y, color=col, **kwargs)
     axis.plot(gps_x[0], gps_y[0], 'ks', label='Start')
-    axis.plot(gps_x[-1], gps_y[-1], 'k^', label='End')
+    axis.plot(gps_x[-1], gps_y[-1], 'kv', label='End')
     return axis
 
 def puppy_plot_all_trajectories(analysis, axis, step_width=1, **kwargs):
@@ -165,6 +165,9 @@ def puppy_offline_playback(pth_data, critic, samples_per_action, ms_per_step, ep
             critic(dict(), time_start_ms, time_start_ms + samples_per_action, ms_per_step)
             time_tumbled -= samples_per_action
         
+        # initial action
+        critic.a_curr = np.atleast_2d(data_grp['a_curr'][0]).T
+        
         # loop through data, incrementally feed the critic
         for num_iter in np.arange(0, N, samples_per_action):
             # next action
@@ -192,7 +195,7 @@ def puppy_offline_playback(pth_data, critic, samples_per_action, ms_per_step, ep
     del critic._pre_increment_hook_orig
     del critic._next_action_hook_orig
 
-def puppy_plot_action(analysis, episode, critic, inspect_epochs, actions_range_x, actions_range_y, step_width):
+def puppy_plot_action(analysis, episode, critic, reservoir, inspect_epochs, actions_range_x, actions_range_y, step_width, obs_offset):
     """
     
     .. todo::
@@ -202,22 +205,21 @@ def puppy_plot_action(analysis, episode, critic, inspect_epochs, actions_range_x
         implementation unfinished, untested, undocumented
     
     """
-    raise NotImplementedError()
-    grp = analysis[episode_idx]
+    grp = analysis[episode]
     for trg_epoch in inspect_epochs:
         reservoir.reset()
         reservoir.states = np.atleast_2d(grp['x_curr'][trg_epoch-1,:])
 
         # evaluate actions
-        # Note: epoch is one step ahead (of a_curr, same time as to a_next)!
-        s_curr = dict([(sensor,grp[sensor][step_width*(trg_epoch-1):trg_epoch*step_width]) for sensor in sensor_names])
-        in_state = plant.state_input(s_curr)
+        # Note: epoch is one step ahead (of a_curr, same time as a_next)!
+        # Note: sensor values are shifted w.r.t a_curr by obs_offset
+        s_curr = dict([(sensor,grp[sensor][obs_offset+step_width*(trg_epoch-1):obs_offset+trg_epoch*step_width]) for sensor in sensor_names])
         a_ret = np.zeros((len(actions_range_x), len(actions_range_y)))
 
         actions_iter = itertools.product(range(len(actions_range_x)), range(len(actions_range_y)))
         for idx_x, idx_y in actions_iter:
             action_candidate = np.atleast_2d((actions_range_x[idx_x], actions_range_y[idx_y])).T
-            i_curr, x_curr, j_curr = critic(s_curr, action_candidate)
+            j_curr = critic(s_curr, action_candidate, simulate=True)
             a_ret[idx_x, idx_y] = j_curr[0, 0]
 
         # plot results

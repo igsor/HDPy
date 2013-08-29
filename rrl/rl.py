@@ -149,7 +149,6 @@ class RadialMomentum:
         zr = self._value * z0 + (1.0 - self._value) * z1
         return np.angle(zr) % (2*pi)
 
-
 class ActorCritic(PuPy.PuppyActor):
     """Actor-critic design.
     
