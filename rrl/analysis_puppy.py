@@ -9,20 +9,23 @@ import itertools
 
 sensor_names = ['trg0','trg1','trg2','trg3','accelerometer_x','accelerometer_y','accelerometer_z','compass_x','compass_y','compass_z','gyro_x','gyro_y','gyro_z','hip0','hip1','hip2','hip3','knee0','knee1','knee2','knee3','puppyGPS_x','puppyGPS_y','puppyGPS_z','touch0','touch0','touch1','touch2','touch3']
 
-def puppy_plot_trajectory(analysis, axis, episode, step_width=1, **kwargs):
+def puppy_plot_trajectory(analysis, axis, episode, step_width=1, offset=0, legend=True, **kwargs):
     """Plot the trajectory of an episode
     """
-    gps_x = analysis[episode]['puppyGPS_x'][step_width-1::step_width]
-    gps_y = analysis[episode]['puppyGPS_y'][step_width-1::step_width]
+    gps_x = analysis[episode]['puppyGPS_x'][offset+step_width-1::step_width]
+    gps_y = analysis[episode]['puppyGPS_y'][offset+step_width-1::step_width]
     if step_width > 1:
-        gps_x = np.concatenate(([analysis[episode]['puppyGPS_x'][0]], gps_x))
-        gps_y = np.concatenate(([analysis[episode]['puppyGPS_y'][0]], gps_y))
+        gps_x = np.concatenate(([analysis[episode]['puppyGPS_x'][offset]], gps_x))
+        gps_y = np.concatenate(([analysis[episode]['puppyGPS_y'][offset]], gps_y))
 
     col = kwargs.pop('color', 'k')
     label = kwargs.pop('label', 'Trajectory')
     axis.plot(gps_x, gps_y, color=col, **kwargs)
-    axis.plot(gps_x[0], gps_y[0], 'ks', label='Start')
-    axis.plot(gps_x[-1], gps_y[-1], 'kv', label='End')
+    axis.axis('equal')
+    if legend:
+        axis.plot(gps_x[0], gps_y[0], 'ks', label='Start')
+        axis.plot(gps_x[-1], gps_y[-1], 'kv', label='End')
+    
     return axis
 
 def puppy_plot_all_trajectories(analysis, axis, step_width=1, **kwargs):
@@ -221,6 +224,7 @@ def puppy_plot_action(analysis, episode, critic, reservoir, inspect_epochs, acti
             action_candidate = np.atleast_2d((actions_range_x[idx_x], actions_range_y[idx_y])).T
             j_curr = critic(s_curr, action_candidate, simulate=True)
             a_ret[idx_x, idx_y] = j_curr[0, 0]
+            print actions_range_x[idx_x], actions_range_y[idx_y], j_curr[0, 0]
 
         # plot results
         fig = pylab.figure()

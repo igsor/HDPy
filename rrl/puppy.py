@@ -104,7 +104,6 @@ class PuppyHDP(CollectingADHDP):
         self.s_curr = epoch
         return self.policy.get_iterator(time_start_ms, time_end_ms, step_size_ms)
 
-
 class OfflineCollector(CollectingADHDP):
     def __init__(self, *args, **kwargs):
         class Phony:

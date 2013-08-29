@@ -5,6 +5,7 @@ ACD plants
 """
 from rl import Plant
 import numpy as np
+from math import exp
 
 class SpeedReward(Plant):
     """A :py:class:`Plant` with focus on the speed of the robot.
@@ -198,8 +199,12 @@ class LandmarksTarLoc(Plant):
         dist = np.linalg.norm(diff)
         
         reward = -dist
-        if dist < self.radius:
-            reward = 0.0
+        #reward = 1.0/dist
+        #reward = np.atleast_2d([exp(-0.2*dist)])
+        #reward = np.tanh(1.0/dist)
+        
+        #if dist < self.radius:
+        #    reward = 0.0
         
         if self.reward_noise > 0.0:
             reward += np.random.normal(scale=self.reward_noise, size=reward.shape)
