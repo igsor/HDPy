@@ -419,7 +419,7 @@ class Analysis:
             self.plot_grid(axis)
         return axis
     
-    def plot_absolute_error(self, axis):
+    def plot_absolute_error(self, axis, episode_marker=False):
         """Plot the absolute error over time in ``axis``."""
         data = abs(self.stack_data('err'))
         axis.plot(data, 'k', label='error')
@@ -427,9 +427,14 @@ class Analysis:
         axis.set_ylabel('TD-error')
         if self.always_plot_grid:
             self.plot_grid(axis)
+        if episode_marker:
+            episode_lengths = np.cumsum([self.f[exp]['err'].shape[0] for exp in self.experiments])
+            ylim = axis.get_ylim()
+            for l in episode_lengths:
+                axis.plot([l,l], ylim, ':k')    
         return axis
     
-    def plot_error(self, axis):
+    def plot_error(self, axis, episode_marker=False):
         """Plot the error over time in ``axis``."""
         data = self.stack_data('err')
         axis.plot(data, 'k', label='error')
@@ -437,6 +442,11 @@ class Analysis:
         axis.set_ylabel('TD-error')
         if self.always_plot_grid:
             self.plot_grid(axis)
+        if episode_marker:
+            episode_lengths = np.cumsum([self.f[exp]['err'].shape[0] for exp in self.experiments])
+            ylim = axis.get_ylim()
+            for l in episode_lengths:
+                axis.plot([l,l], ylim, ':k')   
         return axis
     
     def plot_accumulated_reward(self, axis, **kwargs):
@@ -596,6 +606,35 @@ class Analysis:
         axis.legend(loc=0)
         axis.set_xlabel('step')
         axis.set_ylabel('TD-Error')
+        return axis
+    
+    def plot_error_avg_over_episodes(self, axis, step=1, median=False):
+        """Plot the evolution of the error over multiple episodes.
+        
+        This function assumes that the same path (same action sequence)
+        was applied in all experiments.
+        
+        """
+        err = self.get_data('err')
+        err = err[::step]
+        err_mat = np.empty([len(err), max([e.shape[0] for e in err])])
+        
+        for i, j_per_episode in enumerate(err):
+            err_mat[i,:j_per_episode.shape[0]] = j_per_episode[:,0]
+            err_mat[i,j_per_episode.shape[0]:] = np.nan
+        print err_mat
+        if median:
+            err_avg = np.empty([err_mat.shape[1]])
+            for i in range(err_mat.shape[1]):
+                err_avg[i] = np.median(err_mat[np.negative(np.isnan(err_mat[:,i])),i])
+            axis.plot(err_avg, 'b')
+        else:
+            err_avg = np.nansum(err_mat,0) / err_mat.shape[0]
+            axis.plot(err_avg, 'k')
+        print err_avg
+        
+        axis.set_xlabel('step')
+        axis.set_ylabel('Avg TD-Error')
         return axis
     
     def plot_reservoir_input(self, axis):

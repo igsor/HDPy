@@ -60,6 +60,10 @@ class Plant(object):
         if norm is None:
             norm = PuPy.Normalization()
         self.normalization = norm
+    
+    def reset(self):
+        """Reset plant to initial state."""
+        pass
 
 class Policy(object):
     """A template for Actor-Critic *policies*. The *Policy* defines how
@@ -393,6 +397,7 @@ class ADHDP(ActorCritic):
         it is loaded from a file.
         """
         self.reservoir.reset()
+        self.plant.reset()
         super(ADHDP, self).new_episode()
     
     def _critic_eval(self, state, action, simulate, action_name='a_curr'):
