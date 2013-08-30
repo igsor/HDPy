@@ -62,7 +62,7 @@ class PuppyHDP(CollectingADHDP):
                 # note that with this, its err = r/(1-gamma) - J * (1-gamma)
                 # but should be err = r/(1-gamma) - J
                 # thus, there's an difference of J*gamma
-                # could, for example solve this by temporarily set gamma = 0.0
+                # is solved this by temporarily set gamma = 0.0
                 self.has_tumbled = True
                 old_gamma = self.gamma
                 self.set_gamma(0.0)

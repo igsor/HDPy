@@ -224,7 +224,7 @@ def puppy_plot_action(analysis, episode, critic, reservoir, inspect_epochs, acti
             action_candidate = np.atleast_2d((actions_range_x[idx_x], actions_range_y[idx_y])).T
             j_curr = critic(s_curr, action_candidate, simulate=True)
             a_ret[idx_x, idx_y] = j_curr[0, 0]
-            print actions_range_x[idx_x], actions_range_y[idx_y], j_curr[0, 0]
+            #print actions_range_x[idx_x], actions_range_y[idx_y], j_curr[0, 0]
 
         # plot results
         fig = pylab.figure()
