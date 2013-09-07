@@ -253,7 +253,7 @@ class Analysis:
         return history
     
     def episode_len(self):
-        return [len(self.f[e]['reward']) for e in self.experiments]
+        return np.array([len(self.f[e]['reward']) for e in self.experiments])
     
     def plot_episode_len(self, axis, **kwargs):
         """Plot the length of the episodes in ``axis``."""

@@ -66,7 +66,7 @@ def puppy_plot_locationtarget(axis, target=(4.0, 4.0), distance=0.5, **kwargs):
     linewidth = kwargs.pop('linewidth', 2)
     color = kwargs.pop('facecolor', 'k')
     fill = kwargs.pop('fill', False)
-    lbl = kwargs.pop('label', '')
+    lbl = kwargs.pop('label', 'Target')
     axis.plot([target[0]], [target[1]], 'kD', **kwargs)
     if distance > 0.0:
         trg_field = pylab.Circle(target, distance, fill=fill, facecolor=color, linewidth=linewidth, label=lbl, **kwargs)
@@ -83,7 +83,7 @@ def puppy_plot_landmarks(axis, landmarks, **kwargs):
         axis.plot([x],[y], marker=marker, color=color)
     return axis
 
-def puppy_offline_playback(pth_data, critic, samples_per_action, ms_per_step, episode_start=None, episode_end=None):
+def puppy_offline_playback(pth_data, critic, samples_per_action, ms_per_step, episode_start=None, episode_end=None, min_episode_len=0):
     """Simulate an experiment run for the critic by using offline data.
     The data has to be collected in webots, using the respective
     robot and supervisor. Note that the behaviour of the simulation
@@ -117,11 +117,16 @@ def puppy_offline_playback(pth_data, critic, samples_per_action, ms_per_step, ep
         Defines an upper limit on the episode number. Passed as int,
         is with respect to the episode index, not its identifier.
     
+    ``min_episode_len``
+        Only pick episodes longer than this threshold.
+    
     """
     # Open data file, get valid experiments
     f = h5py.File(pth_data,'r')
     storages = map(str, sorted(map(int, f.keys())))
     storages = filter(lambda s: len(f[s]) > 0, storages)
+    if min_episode_len > 0:
+        storages = filter(lambda s: f[s]['a_curr'].shape[0] > min_episode_len, storages)
     
     if episode_end is not None:
         storages = storages[:episode_end]
@@ -134,10 +139,12 @@ def puppy_offline_playback(pth_data, critic, samples_per_action, ms_per_step, ep
     # Prepare critic; redirect hooks to avoid storing epoch data twice
     # and feed the actions
     next_action = None
+    episode = None
     critic._pre_increment_hook_orig = critic._pre_increment_hook
     critic._next_action_hook_orig = critic._next_action_hook
     
     def pre_increment_hook(epoch, **kwargs):
+        kwargs['offline_episode'] = np.array([episode])
         critic._pre_increment_hook_orig(dict(), **kwargs)
     def next_action_hook(a_next):
         #print "(next)", a_next.T, next_action.T
@@ -198,7 +205,7 @@ def puppy_offline_playback(pth_data, critic, samples_per_action, ms_per_step, ep
     del critic._pre_increment_hook_orig
     del critic._next_action_hook_orig
 
-def puppy_plot_action(analysis, episode, critic, reservoir, inspect_epochs, actions_range_x, actions_range_y, step_width, obs_offset):
+def puppy_plot_action(analysis, episode, critic, reservoir, inspect_epochs, actions_range_x, actions_range_y, step_width, obs_offset, actions=None):
     """
     
     .. todo::
@@ -239,5 +246,10 @@ def puppy_plot_action(analysis, episode, critic, reservoir, inspect_epochs, acti
         pylab.title('Expected Return per action at epoch ' + str(trg_epoch))
         pylab.xlabel('Amplitude right legs') # cols are idx_y, right legs
         pylab.ylabel('Amplitude left legs') # rows are idx_x, left legs
+    
+    if actions is not None:
+        a_left, a_right = zip(*actions)
+        pylab.plot(a_left, a_right, 'r')
+        pylab.plot([a_left[0]], [a_right[0]], 'rs')
     
     return fig
