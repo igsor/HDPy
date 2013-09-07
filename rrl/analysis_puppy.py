@@ -315,9 +315,8 @@ def puppy_vid_init(actions_range_x, actions_range_y, with_actions=True):
     
     return fig, axis, axim, title, (a_line, a_marker, (ox,sx), (oy,sy))
 
-def puppy_vid_inspected_trajectory(analysis, episode_idx, step_width, axis, inspect_epochs, obs_offset):
-    puppy_plot_trajectory(analysis, axis, episode_idx, step_width, color='b')
-    trg_x = [analysis[episode_idx]['puppyGPS_x'][obs_offset + step_width*trg_epoch+step_width-1] for trg_epoch in inspect_epochs]
-    trg_y = [analysis[episode_idx]['puppyGPS_y'][obs_offset + step_width*trg_epoch+step_width-1] for trg_epoch in inspect_epochs]
-    axis.plot(trg_x, trg_y, 'k*', label='Inspected states')
-    return axis
+def puppy_vid_inspected_trajectory(grp, step_width, loc_marker, epoch_idx, obs_offset):
+    loc_x = grp['puppyGPS_x'][obs_offset+step_width*epoch_idx+step_width-1]
+    loc_y = grp['puppyGPS_y'][obs_offset+step_width*epoch_idx+step_width-1]
+    loc_marker.set_data([loc_x], [loc_y])
+    return loc_marker
