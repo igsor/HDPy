@@ -20,7 +20,7 @@ def puppy_plot_trajectory(analysis, axis, episode, step_width=1, offset=0, legen
 
     col = kwargs.pop('color', 'k')
     label = kwargs.pop('label', 'Trajectory')
-    axis.plot(gps_x, gps_y, color=col, **kwargs)
+    axis.plot(gps_x, gps_y, color=col, linewidth=3, **kwargs)
     axis.axis('equal')
     if legend:
         axis.plot(gps_x[0], gps_y[0], 'ks', label='Start')
@@ -67,7 +67,7 @@ def puppy_plot_locationtarget(axis, target=(4.0, 4.0), distance=0.5, **kwargs):
     color = kwargs.pop('facecolor', 'k')
     fill = kwargs.pop('fill', False)
     lbl = kwargs.pop('label', 'Target')
-    axis.plot([target[0]], [target[1]], 'kD', **kwargs)
+    axis.plot([target[0]], [target[1]], 'kD', label=lbl, **kwargs)
     if distance > 0.0:
         trg_field = pylab.Circle(target, distance, fill=fill, facecolor=color, linewidth=linewidth, label=lbl, **kwargs)
         axis.add_artist(trg_field)
@@ -80,7 +80,7 @@ def puppy_plot_landmarks(axis, landmarks, **kwargs):
     lbl = kwargs.pop('label', '')
     marker = kwargs.pop('marker','^')
     for x,y in landmarks:
-        axis.plot([x],[y], marker=marker, color=color)
+        axis.plot([x],[y], marker=marker, color=color, label=lbl, **kwargs)
     return axis
 
 def puppy_offline_playback(pth_data, critic, samples_per_action, ms_per_step, episode_start=None, episode_end=None, min_episode_len=0):
@@ -242,7 +242,7 @@ def puppy_plot_action(analysis, episode, critic, reservoir, inspect_epochs, acti
     return fig
 
 def puppy_plot_inspected_trajectory(analysis, episode_idx, step_width, axis, inspect_epochs, obs_offset):
-    puppy_plot_trajectory(analysis, axis, episode_idx, step_width, color='b')
+    puppy_plot_trajectory(analysis, axis, episode_idx, step_width, color='b', offset=obs_offset)
     trg_x = [analysis[episode_idx]['puppyGPS_x'][obs_offset + step_width*trg_epoch+step_width-1] for trg_epoch in inspect_epochs]
     trg_y = [analysis[episode_idx]['puppyGPS_y'][obs_offset + step_width*trg_epoch+step_width-1] for trg_epoch in inspect_epochs]
     axis.plot(trg_x, trg_y, 'k*', label='Inspected states')
@@ -250,7 +250,9 @@ def puppy_plot_inspected_trajectory(analysis, episode_idx, step_width, axis, ins
 
 def _puppy_action_eval(grp, reservoir, critic, trg_epoch, obs_offset, step_width, actions_range_x, actions_range_y):
     reservoir.reset()
-    reservoir.states = np.atleast_2d(grp['x_curr'][trg_epoch-1,:])
+    #reservoir.states = np.atleast_2d(grp['x_next'][trg_epoch-1-25,:])
+    #reservoir.states = np.atleast_2d(grp['x_curr'][trg_epoch-1,:])
+    reservoir.states = np.atleast_2d(grp['x_curr'][trg_epoch-1,:reservoir.get_output_dim()])
     
     # evaluate actions
     # Note: epoch is one step ahead (of a_curr, same time as a_next)!
@@ -290,18 +292,25 @@ def puppy_vid_action(image, (a_line, a_marker, px, py), grp, critic, reservoir, 
     return image
 
 def puppy_vid_init(actions_range_x, actions_range_y, with_actions=True):
+    """
+    
+    .. todo::
+        The action isn't displayed correctly (offset?)
+    
+    """
     fig = pylab.figure()
     axis = fig.add_subplot(111)
     axis.set_xticks(range(len(actions_range_y)))
     axis.set_xticklabels(actions_range_y)
     axis.set_yticks(range(len(actions_range_x)))
     axis.set_yticklabels(actions_range_x)
-    title = fig.suptitle('Expected Return per action')
+    #title = fig.suptitle('Expected Return per action')
+    title = None
     axis.set_xlabel('Amplitude right legs') # cols are idx_y, right legs
     axis.set_ylabel('Amplitude left legs') # rows are idx_x, left legs
     axis.plot((0, len(actions_range_x)-1), (0, len(actions_range_y)-1), 'b')
     img_data = np.zeros((len(actions_range_x), len(actions_range_y)))
-    axim = axis.imshow(img_data, origin='lower', cmap=pylab.cm.gray)
+    axim = axis.imshow(img_data, origin='lower', cmap=pylab.cm.Greys)
     fig.colorbar(axim)
     
     # action line

@@ -253,7 +253,7 @@ class Analysis:
         return history
     
     def episode_len(self):
-        return np.array([len(self.f[e]['reward']) for e in self.experiments])
+        return np.array([len(self.f[e]['a_curr']) for e in self.experiments])
     
     def plot_episode_len(self, axis, **kwargs):
         """Plot the length of the episodes in ``axis``."""
@@ -269,7 +269,7 @@ class Analysis:
     def stack_data(self, key):
         """Return data related to ``key`` of all experiments in a single
         array."""
-        data = [self.f[exp][key][:] for exp in self.experiments]
+        data = [self.f[exp][key][:] for exp in self.experiments if key in self.f[exp]]
         return np.concatenate(data)
     
     def num_steps(self, key=None):
@@ -786,9 +786,9 @@ def critic(plant, reservoir, readout, norm=None):
         action_nrm = norm.normalize_value('a_curr', action)
         i_curr = np.vstack((in_state, action_nrm)).T
         x_curr = reservoir(i_curr, simulate=simulate)
-        #o_curr = np.hstack((x_curr, i_curr)) # FIXME: Input/Output ESN Model
-        #j_curr = readout(o_curr) # FIXME: Input/Output ESN Model
-        j_curr = readout(x_curr)
+        #o_curr = x_curr # FIXME: Direct ESN Model
+        o_curr = np.hstack((x_curr, i_curr)) # FIXME: Input/Output ESN Model
+        j_curr = readout(o_curr)
         return j_curr
     
     return critic_fu

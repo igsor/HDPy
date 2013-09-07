@@ -404,25 +404,40 @@ class ADHDP(ActorCritic):
         """Evaluate the critic at ``state`` and ``action``."""
         in_state = self.plant.state_input(state)
         action_nrm = self.normalizer.normalize_value(action_name, action)
-        #in_state += np.random.normal(scale=0.05, size=in_state.shape)
         r_input = np.vstack((in_state, action_nrm)).T
+        #r_input += np.random.normal(scale=0.001, size=r_input.shape)
         r_state = self.reservoir(r_input, simulate=simulate)
-        #o_input = np.hstack((r_state, r_input)) # FIXME: Input/Output ESN Model
-        #j_curr = self.readout(o_input) # FIXME: Input/Output ESN Model
-        j_curr = self.readout(r_state)
-        return r_input, r_state, j_curr
+        #o_state = r_state # FIXME: Direct ESN Model
+        o_state = np.hstack((r_state, r_input)) # FIXME: Input/Output ESN Model
+        j_curr = self.readout(o_state)
+        return r_input, o_state, j_curr
     
-    def _critic_deriv(self, r_state):
+    def _critic_deriv_io_model(self, r_state):
         """Return the critic's derivative at ``r_state``."""
+        direct_input_size = self.plant.state_space_dim()+self.policy.action_space_dim() # FIXME: Input/Output ESN Model
+        r_state = r_state[:,:-direct_input_size] # this is because _critic_eval appends the input to the state
         e = (np.ones(r_state.shape) - r_state**2).T # Nx1
         k = e * self.reservoir.w_in[:, -self._motor_action_dim:].toarray() # Nx1 .* NxA => NxA
-        deriv = self.readout.beta[1:].T.dot(k) #  LxA
-        #deriv = self.readout.beta[1:-i_curr.shape[1]].T.dot(k) #  LxA  # FIXME: Input/Output ESN Model
-        #deriv += self.readout.beta[-self._motor_action_dim:].T # FIXME: Input/Output ESN Model
+        deriv = self.readout.beta[1:-direct_input_size].T.dot(k) # FIXME: Input/Output ESN Model
+        deriv += self.readout.beta[-self._motor_action_dim:].T # FIXME: Input/Output ESN Model
         deriv = deriv.T # AxL
         scale = self.normalizer.get('a_curr')[1]
         deriv *= scale # Derivative denormalization
         return deriv
+    
+    def _critic_deriv_direct_model(self, r_state):
+        """Return the critic's derivative at ``r_state``."""
+        e = (np.ones(r_state.shape) - r_state**2).T # Nx1
+        k = e * self.reservoir.w_in[:, -self._motor_action_dim:].toarray() # Nx1 .* NxA => NxA
+        deriv = self.readout.beta[1:].T.dot(k) #  LxA # FIXME: Direct ESN Model
+        deriv = deriv.T # AxL
+        scale = self.normalizer.get('a_curr')[1]
+        deriv *= scale # Derivative denormalization
+        return deriv
+    
+    def _critic_deriv(self, r_state):
+        """Return the critic's derivative at ``r_state``."""
+        return self._critic_deriv_io_model(r_state)
     
     def _step(self, s_curr, s_next, a_curr, reward):
         """Execute one step of the actor and return the next action.
@@ -578,6 +593,9 @@ class CollectingADHDP(ADHDP):
             #    'r_input'  : self.reservoir.w_in.todense()
             #    }
         )
+        
+        # in case of online experiments, episode number is taken from data file
+        self.num_episode = int(self.collector.grp_name) + 1
     
     def __del__(self):
         del self.collector

@@ -55,23 +55,24 @@ class PuppyHDP(CollectingADHDP):
         if self.supervisor_tumbled_notice > 0:
             if self.supervisor_tumbled_notice > 1:
                 if self._tumbled_reward is not None:
-                    reward = self._tumbled_reward
+                    reward = np.atleast_2d([self._tumbled_reward])
                 
-                reward /= (1.0 - self.gamma(self.num_episode, self.num_step))
+                #reward /= (1.0 - self.gamma(self.num_episode, self.num_step))
                 # geometric series to incorporate future rewards
                 # note that with this, its err = r/(1-gamma) - J * (1-gamma)
                 # but should be err = r/(1-gamma) - J
                 # thus, there's an difference of J*gamma
                 # is solved this by temporarily set gamma = 0.0
                 self.has_tumbled = True
-                old_gamma = self.gamma
-                self.set_gamma(0.0)
+                #old_gamma = self.gamma
+                #self.set_gamma(0.0)
             self.supervisor_tumbled_notice += 1
         
+        reward += np.random.normal(scale=0.001)
         a_next = super(PuppyHDP, self)._step(s_curr, s_next, a_curr, reward)
         
-        if self.supervisor_tumbled_notice > 2:
-            self.gamma = old_gamma
+        #if self.supervisor_tumbled_notice > 2:
+        #    self.gamma = old_gamma
         
         #print self.num_step, reward, a_curr.T, a_next.T, s_next['puppyGPS_x'][-1]
         return a_next
@@ -93,6 +94,7 @@ class PuppyHDP(CollectingADHDP):
             a_curr_nrm = self.normalizer.normalize_value('a_curr', self.a_curr)
             i_curr = np.vstack((in_state, a_curr_nrm)).T
             x_curr = self.reservoir(i_curr, simulate=False)
+            x_curr = np.hstack((x_curr, i_curr)) # FIXME: Input/Output ESN Model
             self._pre_increment_hook(
                 epoch,
                 x_curr=x_curr,

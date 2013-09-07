@@ -198,19 +198,24 @@ class LandmarksTarLoc(Plant):
         diff = self.target - point
         dist = np.linalg.norm(diff)
         
-        reward = -dist
+        if dist < self.radius:
+            dist = 0.0
+        
+        #reward = -dist
         #reward = 1.0/dist
         #reward = np.atleast_2d([exp(-0.2*dist)])
+        #reward = np.atleast_2d([exp(-0.3*(dist-4.0))])
+        reward = exp(-0.25*(dist-9.0)) + 1.0
+        
         #reward = np.tanh(1.0/dist)
         
         #if dist < self.radius:
         #    reward = 0.0
         
         if self.reward_noise > 0.0:
-            reward += np.random.normal(scale=self.reward_noise, size=reward.shape)
+            reward += np.random.normal(scale=self.reward_noise)
         
         return reward
-
 
 class LandmarksTarLocDiff(Plant):
     """A :py:class:`Plant` which gives positive reward proportional to the absolute difference 

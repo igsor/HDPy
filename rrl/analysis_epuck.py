@@ -164,8 +164,18 @@ def epuck_plot_snapshot(axis, robot, critic, trajectory, sample_actions, init_st
     # plot rays
     for (loc, ori, length, predicted_return) in rays:
         nrm_return = (predicted_return - r_offset) / r_scale
-        nrm_return *= 0.7
-        col = pylab.cm.hot(nrm_return)
+        #nrm_return *= 0.7
+        #col = pylab.cm.hot(nrm_return) # for the report
+        col = pylab.cm.spectral(nrm_return*0.25) # for the presentation
+        # other schemas (not used)
+        #col = pylab.cm.Spectral(nrm_return*0.8)
+        #col = pylab.cm.gray(nrm_return)
+        #col = pylab.cm.winter(nrm_return)
+        #col = pylab.cm.gist_heat(nrm_return*0.9)
+        #col = pylab.cm.Accent(nrm_return) # ok
+        #col = pylab.cm.Dark2(nrm_return) # ok, a bit indifferent
+        #col = pylab.cm.RdGy(nrm_return) # ok, a bit indifferent
+        #col = pylab.cm.RdYlBu(nrm_return) # ok
         
         # plot ray
         _plot_line(axis, loc, ori, size_hi=length+0.03, size_lo=robot_radius+0.03, color=col, linewidth=4)

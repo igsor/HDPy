@@ -402,6 +402,7 @@ class OnlineLinearRegression(mdp.Node): # FIXME: Does not work properly
         """
         return np.concatenate((np.ones((x.shape[0], 1), dtype=self.dtype), x), axis=1)
 
+#class PlainRLS: # For old pickled instances, the class must not be new-style
 class PlainRLS(object):
     """Compute online least-square, multivariate linear regression.
     
