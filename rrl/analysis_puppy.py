@@ -205,18 +205,18 @@ def puppy_offline_playback(pth_data, critic, samples_per_action, ms_per_step, ep
     del critic._pre_increment_hook_orig
     del critic._next_action_hook_orig
 
-def puppy_plot_action(analysis, episode, critic, reservoir, inspect_epochs, actions_range_x, actions_range_y, step_width, obs_offset, actions=None):
+def puppy_plot_action(analysis, episode, critic, reservoir, inspect_epochs, actions_range_x, actions_range_y, step_width, obs_offset, epoch_actions=None):
     """
     
     .. todo::
-        offset in case of offline data?
-    
-    .. todo::
-        implementation unfinished, untested, undocumented
+        documentation, video mode
     
     """
     grp = analysis[episode]
-    for trg_epoch in inspect_epochs:
+    if epoch_actions is None:
+        epoch_actions = [None] * len(inspect_epochs)
+    
+    for trg_epoch, actions in zip(inspect_epochs, epoch_actions):
         reservoir.reset()
         reservoir.states = np.atleast_2d(grp['x_curr'][trg_epoch-1,:])
 
@@ -247,9 +247,16 @@ def puppy_plot_action(analysis, episode, critic, reservoir, inspect_epochs, acti
         pylab.xlabel('Amplitude right legs') # cols are idx_y, right legs
         pylab.ylabel('Amplitude left legs') # rows are idx_x, left legs
     
-    if actions is not None:
-        a_left, a_right = zip(*actions)
-        pylab.plot(a_left, a_right, 'r')
-        pylab.plot([a_left[0]], [a_right[0]], 'rs')
+        if actions is not None:
+            a_left, a_right = zip(*actions)
+            pylab.plot(a_left, a_right, 'r')
+            pylab.plot([a_left[0]], [a_right[0]], 'rs')
     
     return fig
+
+def puppy_plot_inspected_trajectory(analysis, episode_idx, step_width, axis, inspect_epochs, obs_offset):
+    puppy_plot_trajectory(analysis, axis, episode_idx, step_width, color='b')
+    trg_x = [analysis[episode_idx]['puppyGPS_x'][obs_offset + step_width*trg_epoch+step_width-1] for trg_epoch in inspect_epochs]
+    trg_y = [analysis[episode_idx]['puppyGPS_y'][obs_offset + step_width*trg_epoch+step_width-1] for trg_epoch in inspect_epochs]
+    axis.plot(trg_x, trg_y, 'k*', label='Inspected states')
+    return axis
