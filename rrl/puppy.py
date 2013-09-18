@@ -2,8 +2,10 @@
 HDP code for Puppy experiments
 
 """
-from rl import CollectingADHDP, Plant
+from hdp import CollectingADHDP
+from rl import Plant
 import numpy as np
+import warnings
 
 class PuppyHDP(CollectingADHDP):
     """ADHDP subtype for simulations using Puppy in webots.
@@ -107,12 +109,27 @@ class PuppyHDP(CollectingADHDP):
         return self.policy.get_iterator(time_start_ms, time_end_ms, step_size_ms)
 
 class OfflineCollector(CollectingADHDP):
+    """Collect sensor data for Puppy in webots, such that it can be
+    reused later to train a critic offline.
+    
+    Note that in contrast to :py:class:`CollectingADHDP`, some
+    structures are not required (reservoir, plant). They will be set
+    to stubs, hence don't need to be passed. 
+    
+    Some extra metadata is stored in the datafile, which allows
+    processing of the experiment in an offline fashion through the
+    function :py:func:`puppy_offline_playback`.
+    
+    """
     def __init__(self, *args, **kwargs):
         class Phony:
+            """Stub for a reservoir."""
             reset_states = False
             def get_input_dim(self):
+                """Return input dimension (action space dim.)"""
                 return kwargs['policy'].action_space_dim()
             def reset(self):
+                """Reset to the initial state (no effect)"""
                 pass
         
         kwargs['plant'] = Plant(state_space_dim=0)
@@ -129,6 +146,13 @@ class OfflineCollector(CollectingADHDP):
         self.supervisor_tumbled_notice = 0
     
     def __call__(self, epoch, time_start_ms, time_end_ms, step_size_ms):
+        """Store the sensor measurements of an epoch in the datafile
+        as well as relevant metadata. The robot detects if the
+        simulation was reverted and if it has tumbled (through the
+        supervisor message). Other guards are not considered, as none
+        are covered by :py:class:`PuppyHDP`.
+        
+        """
         #print "(call)", time_start_ms, self.a_curr.T, ('puppyGPS_x' in epoch and epoch['puppyGPS_x'][-1] or 'NOX')
         if len(epoch) == 0:
             # the very first initial epoch of the first episode
@@ -192,9 +216,15 @@ class OfflineCollector(CollectingADHDP):
             self.new_episode()
     
     def _next_action_hook(self, a_next):
+        """Defines the action sampling policy of the offline data
+        gathering. Note that this policy is very relevant to later
+        experiments, hence this methods should be overloaded (although
+        a default policy is provided).
+        """
+        warnings.warn('Default sampling policy is used.')
         a_next = np.zeros(self.a_curr.shape)
-        while (a_next < 0.2).any() or (a_next > 2.0).any() or ((a_next > 1.0).any() and a_next.ptp() > 0.4): # Prohibit too small or large amplitudes
-            #a_next = self.a_curr + np.random.uniform(-0.2, 0.2, size=self.a_curr.shape)
+        # Prohibit too small or large amplitudes
+        while (a_next < 0.2).any() or (a_next > 2.0).any() or ((a_next > 1.0).any() and a_next.ptp() > 0.4):
             a_next = self.a_curr + np.random.normal(0.0, 0.15, size=self.a_curr.shape)
         
         return a_next

@@ -6,6 +6,7 @@ ACD plants
 from rl import Plant
 import numpy as np
 from math import exp
+import warnings
 
 class SpeedReward(Plant):
     """A :py:class:`Plant` with focus on the speed of the robot.
@@ -27,10 +28,7 @@ class SpeedReward(Plant):
         """Return the covered distance and -1.0 if the robot tumbled.
         The speed measurement is taken from the 100th to the last sample.
         """
-        #acc_z = epoch['accelerometer_z'][-100:] * 86.346093474890296 - 13.893742994128598 # unit interval
-        #acc_z = epoch['accelerometer_z'][-100:] * 3.9537216197680531 + 9.1285160984449654 # zero mean, unit variance
-        #if (acc_z < 1.0).sum() > 80: # FIXME: Normalization
-        if (epoch['accelerometer_z'][-100:] < 1.0).sum() > 80: # FIXME: Normalization
+        if (epoch['accelerometer_z'][-100:] < 1.0).sum() > 80:
             return -1.0
         
         x = epoch['puppyGPS_x']
@@ -56,8 +54,8 @@ class LineFollower(Plant):
         
         self.direction /= np.linalg.norm(self.direction)
         
-        assert self.direction.shape == (2,1)
-        assert self.origin.shape == (2,1)
+        assert self.direction.shape == (2, 1)
+        assert self.origin.shape == (2, 1)
     
     def state_input(self, state):
         """Return the latest *GPS* (x,y) values.
@@ -72,12 +70,9 @@ class LineFollower(Plant):
         """Return the distance between the current robot location and
         the line.
         """
-        #if (epoch['accelerometer_z'][-100:] < 1.0).sum() > 80: # FIXME: Normalization
-        #    return 0.0
-        
         x = epoch['puppyGPS_x'][-1]
         y = epoch['puppyGPS_y'][-1]
-        point = np.atleast_2d([x,y]).T
+        point = np.atleast_2d([x, y]).T
         
         #(origin - point) - (<origin - point, dir>) * dir
         diff = self.origin - point
@@ -102,7 +97,7 @@ class TargetLocation(Plant):
         if self.target.shape[0] < self.target.shape[1]:
             self.target = self.target.T
             
-        assert self.target.shape == (2,1)
+        assert self.target.shape == (2, 1)
     
     def state_input(self, state):
         """Return the latest *GPS* (x,y) values.
@@ -120,78 +115,9 @@ class TargetLocation(Plant):
         .. todo::
             Average location over multiple samples of the epoch.
         """
-        #if (epoch['accelerometer_z'][-100:] < 1.0).sum() > 80: # FIXME: Normalization
-        #    return 0.0
-        
         x = epoch['puppyGPS_x'][-1]
         y = epoch['puppyGPS_y'][-1]
-        point = np.atleast_2d([x,y]).T
-        
-        
-        #(target - point)
-        diff = self.target - point
-        dist = np.linalg.norm(diff)
-        
-        reward = -dist
-        if dist < self.radius:
-            reward = 0.0
-        
-        if self.reward_noise > 0.0:
-            reward += np.random.normal(scale=self.reward_noise, size=reward.shape)
-        
-        return reward
-
-class LandmarksTarLoc(Plant):
-    """A :py:class:`Plant` which gives negative reward proportional to
-    the distance to point ``target`` in the xy plane. If the robot is
-    closer than ``radius`` to the target, the reward will be 0.0.
-    The state is composed of the distance to predefined landmarks.
-    """
-    def __init__(self, target, landmarks, radius=0.0, reward_noise=0.01):
-        super(LandmarksTarLoc, self).__init__(state_space_dim=len(landmarks))
-        self.target = np.atleast_2d(target)
-        self.radius = radius
-        self.reward_noise = reward_noise
-        
-        self.landmarks = []
-        
-        for mark in landmarks:
-            mark = np.atleast_2d(mark)
-            if mark.shape[0] < mark.shape[1]:
-                mark = mark.T
-            self.landmarks.append(mark)
-        
-        if self.target.shape[0] < self.target.shape[1]:
-            self.target = self.target.T
-            
-        assert self.target.shape == (2,1)
-    
-    def state_input(self, state):
-        """Return the distance to the landmarks.
-        """
-        sio =  np.atleast_2d([
-            state['puppyGPS_x'][-10:].mean(),
-            state['puppyGPS_y'][-10:].mean()
-        ]).T
-        
-        dist = [np.linalg.norm(sio - mark) for mark in self.landmarks]
-        dist = np.atleast_2d(dist).T
-        dist = self.normalization.normalize_value('landmark_dist', dist)
-        return dist
-    
-    def reward(self, epoch):
-        """Return the distance between the current robot location and
-        the target point.
-        
-        .. todo::
-            Average location over multiple samples of the epoch.
-        """
-        #if (epoch['accelerometer_z'][-100:] < 1.0).sum() > 80: # FIXME: Normalization
-        #    return 0.0
-        
-        x = epoch['puppyGPS_x'][-1]
-        y = epoch['puppyGPS_y'][-1]
-        point = np.atleast_2d([x,y]).T
+        point = np.atleast_2d([x, y]).T
         
         
         #(target - point)
@@ -201,47 +127,30 @@ class LandmarksTarLoc(Plant):
         if dist < self.radius:
             dist = 0.0
         
-        #reward = -dist
-        #reward = 1.0/dist
-        #reward = np.atleast_2d([exp(-0.2*dist)])
-        #reward = np.atleast_2d([exp(-0.3*(dist-4.0))])
-        reward = exp(-0.25*(dist-9.0)) + 1.0
-        
-        #reward = np.tanh(1.0/dist)
-        
-        #if dist < self.radius:
-        #    reward = 0.0
+        reward = exp(-0.25 * (dist - 9.0)) + 1.0
         
         if self.reward_noise > 0.0:
             reward += np.random.normal(scale=self.reward_noise)
         
         return reward
 
-class LandmarksTarLocDiff(Plant):
-    """A :py:class:`Plant` which gives positive reward proportional to the absolute difference 
-    (between two episodes) in distance to point ``target`` in the xy plane.
+class TargetLocationLandmarks(TargetLocation):
+    """A :py:class:`Plant` which gives negative reward proportional to
+    the distance to point ``target`` in the xy plane. If the robot is
+    closer than ``radius`` to the target, the reward will be 0.0.
     The state is composed of the distance to predefined landmarks.
     """
-    def __init__(self, target, landmarks, reward_noise=0.01, init_distance=100):
-        super(LandmarksTarLocDiff, self).__init__(state_space_dim=len(landmarks))
-        self.target = np.atleast_2d(target)
-        self.reward_noise = reward_noise
+    def __init__(self, target, landmarks, radius=0.0, reward_noise=0.01):
+        super(TargetLocationLandmarks, self).__init__(target, radius, reward_noise)
+        self._state_space_dim = len(landmarks)
         
+        # add landmarks
         self.landmarks = []
-        
         for mark in landmarks:
             mark = np.atleast_2d(mark)
             if mark.shape[0] < mark.shape[1]:
                 mark = mark.T
             self.landmarks.append(mark)
-        
-        if self.target.shape[0] < self.target.shape[1]:
-            self.target = self.target.T
-            
-        assert self.target.shape == (2,1)
-        
-        self.init_distance = init_distance
-        self._last_target_distance = self.init_distance # TODO: what is good init value?
     
     def state_input(self, state):
         """Return the distance to the landmarks.
@@ -256,19 +165,22 @@ class LandmarksTarLocDiff(Plant):
         dist = self.normalization.normalize_value('landmark_dist', dist)
         return dist
     
+class DiffTargetLocationLandmarks(TargetLocationLandmarks):
+    """A :py:class:`Plant` which gives positive reward proportional to the absolute difference 
+    (between two episodes) in distance to point ``target`` in the xy plane.
+    The state is composed of the distance to predefined landmarks.
+    """
+    def __init__(self, target, landmarks, reward_noise=0.01, init_distance=100):
+        super(DiffTargetLocationLandmarks, self).__init__(target, landmarks, 0.0, reward_noise)
+        self.init_distance = init_distance
+        self._last_target_distance = self.init_distance # TODO: what is good init value?
+    
     def reward(self, epoch):
-        """Return the distance between the current robot location and
-        the target point.
-        
-        .. todo::
-            Average location over multiple samples of the epoch.
         """
-        #if (epoch['accelerometer_z'][-100:] < 1.0).sum() > 80: # FIXME: Normalization
-        #    return 0.0
-        
+        """
         x = epoch['puppyGPS_x'][-1]
         y = epoch['puppyGPS_y'][-1]
-        point = np.atleast_2d([x,y]).T
+        point = np.atleast_2d([x, y]).T
         
         
         #(target - point)
@@ -284,3 +196,25 @@ class LandmarksTarLocDiff(Plant):
     def reset(self):
         self._last_target_distance = self.init_distance
 
+
+class LandmarksTarLoc(TargetLocationLandmarks):
+    """
+    
+    .. deprecated:: 1.0
+        Use :py:class:`TargetLocationLandmarks` instead.
+    
+    """
+    def __init__(self, *args, **kwargs):
+        warnings.warn('This class is depcreated. Use TargetLocationLandmarks instead')
+        super(LandmarksTarLoc, self).__init__(*args, **kwargs)
+
+class LandmarksTarLocDiff(DiffTargetLocationLandmarks):
+    """
+    
+    .. deprecated:: 1.0
+        Use :py:class:`DiffTargetLocationLandmarks` instead.
+    
+    """
+    def __init__(self, *args, **kwargs):
+        warnings.warn('This class is depcreated. Use DiffTargetLocationLandmarks instead')
+        super(LandmarksTarLocDiff, self).__init__(*args, **kwargs)

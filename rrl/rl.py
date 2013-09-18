@@ -1,12 +1,39 @@
-"""Reinforcement learning parts of the rrl package. This mainly
-includes the Actor-Critic-Design.
+"""Reinforcement Learning parts of the module.
+
+The Reinforcement Learning Problem is approached by Actor-Critic
+methods. This method splits the agent (the learner) into a
+return-estimator (Critic) and an action-selection mechanism (Actor).
+The plant (also denoted environment) remains the same as in the
+standard framework.
+
+This file defines three structures to cover this setup:
+
+1) The Actor-Critic
+2) The Policy
+3) The Plant
+
+The **ActorCritic** class implements the Actor-Critic base
+algorithm. With the **Plant** and **Policy**, the learning problem can
+be specified decoupled from the algorithm which is used to solve it.
+
+The main concern of :py:class:`ActorCritic` is coarse behaviour,
+bookkeeping stuff, and integration of the parent's interface.
+As it inherits from :py:class:`PuPy.PuPyActor`, it can easily be
+combined with :py:mod:`PuPy`.
+
+This combination makes it necessary to have a structure which generates
+the motor targets from a possibly high-level action description. This
+link is implemented through :py:class:`Policy`. Hence, it also defines
+the action type for the Actor-Critic method.
+
+The :py:class`Plant` defines the influence of the environment,
+specifically the state and reward information.
+
 
 """
-
 import PuPy
 import numpy as np
 import cPickle as pickle
-from math import pi
 
 class Plant(object):
     """A template for Actor-Critic *plants*. The *Plant* describes the
@@ -19,9 +46,10 @@ class Plant(object):
     """
     def __init__(self, state_space_dim=None, norm=None):
         self._state_space_dim = state_space_dim
+        self.normalization = None
         self.set_normalization(norm)
     
-    def state_input(self, state, action):
+    def state_input(self, state):
         """Return the state-part of the critic input
         (i.e. the reservoir input).
         
@@ -76,6 +104,7 @@ class Policy(object):
     """
     def __init__(self, action_space_dim=None, norm=None):
         self._action_space_dim = action_space_dim
+        self.normalization = None
         self.set_normalization(norm)
     
     def initial_action(self):
@@ -126,7 +155,7 @@ class Policy(object):
             norm = PuPy.Normalization()
         self.normalization = norm
 
-class _ConstParam:
+class _ConstParam(object):
     """Stub for wrapping constant values into an executable function."""
     def __init__(self, value):
         self._value = value
@@ -134,24 +163,72 @@ class _ConstParam:
         """Return the constant value."""
         return self._value
 
-class ConstMomentum:
-    def __init__(self, value):
-        self._value = value
-        assert 0 <= self._value and self._value <= 1
-    def __call__(self, a_curr, a_next, time0=None, time1=None):
-        return self._value * a_curr + (1.0 - self._value) * a_next
+class Momentum(object):
+    """Template class for an action momentum. 
+    
+    With a momentum, the next action is computed from the lastest one
+    and the proposed action :math:`a^*`. The momentum controls how much
+    each of the two influences the next action. Generally, a momentum
+    of zero implies following strictly the proposal, while a momentum
+    of one does the opposite. Usually, the (linear) momentum is
+    formulated as
+    
+    .. math::
+        a_{t+1} = m a_t + (1-m) a^*
+    
+    The momentum may be time dependent with
+    - time0: Episode counter
+    - time1: Episode's step counter
+    
+    """
+    def __call__(self, a_curr, a_prop, time0=None, time1=None):
+        """Return the next action from a current action ``a_curr``, 
+        a proposal ``a_prop`` at episode ``time0`` in step ``time1``."""
+        raise NotImplementedError()
 
-class RadialMomentum:
+class ConstMomentum(Momentum):
+    """Linear momentum equation, as specified in :py:class:`Momentum`
+    with time-constant momentum value (m).
+    
+    ``value``
+        Momentum value, [0,1].
+    
+    """
     def __init__(self, value):
+        super(ConstMomentum, self).__init__()
         self._value = value
         assert 0 <= self._value and self._value <= 1
-    def __call__(self, a_curr, a_next, time0=None, time1=None):
-        phi0 = a_curr % (2*pi)
-        phi1 = a_next % (2*pi)
-        z0 = np.exp(phi0*1j)
-        z1 = np.exp(phi1*1j)
-        zr = self._value * z0 + (1.0 - self._value) * z1
-        return np.angle(zr) % (2*pi)
+    
+    def __call__(self, a_curr, a_prop, time0=None, time1=None):
+        """Return the next action from a current action ``a_curr``, 
+        a proposal ``a_prop`` at episode ``time0`` in step ``time1``."""
+        return self._value * a_curr + (1.0 - self._value) * a_prop
+
+class RadialMomentum(Momentum):
+    """Momentum with respect to angular action. The resulting action
+    is the (smaller) intermediate angle of the latest action
+    and proposal (with respect to the momentum). The actions are
+    supposed to be in radians, hence the output is in the range
+    :math:`[0,2\pi]`. The momentum is a time-constant value (m).
+    
+    ``value``
+        Momentum value, [0,1].
+    
+    """
+    def __init__(self, value):
+        super(RadialMomentum, self).__init__()
+        self._value = value
+        assert 0 <= self._value and self._value <= 1
+    
+    def __call__(self, a_curr, a_prop, time0=None, time1=None):
+        """Return the next action from a current action ``a_curr``, 
+        a proposal ``a_prop`` at episode ``time0`` in step ``time1``."""
+        phi_0 = a_curr % (2*np.pi)
+        phi_1 = a_prop % (2*np.pi)
+        imag_0 = np.exp(phi_0*1j)
+        imag_1 = np.exp(phi_1*1j)
+        imag_r = self._value * imag_0 + (1.0 - self._value) * imag_1
+        return np.angle(imag_r) % (2*np.pi)
 
 class ActorCritic(PuPy.PuppyActor):
     """Actor-critic design.
@@ -210,24 +287,33 @@ class ActorCritic(PuPy.PuppyActor):
     """
     def __init__(self, plant, policy, gamma=1.0, alpha=1.0, init_steps=1, norm=None, momentum=0.0):
         super(ActorCritic, self).__init__()
+        
+        # Initial members
         self.plant = plant
         self.policy = policy
-        if norm is None:
-            norm = PuPy.Normalization()
+        self.normalizer = None
+        self.num_episode = 0
+        self._init_steps = init_steps
+        self.a_curr = None
+        self._motor_action_dim = None
+        self.s_curr = dict()
+        self.alpha = None
+        self.momentum = None
+        self.gamma = None
+        self.num_step = 0
         
-        self.normalizer = norm
-        self.plant.set_normalization(self.normalizer)
-        self.policy.set_normalization(self.normalizer)
+        # Init members through dedicated routines
+        self.set_normalization(norm)
         self.set_alpha(alpha)
         self.set_gamma(gamma)
         self.set_momentum(momentum)
-        self.num_episode = 0
-        self.new_episode()
-        self._init_steps = init_steps
         
         # Check assumptions
         assert self.policy.initial_action().shape[0] >= 1
         assert self.policy.initial_action().shape[1] == 1
+        
+        # Start a new episode
+        self.new_episode()
     
     def new_episode(self):
         """Start a new episode of the same experiment. This method can
@@ -241,6 +327,20 @@ class ActorCritic(PuPy.PuppyActor):
         self.num_step = 0
     
     def init_episode(self, epoch, time_start_ms, time_end_ms, step_size_ms):
+        """Define the behaviour during the initial phase, i.e. as long
+        as
+        
+            num_step <= init_steps
+        
+        with ``num_step`` the episode's step iterator and ``init_steps``
+        given at construction (default 1). The default is to store the
+        ``epoch`` but do nothing else.
+        
+        .. note::
+            The step iterator ``num_step`` is incremented before this
+            method is called.
+        
+        """
         self.s_curr = epoch
         self._pre_increment_hook(epoch)
         return self.policy.get_iterator(time_start_ms, time_end_ms, step_size_ms)
@@ -258,14 +358,6 @@ class ActorCritic(PuPy.PuppyActor):
         if self.num_step <= self._init_steps:
             self.num_step += 1
             return self.init_episode(epoch, time_start_ms, time_end_ms, step_size_ms)
-        
-        """
-        if self.num_step < 3:
-            self.num_step += 1
-            self.s_curr = epoch
-            self._pre_increment_hook(epoch)
-            return self.policy.get_iterator(time_start_ms, time_end_ms, step_size_ms)
-        """
         
         # extern through the robot:
         # take action (a_curr = a_next in the previous run)
@@ -303,6 +395,11 @@ class ActorCritic(PuPy.PuppyActor):
             Latest observed state. :py:keyword:`dict`, same as ``epoch``
             of the :py:meth:`__call__`.
         
+        ``a_curr``
+            Previously executed action. This is the action which lead
+            from ``s_curr`` into ``s_next``. Type specified through
+            the :py:class:`Policy`.
+        
         ``reward``
             Reward of ``s_next``
         
@@ -322,9 +419,6 @@ class ActorCritic(PuPy.PuppyActor):
         """Postprocessing hook, after the next action ``a_next`` was
         proposed by the algorithm. Must return the possibly altered
         next action in the same format."""
-        #from math import pi
-        #a_next = np.random.uniform(-pi/2.0, pi/2.0, size=self.a_curr.shape)
-        #a_next = a_next % (2*pi)
         return a_next
     
     def save(self, pth):
@@ -375,227 +469,13 @@ class ActorCritic(PuPy.PuppyActor):
             self.momentum = momentum
         else:
             self.momentum = ConstMomentum(momentum)
+    
+    def set_normalization(self, norm):
+        """Set the normalization instance to ``norm``. The normalization
+        is propagated to the plant and policy."""
+        if norm is None:
+            norm = PuPy.Normalization()
+        self.normalizer = norm
+        self.plant.set_normalization(norm)
+        self.policy.set_normalization(norm)
 
-class ADHDP(ActorCritic):
-    """
-    """
-    def __init__(self, reservoir, readout, *args, **kwargs):
-        self.reservoir = reservoir
-        self.readout = readout
-        super(ADHDP, self).__init__(*args, **kwargs)
-        
-        # Check assumptions
-        assert self.reservoir.reset_states == False
-        assert self.reservoir.get_input_dim() == self.policy.action_space_dim() + self.plant.state_space_dim()
-        #assert self.readout.beta.shape == (self.reservoir.output_dim + 1, 1)
-        #assert self.readout.beta.shape == (self.reservoir.output_dim + self.policy.action_space_dim() + self.plant.state_space_dim() + 1, 1) # FIXME: Input/Output ESN Model
-        assert self.reservoir.get_input_dim() >= self.policy.initial_action().shape[0]
-    
-    def new_episode(self):
-        """Start a new episode of the same experiment. This method can
-        also be used to initialize the *ActorCritic*, for example when
-        it is loaded from a file.
-        """
-        self.reservoir.reset()
-        self.plant.reset()
-        super(ADHDP, self).new_episode()
-    
-    def _critic_eval(self, state, action, simulate, action_name='a_curr'):
-        """Evaluate the critic at ``state`` and ``action``."""
-        in_state = self.plant.state_input(state)
-        action_nrm = self.normalizer.normalize_value(action_name, action)
-        r_input = np.vstack((in_state, action_nrm)).T
-        #r_input += np.random.normal(scale=0.001, size=r_input.shape)
-        r_state = self.reservoir(r_input, simulate=simulate)
-        #o_state = r_state # FIXME: Direct ESN Model
-        o_state = np.hstack((r_state, r_input)) # FIXME: Input/Output ESN Model
-        j_curr = self.readout(o_state)
-        return r_input, o_state, j_curr
-    
-    def _critic_deriv_io_model(self, r_state):
-        """Return the critic's derivative at ``r_state``."""
-        direct_input_size = self.plant.state_space_dim()+self.policy.action_space_dim() # FIXME: Input/Output ESN Model
-        r_state = r_state[:,:-direct_input_size] # this is because _critic_eval appends the input to the state
-        e = (np.ones(r_state.shape) - r_state**2).T # Nx1
-        k = e * self.reservoir.w_in[:, -self._motor_action_dim:].toarray() # Nx1 .* NxA => NxA
-        deriv = self.readout.beta[1:-direct_input_size].T.dot(k) # FIXME: Input/Output ESN Model
-        deriv += self.readout.beta[-self._motor_action_dim:].T # FIXME: Input/Output ESN Model
-        deriv = deriv.T # AxL
-        scale = self.normalizer.get('a_curr')[1]
-        deriv *= scale # Derivative denormalization
-        return deriv
-    
-    def _critic_deriv_direct_model(self, r_state):
-        """Return the critic's derivative at ``r_state``."""
-        e = (np.ones(r_state.shape) - r_state**2).T # Nx1
-        k = e * self.reservoir.w_in[:, -self._motor_action_dim:].toarray() # Nx1 .* NxA => NxA
-        deriv = self.readout.beta[1:].T.dot(k) #  LxA # FIXME: Direct ESN Model
-        deriv = deriv.T # AxL
-        scale = self.normalizer.get('a_curr')[1]
-        deriv *= scale # Derivative denormalization
-        return deriv
-    
-    def _critic_deriv(self, r_state):
-        """Return the critic's derivative at ``r_state``."""
-        return self._critic_deriv_io_model(r_state)
-    
-    def _step(self, s_curr, s_next, a_curr, reward):
-        """Execute one step of the actor and return the next action.
-        
-        ``s_next``
-            Latest observed state. :py:keyword:`dict`, same as ``s_next``
-            of the :py:meth:`__call__`.
-        
-        ``s_curr``
-            Previous observed state. :py:keyword:`dict`, same as ``s_next``
-            of the :py:meth:`__call__`.
-        
-        ``reward``
-            Reward of ``s_next``
-        
-        """
-        # ESN-critic, first instance: in(k) => J(k)
-        i_curr, x_curr, j_curr = self._critic_eval(s_curr, a_curr, simulate=False, action_name='a_curr')
-        
-        # Next action
-        deriv = self._critic_deriv(x_curr)
-        
-        # gradient training of action (acc. to eq. 10)
-        #a_next = a_curr + self.alpha(self.num_episode, self.num_step) * deriv
-        a_next = a_curr + self.alpha(self.num_episode, self.num_step) * deriv
-        a_next = self.momentum(a_curr, a_next, self.num_episode, self.num_step)
-        a_next = self._next_action_hook(a_next)
-        
-        # ESN-critic, second instance: in(k+1) => J(k+1)
-        i_next, x_next, j_next = self._critic_eval(s_next, a_next, simulate=True, action_name='a_next')
-        
-        # TD_error(k) = J(k) - U(k) - gamma * J(k+1)
-        err = reward + self.gamma(self.num_episode, self.num_step) * j_next - j_curr
-        
-        # One-step RLS training => Trained ESN
-        self.readout.train(x_curr, e=err)
-        #trg = reward + self.gamma(self.num_episode, self.num_step) * j_next
-        #self.readout.train(x_curr, d=trg)
-        #self.readout.train(o_curr, e=err) # FIXME: Input/Output ESN Model
-        
-        # increment hook
-        self._pre_increment_hook(
-            s_next,
-            reward=np.atleast_2d([reward]).T,
-            deriv=deriv.T,
-            err=err.T,
-            readout=self.readout.beta.T,
-            #psiInv=self.readout._psiInv.reshape((1, self.readout._psiInv.shape[0]**2)),
-            gamma=np.atleast_2d([self.gamma(self.num_episode, self.num_step)]).T,
-            i_curr=i_curr,
-            x_curr=x_curr,
-            j_curr=j_curr,
-            a_curr=a_curr.T,
-            i_next=i_next,
-            x_next=x_next,
-            j_next=j_next,
-            a_next=a_next.T
-            )
-        
-        # increment
-        return a_next
-    
-    def init_episode(self, epoch, time_start_ms, time_end_ms, step_size_ms):
-        """Initial behaviour (after reset)
-        
-        .. note::
-            Assuming identical initial trajectories, the initial state
-            is the same - and thus doesn't matter.
-            Non-identical initial trajectories will result in
-            non-identical behaviour, therefore the initial state should
-            be different (initial state w.r.t. start of learning).
-            Due to this, the critic is already updated in the initial
-            trajectory.
-        """
-        if self.num_step > 1:
-            in_state = self.plant.state_input(self.s_curr)
-            a_curr_nrm = self.normalizer.normalize_value('a_curr', self.a_curr)
-            i_curr = np.vstack((in_state, a_curr_nrm)).T
-            x_curr = self.reservoir(i_curr, simulate=False)
-            self._pre_increment_hook(
-                epoch,
-                x_curr=x_curr,
-                i_curr=i_curr,
-                a_next=self.a_curr.T,
-                a_curr=self.a_curr.T,
-            )
-        
-        self.s_curr = epoch
-        return self.policy.get_iterator(time_start_ms, time_end_ms, step_size_ms)
-
-class CollectingADHDP(ADHDP):
-    """Actor-Critic design with data collector.
-    
-    A :py:class:`PuPy.PuppyCollector` instance is created for recording
-    sensor data and actor-critic internals together. The file is stored
-    at ``expfile``.
-    """
-    def __init__(self, expfile, *args, **kwargs):
-        self.expfile = expfile
-        self.collector = None
-        
-        self.headers = None
-        if 'additional_headers' in kwargs:
-            self.headers = kwargs.pop('additional_headers')
-        
-        super(CollectingADHDP, self).__init__(*args, **kwargs)
-    
-    def _pre_increment_hook(self, epoch, **kwargs):
-        """Add the *ADHDP* internals to the epoch and use the
-        *collector* to save all the data.
-        """
-        ep_write = epoch.copy()
-        for key in kwargs:
-            ep_write[key] = kwargs[key]
-        
-        self.collector(ep_write, 0, 1, 1)
-    
-    def save(self, pth):
-        """Save the instance without the *collector*.
-        
-        .. note::
-            When an instance is reloaded via :py:meth:`ADHDP.load`
-            a new group will be created in *expfile*.
-        
-        """
-        # Shift collector to local
-        collector = self.collector
-        self.collector = None
-        super(CollectingADHDP, self).save(pth)
-        # Shift collector to class
-        self.collector = collector
-
-    def new_episode(self):
-        """Do everything the parent does and additionally reinitialize
-        the collector. The reservoir weights are stored as header
-        information.
-        """
-        super(CollectingADHDP, self).new_episode()
-        
-        # init/reset collector
-        if self.collector is not None:
-            del self.collector
-        
-        self.collector = PuPy.PuppyCollector(
-            actor=None,
-            expfile=self.expfile,
-            headers=self.headers
-            #headers={
-            #    # FIXME: Store complete reservoir or at least include the bias
-            #    # FIXME: Doesn't work with too large reservoirs (>80 nodes)? This is because of the size limit of HDF5 headers
-            #    #        Could be stored as dataset though...
-            #    'r_weights': self.reservoir.w.todense(),
-            #    'r_input'  : self.reservoir.w_in.todense()
-            #    }
-        )
-        
-        # in case of online experiments, episode number is taken from data file
-        self.num_episode = int(self.collector.grp_name) + 1
-    
-    def __del__(self):
-        del self.collector

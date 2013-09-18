@@ -25,17 +25,21 @@ Reference
     :members:
     :show-inheritance:
 
-.. autoclass:: OnlineLinearRegression
-    :members:
-    :show-inheritance:
-
 .. autoclass:: SparseReservoirNode
     :members:
     :show-inheritance:
 
-.. autofunction:: OrthogonalReservoir
+.. autofunction:: orthogonal_reservoir
 
-.. autoclass:: FreerunFlow
-    :members:
-    :show-inheritance:
+.. dense_w_in
+.. sparse_w_in
+.. dense_w_bias
+.. sparse_reservoir
+.. orthogonal_reservoir
+.. chain_of_neurons
+.. ring_of_neurons
+
+.. reservoir_memory
+.. query_reservoir_memory
+.. find_radius_for_mc
 

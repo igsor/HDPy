@@ -17,21 +17,24 @@ Example
 Reference
 ---------
 
-.. autoclass:: ADHDP
-    :members:
-    :show-inheritance:
-
 .. autoclass:: Plant
     :members:
 
 .. autoclass:: Policy
     :members:
 
-.. autoclass:: FRA
+.. autoclass:: ActorCritic
     :members:
-    :show-inheritance:
 
-.. autoclass:: SpeedReward
+.. autoclass:: Momentum
+
+.. autoclass:: ConstMomentum
+
+.. autoclass:: RadialMomentum
+
+
+
+.. autoclass:: ADHDP
     :members:
     :show-inheritance:
 

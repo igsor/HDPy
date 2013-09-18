@@ -42,11 +42,16 @@ class GaitPolicy(Policy):
         """Return an iterator for the *motor_target* sequence.
         """
         return self.gait.iter(time_start_ms, step_size_ms)
-
+    
     def reset(self):
         """Reset the gait to the original values."""
         self.gait = self.gait_orig.copy()
-
+    
+    def update(self, action):
+        raise NotImplementedError()
+    
+    def initial_action(self):
+        raise NotImplementedError()
 
 ## All legs
 
