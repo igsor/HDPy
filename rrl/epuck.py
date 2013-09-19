@@ -1,11 +1,17 @@
+"""
 
+.. todo::
+    documentation
+    
+
+"""
 import numpy as np
-from math import cos,sin,pi,sqrt,acos
 import pylab
 import warnings
+#import epuck_arena
 
 
-def intersect((o1x, o1y), (d1x, d1y), (o2x, o2y), (d2x, d2y)):
+def _intersect((o1x, o1y), (d1x, d1y), (o2x, o2y), (d2x, d2y)):
     """Intersection of two bounded lines. The lines are given
     with the origin and direction. Returned is the step length for
     both lines, in the same order as the input.
@@ -44,8 +50,8 @@ def intersect((o1x, o1y), (d1x, d1y), (o2x, o2y), (d2x, d2y)):
     
     return t1, t0
 
-def in_obstacle(loc, obstacle):
-    """
+def _in_obstacle(loc, obstacle):
+    """Check if a location is within an obstacle.
     
     Assuming the obstacle edges are given in the right order (meaning
     that the polygon is defined through lines between successive
@@ -63,20 +69,20 @@ def in_obstacle(loc, obstacle):
     faces = [(p0,p1) for p0,p1 in zip(obstacle[:-1], obstacle[1:])]
     faces.append((obstacle[-1], obstacle[0]))
     
-    num_intersect = sum([obs_intersect((loc, (0.0, 0.0)), line) for line in faces])
+    num_intersect = sum([_obs_intersect((loc, (0.0, 0.0)), line) for line in faces])
     if num_intersect % 2 == 0:
         return False
     else:
         return True
 
-def obs_intersect(((x0,y0), (x1,y1)), ((x2,y2), (x3,y3))):
+def _obs_intersect(((x0,y0), (x1,y1)), ((x2,y2), (x3,y3))):
     """Check if two lines intersect. The boundaries don't count as
     intersection."""
     base1 = (x0, y0)
     base2 = (x2, y2)
     dir1 = (x1-x0, y1-y0)
     dir2 = (x3-x2, y3-y2)
-    t1, t2 = intersect(base1, dir1, base2, dir2)
+    t1, t2 = _intersect(base1, dir1, base2, dir2)
     
     eps = 0.00001
     if -eps < t1 and t1 < 1.0 + eps and -eps < t2 and t2 < 1.0 + eps:
@@ -91,7 +97,7 @@ class Robot(object):
     obstacle_line are single lines, not necessarily connected
     
     the robot cannot be reset within a polygon
-    polygons may not include the oritin, (0, 0)
+    polygons may not include the origin, (0, 0)
     
     """
     def __init__(self, obstacle_line=None, obstacles=None, speed=0.5, step_time=1.0, tol=0.0):
@@ -110,7 +116,7 @@ class Robot(object):
         if tol > 0.0:
             warnings.warn("tolerance > 0 doesn't work properly; It only works if the robot faces the wall (not when parallel or away from the wall).")
         
-        self.sensors = [2*pi*i/8.0 for i in range(8)]
+        self.sensors = [2*np.pi*i/8.0 for i in range(8)]
         #self.obstacles = [ (x0,y0,x1,y1) ]
         self.obstacle_line = obstacle_line
         self._ir_max, self.tol = 15.0, tol
@@ -120,6 +126,8 @@ class Robot(object):
         self.reset()
     
     def _cmp_obstacles(self, lines):
+        """
+        """
         obstacles = []
         for x0,y0,x1,y1 in lines:
             o_vec = (x1-x0, y1-y0)
@@ -131,6 +139,8 @@ class Robot(object):
         return obstacles
     
     def _cmp_obstacle_lines(self, obstacles):
+        """
+        """
         lines = []
         for o_vec, o_base, o_limit in obstacles:
             x0, y0 = o_base
@@ -142,16 +152,18 @@ class Robot(object):
         return lines
     
     def reset(self):
+        """Reset the robot to the origin."""
         self.loc = (0.0, 0.0)
         self.pose = 0.0
         self.trajectory = [self.loc]
     
     def reset_random(self, loc_lo=-10.0, loc_hi=10.0):
+        """Reset the robot to a random location, outside the obstacles."""
         for i in xrange(1000):
             loc = self.loc = (np.random.uniform(loc_lo, loc_hi), np.random.uniform(loc_lo, loc_hi))
-            pose = self.pose = np.random.uniform(0, 2*pi)
+            pose = self.pose = np.random.uniform(0, 2*np.pi)
             
-            if not any([in_obstacle(self.loc, obs) for obs in self.polygons]) and not self.take_action(0.0):
+            if not any([_in_obstacle(self.loc, obs) for obs in self.polygons]) and not self.take_action(0.0):
                 break
         
         if i == 1000:
@@ -162,17 +174,19 @@ class Robot(object):
         self.trajectory = [self.loc]
     
     def read_ir(self):
+        """Compute the proximities to obstacles in all infrared sensor
+        directions."""
         # view-direction
         readout = []
         for sensor in self.sensors:
             s_dist = self._ir_max
             s_ori = self.pose + sensor
-            s_dir = (cos(s_ori), sin(s_ori))
+            s_dir = (np.cos(s_ori), np.sin(s_ori))
             s_base = self.loc
             
             for o_dir, o_base, o_limit in self.obstacles:
                 # obstacles intersection
-                t0, t1 = intersect(o_base, o_dir, s_base, s_dir)
+                t0, t1 = _intersect(o_base, o_dir, s_base, s_dir)
                 
                 eps = 0.00001
                 if t1 >= 0 and (o_limit == float('inf') or (-eps <= t0 and t0 <= o_limit + eps)):
@@ -191,6 +205,7 @@ class Robot(object):
         return readout
     
     def read_sensors(self):
+        """Read all sensors. A :py:keyword:`dict` is returned."""
         ir = self.read_ir()
         #noise = np.random.normal(scale=0.01, size=(len(ir)))
         #ir = map(operator.add, ir, noise)
@@ -198,18 +213,23 @@ class Robot(object):
         return {'loc': np.atleast_2d(self.loc), 'pose': np.atleast_2d(self.pose), 'ir': np.atleast_2d(ir)}
     
     def take_action(self, action):
+        """Execute an ``action`` and move forward
+        (speed * step_time units or until collision). Return
+        :py:keyword:`True` if the robot collided.
+        
+        """
         # turn
         if isinstance(action, np.ndarray): action = action.flatten()[0]
-        self.pose = (self.pose + action) % (2*pi)
-        #self.pose = action % (2*pi)
+        self.pose = (self.pose + action) % (2*np.pi)
+        #self.pose = action % (2*np.pi)
         
         # move forward
         t = self.speed * self.step_time # distance per step
         
         # Collision detection
         eps = 0.00001
-        r_vec = (cos(self.pose), sin(self.pose))
-        wall_dists = [(idx, intersect(self.loc, r_vec, o_base, o_vec)) for idx, (o_vec, o_base, o_limit) in enumerate(self.obstacles)]
+        r_vec = (np.cos(self.pose), np.sin(self.pose))
+        wall_dists = [(idx, _intersect(self.loc, r_vec, o_base, o_vec)) for idx, (o_vec, o_base, o_limit) in enumerate(self.obstacles)]
         wall_dists = [(idx, r_dist) for idx, (r_dist, o_dist) in wall_dists if r_dist >= 0.0 and r_dist < float('inf') and -eps <= o_dist and o_dist <= 1.0 + eps] # FIXME: Replace 1.0 by o_limit
         if len(wall_dists) > 0:
             # Distance to the wall
@@ -218,12 +238,12 @@ class Robot(object):
             
             # angle between wall and robot trajectory
             o_vec = self.obstacles[wall_idx][0]
-            a = acos( (o_vec[0] * r_vec[0] + o_vec[1] * r_vec[1]) / (np.linalg.norm(o_vec) * np.linalg.norm(r_vec)) )
-            if a > pi/2.0:
-                a = pi - a
+            a = np.arccos( (o_vec[0] * r_vec[0] + o_vec[1] * r_vec[1]) / (np.linalg.norm(o_vec) * np.linalg.norm(r_vec)) )
+            if a > np.pi/2.0:
+                a = np.pi - a
             
             # maximum driving distance
-            k = self.tol / sin(a)
+            k = self.tol / np.sin(a)
             t_max = dist - k
             
         else:
@@ -234,11 +254,25 @@ class Robot(object):
         t = min(t, t_max)
         
         # next location
-        self.loc = (self.loc[0] + cos(self.pose) * t, self.loc[1] + sin(self.pose) * t) # t doesn't denote the distance in moving direction!
+        self.loc = (self.loc[0] + np.cos(self.pose) * t, self.loc[1] + np.sin(self.pose) * t) # t doesn't denote the distance in moving direction!
         self.trajectory.append(self.loc)
         return collide
     
     def plot_trajectory(self, wait=False, with_tol=True, tol=None, full_view=True):
+        """Plot the robot trajectory in a :py:mod:`pylab` figure.
+        
+        .. todo::
+            pylab figure configurable
+        
+        ``wait``
+        
+        ``with_tol``
+        
+        ``tol``
+        
+        ``full_view``
+        
+        """
         pylab.clf()
         self._plot_obstacles(with_tol, tol)
         x,y = zip(*self.trajectory)
@@ -258,6 +292,18 @@ class Robot(object):
         pylab.show(block=wait)
 
     def _plot_obstacles(self, with_tol=True, tol=None):
+        """Plot all obstacles and walls into a :py:mod:`pylab` figure.
+        
+        .. todo::
+            pylab figure configurable
+        
+        ``with_tol``
+            
+        
+        ``tol``
+            
+        
+        """
         if tol is None: tol = self.tol
         for vec, base, limit in self.obstacles:
             # obstacle line
@@ -288,47 +334,79 @@ class Robot(object):
                 
         pass
 
-
 class AbsoluteRobot(Robot):
+    """
+    
+    
+    
+    """
     def take_action(self, action):
+        """Execute an ``action`` and move forward
+        (speed * step_time units or until collision). Return
+        :py:keyword:`True` if the robot collided.
+        
+        """
         if isinstance(action, np.ndarray): action = action.flatten()[0]
-        self.pose = action % (2*pi)
+        self.pose = action % (2*np.pi)
         return super(AbsoluteRobot, self).take_action(0.0)
 
-class OrientedRobot(Robot):
-    def __init__(self, landmarks, speed=0.5, step_time=1.0, tol=0.0):
-        super(OrientedRobot, self).__init__(None, speed, step_time, tol)
-        self.landmarks = landmarks
+def simulation_loop(acd, robot, max_step=-1, max_episodes=-1, max_total_iter=-1):
+    """
     
-    def dist_to_landmark(self, landmark):
-        cx, cy = self.loc
-        lx, ly = landmark
-        dx = cx - lx
-        dy = cy - ly
-        return sqrt(dx**2 + dy**2)
+    ``acd``
     
-    def read_sensors(self):
-        ldists = [self.dist_to_landmark(mark) for mark in self.landmarks]
-        return {'loc': np.atleast_2d(self.loc), 'mdist': np.atleast_2d(ldists)}
-
-    def _plot_obstacles(self, with_tol=False, tol=None):
-        for (x,y) in self.landmarks:
-            pylab.plot(x, y, 'kx', markersize=10.0)
-
-    def take_action(self, action):
-        # turn
-        if isinstance(action, np.ndarray): action = action.flatten()[0]
-        self.pose = action % 2*pi
+    ``robot``
+    
+    ``max_step``
+    
+    ``max_episodes``
+    
+    ``max_total_iter``
+    
+    """
+    if max_step < 0 and max_episodes < 0 and max_total_iter < 0:
+        raise Exception('The simulation cannot run forever.')
+    
+    policy = acd.policy
+    num_episode = 0
+    num_total_iter = 0
+    while True:
         
-        # move forward
-        t = self.speed * self.step_time # distance per step
+        # init episode
+        acd.new_episode()
+        robot.reset()
+        #robot.reset_random(loc_lo=-9.0, loc_hi=9.0)
+        policy.reset()
+        a_curr = np.atleast_2d([policy.action])
         
-        # collision detection
-        # TODO: Fix collision detection, adjust tolerance
-        dist = self.read_ir()
-        t = min(t, min(dist[-1], dist[0], dist[1]) - self.tol)
-        collide = t >= min(dist[-1], dist[0], dist[1]) - self.tol
-        self.loc = (self.loc[0] + cos(self.pose) * t, self.loc[1] + sin(self.pose) * t)
-        #self.loc = map(operator.add, (t*cos(self.pose), t*sin(self.pose)))
-        self.trajectory.append(self.loc)
-        return collide
+        num_step = 0 # k
+        while True:
+            
+            # Apply current action
+            collided = robot.take_action(a_curr)
+            
+            # Observe sensors
+            s_next = robot.read_sensors()
+            
+            # Execute ACD
+            a_next = acd(s_next, num_step, num_step+1, 1)
+            
+            # Iterate
+            num_step += 1
+            num_total_iter += 1
+            if collided:
+                break
+            if max_step > 0 and num_step >= max_step:
+                break
+            acd.a_curr = a_curr = a_next
+        
+        if num_step <= 3:
+            print "Warning: episode ended prematurely"
+        
+        num_episode += 1
+        if max_episodes > 0 and num_episode >= max_episodes:
+            break
+        if max_total_iter > 0 and num_total_iter >= max_total_iter:
+            break
+    
+    return acd

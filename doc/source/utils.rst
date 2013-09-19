@@ -9,7 +9,7 @@ Utility functions
 Introduction
 ------------
 
-
+.. automodule:: rrl.inout
 
 Example
 -------
@@ -19,10 +19,14 @@ Reference
 ---------
 
 
-.. remove_init_only_groups
-.. h5_reorder
-.. h5_merge_experiments
-.. remove_boundary_groups
+.. autofunction:: remove_init_only_groups
 
-.. H5CombinedFile
-.. H5CombinedGroup
+.. autofunction:: h5_reorder
+
+.. autofunction:: h5_merge_experiments
+
+.. autofunction:: remove_boundary_groups
+
+.. autoclass:: H5CombinedFile
+
+.. autoclass:: H5CombinedGroup

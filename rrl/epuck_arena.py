@@ -32,7 +32,6 @@ obstacles_wall=[
     ( dist, -10, dist, 10 ) # wall at dist
 ]
 
-
 # lower box
 train_lower = [
     (6.0, -6.0),
@@ -89,6 +88,8 @@ test_left=[
 ]
 
 def box_gen_lines((cx,cy), (sx, sy)):
+    """Create a rectangle using a center ``(cx,cy)`` and side length
+    ``(sx, sy)``."""
     return [
         (cx - sx, cy - sy, cx - sx, cy + sy),
         (cx + sx, cy - sy, cx + sx, cy + sy),
@@ -97,6 +98,7 @@ def box_gen_lines((cx,cy), (sx, sy)):
     ]
 
 def box_gen_corners((cx,cy), (sx, sy)):
+    """Create a rectangle using two corners ``(cx,cy)`` and ``(sx,sy)``."""
     return [
         (cx - sx, cy - sy),
         (cx + sx, cy - sy),
@@ -123,9 +125,8 @@ obstacles_pipe=[
 ]
     
 
-"""
-Inverse crown
-obstacle = [
+# Inverse crown
+obstacle_crown = [
     (0.0, 0.0),
     (1.0, 1.0),
     (2.0, -1.0),
@@ -134,4 +135,3 @@ obstacle = [
     (4.0, 2.0),
     (0.0, 2.0)
 ]
-"""

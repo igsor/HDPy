@@ -1,4 +1,6 @@
 
+.. _reinforcement-learning:
+
 Reinforcement Learning
 ======================
 
@@ -9,9 +11,13 @@ Introduction
 
 .. automodule:: rrl.rl
 
+.. automodule:: rrl.hdp
+
 Example
 -------
 
+.. todo::
+    testcase
 
 Reference
 ---------
@@ -37,9 +43,12 @@ Reference
 
 
 .. autoclass:: ADHDP
-    :members:
-    :show-inheritance:
 
 .. autoclass:: CollectingADHDP
-    :members:
-    :show-inheritance:
+
+.. autoclass:: ActionGradient
+
+.. autoclass:: ActionRecomputation
+
+.. autoclass:: ActionBruteForce
+

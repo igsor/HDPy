@@ -6,6 +6,13 @@ Heuristic Dynamic Programming in Python
 
 .. automodule:: rrl
 
+
+About this documentation
+------------------------
+
+.. todo::
+    Where to find what (structure), reference to the in-python help system
+
 Contents
 --------
 
@@ -26,8 +33,9 @@ Others
    :maxdepth: 1
 
    pp
-   puppy
    analysis
+   epuck
+   puppy
 
 Module metapages
 ^^^^^^^^^^^^^^^^

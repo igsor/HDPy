@@ -16,3 +16,5 @@ Resources
 .. [Oger] http://organic.elis.ugent.be/organic/engine
 
 .. [MDP] http://mdp-toolkit.sourceforge.net/
+
+.. [Webots] http://www.cyberbotics.com/

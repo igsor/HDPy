@@ -1,9 +1,17 @@
 """
 When storing experimental data in HDF5 files, some extra operations
-may be useful to process them on a low level. The operations in this
-file mangle HDF5 files directly (through h5py), without relying on
-higher-level functionality - but of course providing basics to the
-more advanced stuff.
+may be useful to process them on a low level. The operations provided
+by this module mangle HDF5 files directly (through h5py), without
+relying on higher-level functionality. In turn, some of the
+functionality may be useful for more advanced stuff.
+
+Note that all functions rely on a specific file format, specifically on
+the format which is written by :py:class:`PuPy.RobotCollector`, with
+experiments in groups and sensor data in seperate datasets within the
+experiment group. On this ground, too short experiments can be removed
+(:py:func:`remove_init_only_groups`) or files merged together
+(:py:func:`h5_merge_experiments`). When data is split up between two
+files, they can easily be put together by :py:class:`H5CombinedFile`.
 
 """
 import h5py

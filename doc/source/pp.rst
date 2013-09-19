@@ -1,4 +1,6 @@
 
+.. _plants-and-policies:
+
 Plants and Policies
 ===================
 
@@ -8,6 +10,14 @@ Plants and Policies
 Introduction
 ------------
 
+As described in :ref:`Reinforcement Learning <reinforcement-learning>`,
+the learning problem formulation is achieved by specifying a
+:py:class:`Plant` and a :py:class:`Policy`. For *Puppy* and *ePuck*,
+some examples have already been implemented.
+
+.. automodule:: rrl.plants
+
+.. automodule:: rrl.policies
 
 
 Example
@@ -16,6 +26,16 @@ Example
 
 Reference
 ---------
+
+.. module:: rrl
+
+.. autoclass:: Plant
+
+.. autoclass:: Policy
+
+
+Puppy Plants
+^^^^^^^^^^^^
 
 .. module:: rrl
 
@@ -29,6 +49,25 @@ Reference
 
 .. autoclass:: DiffTargetLocationLandmarks
 
+
+Puppy Policies
+^^^^^^^^^^^^^^
+
+.. module:: rrl
+
 .. GaitPolicy
 
-.. notes from policies_puppy header
+.. automodule:: rrl.policy.puppy
+
+
+ePuck Plants
+^^^^^^^^^^^^
+
+.. module:: rrl
+
+
+ePuck Policies
+^^^^^^^^^^^^^^
+
+.. module:: rrl
+

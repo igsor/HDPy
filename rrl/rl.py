@@ -1,33 +1,27 @@
 """
-The Reinforcement Learning Problem is approached by Actor-Critic
-methods. This method splits the agent (the learner) into a
+The Reinforcement Learning Problem is approached by means of an
+Actor-Critic design. This method splits the agent into a
 return-estimator (Critic) and an action-selection mechanism (Actor).
-The plant (also denoted environment) remains the same as in the
-standard framework.
+Information about state and reward is provided by the plant to the
+agent. As the agent is still viewed as one unit, both of its parts are
+embedded in the same class, the :py:class:`ActorCritic`. It does not
+itself implement a method to solve the learning problem but only
+provides preliminaries for an algorithm doing so. Meaning, that it
+defines common members and method interfaces. Furthermore, it binds
+the Actor-Critic approach to a :py:class:`PuPy.RobotActor`, such that
+any of its descendants can be used within :py:mod:`PuPy`.
 
-This file defines three structures to cover this setup:
-
-1) The Actor-Critic
-2) The Policy
-3) The Plant
-
-The **ActorCritic** class implements the Actor-Critic base
-algorithm. With the **Plant** and **Policy**, the learning problem can
-be specified decoupled from the algorithm which is used to solve it.
-
-The main concern of :py:class:`ActorCritic` is coarse behaviour,
-bookkeeping stuff, and integration of the parent's interface.
-As it inherits from :py:class:`PuPy.PuPyActor`, it can easily be
-combined with :py:mod:`PuPy`.
-
-This combination makes it necessary to have a structure which generates
-the motor targets from a possibly high-level action description. This
-link is implemented through :py:class:`Policy`. Hence, it also defines
-the action type for the Actor-Critic method.
-
-The :py:class:`Plant` defines the influence of the environment,
-specifically the state and reward information.
-
+The Actor-Critic implementation is kept general, meaning that it is not
+limited to a specific learning problem. For this, the template classes
+:py:class:`Plant` and :py:class:`Policy` are defined. Using the former,
+a concrete environment can be implemented by specifying state and reward.
+The latter class is required to hide the representation of the action
+from the :py:class:`ActorCritic`. Due to the integration in
+:py:mod:`PuPy`, motor targets (a low-level representation of an
+action) have to be generated, but the action representation for the
+Reinforcement Learning problem may be more abstract. For example, gait
+parameters could be used as action. From these, a motor target sequence
+has to be generated to actually steer the robot.
 
 """
 import PuPy

@@ -1,10 +1,19 @@
 """
-Heuristic Dynamic Programming code.
+On top of the :py:class:`ActorCritic` implementation, this module
+provides a couple algorithms to solve a problem stated in terms of
+Reinforcement Learning. All algorithms follow the same approach, namely
+(action dependent) Heuristic Dynamic Programming. The baseline
+algorithm is implemented in :py:class:`ADHDP`. A data collecting version
+is provided in :py:class:`CollectingADHDP`, as the class is already
+embedded in the :py:mod:`PuPy` framework through
+:py:class:`ActorCritic`. Hence the collector works in the same fashion
+as :py:class:`PuPy.RobotCollector`.
 
-In this file, the HDP and ADHDP algorithms are implemented. They build
-on top of the Actor-Critic class in the file *rl.py*. For the basic
-ADHDP algorithm, a collecting version exists, which stores the data
-in a HDF5 file (through PuPy.PuppyCollector)
+Some variations of the baseline algorithm are implemented as well in
+:py:class:`ActionGradient`, :py:class:`ActionRecomputation` and
+:py:class:`ActionBruteForce`. They fulfill the same purpose but approach
+it differently (specifically, the actor is implemented differently). The
+details are given in details of the respective class.
 
 """
 import numpy as np
