@@ -4,7 +4,6 @@ Plants and Policies
 
 .. contents::
 
-.. module:: rrl
 
 Introduction
 ------------
@@ -18,13 +17,18 @@ Example
 Reference
 ---------
 
-.. Plant
-.. SpeedReward
-.. LineFollower
-.. TargetLocation
-.. LandmarksTarLoc
-.. LandmarksTarLocDiff
+.. module:: rrl
 
-.. Policy
+.. autoclass:: SpeedReward
+
+.. autoclass:: LineFollower
+
+.. autoclass:: TargetLocation
+
+.. autoclass:: TargetLocationLandmarks
+
+.. autoclass:: DiffTargetLocationLandmarks
+
 .. GaitPolicy
+
 .. notes from policies_puppy header

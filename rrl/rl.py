@@ -1,5 +1,4 @@
-"""Reinforcement Learning parts of the module.
-
+"""
 The Reinforcement Learning Problem is approached by Actor-Critic
 methods. This method splits the agent (the learner) into a
 return-estimator (Critic) and an action-selection mechanism (Actor).
@@ -26,7 +25,7 @@ the motor targets from a possibly high-level action description. This
 link is implemented through :py:class:`Policy`. Hence, it also defines
 the action type for the Actor-Critic method.
 
-The :py:class`Plant` defines the influence of the environment,
+The :py:class:`Plant` defines the influence of the environment,
 specifically the state and reward information.
 
 

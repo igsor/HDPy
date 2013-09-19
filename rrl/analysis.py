@@ -172,7 +172,6 @@ Other ideas
 
 import numpy as np
 import h5py
-from math import pi
 import inout
 import warnings
 

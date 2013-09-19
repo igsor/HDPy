@@ -3,7 +3,6 @@ Analysis tools, specific for the *epuck* experiment.
 """
 
 import pylab
-from math import cos, sin, pi
 import numpy as np
 
 def epuck_plot_all_trajectories(analysis, axis, key='loc'):
@@ -33,17 +32,17 @@ def _plot_line(axis, origin, angle, size_hi, size_lo=0.0, **kwargs):
     ``size_hi``, where both parameters are passed as fractions of said
     line. ``kwargs`` are passed to :py:meth:`pylab.plot`.
     """
-    src = (origin[0] + cos(angle) * size_lo, origin[1] + sin(angle) * size_lo)
-    trg = (origin[0] + cos(angle) * size_hi, origin[1] + sin(angle) * size_hi)
+    src = (origin[0] + np.cos(angle) * size_lo, origin[1] + np.sin(angle) * size_lo)
+    trg = (origin[0] + np.cos(angle) * size_hi, origin[1] + np.sin(angle) * size_hi)
     axis.plot((src[0], trg[0]), (src[1], trg[1]), **kwargs)
 
-def epuck_plot_value_over_action(critic, state, axis, a_range=np.arange(0.0, 2*pi, 0.01)):
+def epuck_plot_value_over_action(critic, state, axis, a_range=np.arange(0.0, 2*np.pi, 0.01)):
     """Given a trained ``critic``, plot the expected return as function
     of the action, given a ``state`` into ``axis``. Assuming 1-d action
     (otherwise, it becomes messy to plot).
     """
-    exp_return = np.vstack([critic(state, action%(2*pi), simulate=True) for action in a_range])
-    #axis.plot([action%(2*pi) for action in a_range], exp_return, label='J(a|s)')
+    exp_return = np.vstack([critic(state, action%(2*np.pi), simulate=True) for action in a_range])
+    #axis.plot([action%(2*np.pi) for action in a_range], exp_return, label='J(a|s)')
     axis.plot(a_range, exp_return, label='J(a|s)')
     axis.set_xlabel('action')
     axis.set_ylabel('Expected return')
@@ -142,13 +141,13 @@ def epuck_plot_snapshot(axis, robot, critic, trajectory, sample_actions, init_st
             for action_eval, predicted_return in p_returns:
                 length = ray_len + 0.1 * (predicted_return - r_offset) / r_scale
                 #length = ray_len + abs(predicted_return)
-                #rays.append((loc_robot, (pose+action_eval) % (2*pi), length, predicted_return))
-                rays.append((loc_robot, (action_eval) % (2*pi), length, predicted_return))
+                #rays.append((loc_robot, (pose+action_eval) % (2*np.pi), length, predicted_return))
+                rays.append((loc_robot, (action_eval) % (2*np.pi), length, predicted_return))
 
         if num_step in inspected_steps:
             fig_inspected = pylab.figure()
-            #epuck_plot_value_over_action(critic, s_curr, fig_inspected.add_subplot(111), a_range=np.arange(-pi/2.0, pi/2.0, 0.01))
-            epuck_plot_value_over_action(critic, s_curr, fig_inspected.add_subplot(111), a_range=np.arange(-2.0*pi, 2.0*pi, 0.01))
+            #epuck_plot_value_over_action(critic, s_curr, fig_inspected.add_subplot(111), a_range=np.arange(-np.pi/2.0, np.pi/2.0, 0.01))
+            epuck_plot_value_over_action(critic, s_curr, fig_inspected.add_subplot(111), a_range=np.arange(-2.0*np.pi, 2.0*np.pi, 0.01))
             fig_inspected.suptitle('Expected return in after %i steps (%s)' % (num_step, str(loc_robot)))
         
         # advance critic

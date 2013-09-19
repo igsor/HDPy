@@ -1,4 +1,5 @@
-"""Heuristic Dynamic Programming code.
+"""
+Heuristic Dynamic Programming code.
 
 In this file, the HDP and ADHDP algorithms are implemented. They build
 on top of the Actor-Critic class in the file *rl.py*. For the basic
@@ -9,6 +10,7 @@ in a HDF5 file (through PuPy.PuppyCollector)
 import numpy as np
 import PuPy
 from rl import ActorCritic
+import warnings
 
 
 class ADHDP(ActorCritic):
@@ -244,3 +246,292 @@ class CollectingADHDP(ADHDP):
     def __del__(self):
         del self.collector
 
+## HDP VARIATIONS ##
+
+class ActionGradient(CollectingADHDP):
+    """
+    
+    Additional keyword arguments:
+    
+    ``gd_tolerance``
+        Stop gradient descent if gradient below this threshold.
+    
+    ``gd_max_iter``
+        Maximum number of gradient descent steps
+    
+    """
+    def __init__(self, *args, **kwargs):
+        self.gd_tol = kwargs.pop('gd_tolerance', 1e-15)
+        self.gd_max_iter = kwargs.pop('gd_max_iter', 500)
+        self.rho, self.beta = 0.001, 0.1
+        self.alpha_max = 20.0
+        self.ls_max_iter = 1000
+        super(ActionGradient, self).__init__(*args, **kwargs)
+    
+    def _step(self, s_curr, s_next, a_curr, reward):
+        """
+        """
+        # ESN-critic, first instance: in(k) => J(k)
+        i_curr, x_curr, j_curr = self._critic_eval(s_curr, a_curr, simulate=False, action_name='a_curr')
+        
+        # Gradient ascent of J(a|s_{t+1})
+        a_next = self.gradient_descent(s_next, a_curr)
+        deriv = (a_next - a_curr) / self.alpha(self.num_episode, self.num_step)
+        
+        # Next action
+        a_next = self.momentum(a_curr, a_next, self.num_episode, self.num_step)
+        a_next = self._next_action_hook(a_next)
+        
+        # ESN-critic, second instance: in(k+1) => J(k+1)
+        i_next, x_next, j_next = self._critic_eval(s_next, a_next, simulate=True, action_name='a_next')
+        
+        # TD_error(k) = J(k) - U(k) - gamma * J(k+1)
+        err = reward + self.gamma(self.num_episode, self.num_step) * j_next - j_curr
+        
+        # One-step RLS training => Trained ESN
+        self.readout.train(x_curr, err=err) 
+        
+        # increment hook
+        self._pre_increment_hook(
+            s_next,
+            reward=np.atleast_2d([reward]).T,
+            deriv=deriv.T,
+            err=err.T,
+            readout=self.readout.beta.T,
+            gamma=np.atleast_2d([self.gamma(self.num_episode, self.num_step)]).T,
+            i_curr=i_curr,
+            x_curr=x_curr,
+            j_curr=j_curr,
+            a_curr=a_curr.T,
+            i_next=i_next,
+            x_next=x_next,
+            j_next=j_next,
+            a_next=a_next.T
+            )
+        
+        # increment
+        return a_next
+    
+    def _line_search(self, state, action, gradient):
+        """
+        0 < rho  < 0.5
+        rho < beta < 1.0
+        """
+        
+        def phi(alpha):
+            action_query = action + alpha * gradient
+            query_result = self._critic_eval(state, action_query, simulate=True, action_name='a_curr') # TODO: Check reservoir state!
+            return - query_result[-1]
+        
+        def dphi(alpha):
+            # gradient * -derivative(action + alpha * gradient)
+            action_query = action + alpha * gradient
+            in_state = self.plant.state_input(state)
+            action_nrm = self.normalizer.normalize_value('a_next', action_query)
+            i_inter = np.vstack((in_state, action_nrm)).T
+            x_inter = self.reservoir(i_inter, simulate=True) # TODO: Check reservoir state!
+            deriv = self._critic_deriv(x_inter)
+            return gradient * -deriv
+        
+        dphi_zero, phi_zero = dphi(0.0), phi(0.0)
+        lambda_ = lambda al: phi_zero + self.rho * al * dphi_zero
+        
+        if (dphi_zero >= 0.0).any():
+            #warnings.warn('step_size cannot increase the function')
+            print 'WARNING: step_size cannot increase the function (dphi(0.0) = %f)' % dphi_zero
+            return 0.0
+        
+        # enforce lower bound
+        gamma = self.beta * dphi_zero
+        a=0
+        b=min(1.0, self.alpha_max)
+        num_iter = self.ls_max_iter
+        while b < self.alpha_max and (phi(b) <= lambda_(b)).any() and (dphi(b) <= gamma).any() and num_iter > 0:
+            #print a,b
+            a = b
+            b = min(2*b, self.alpha_max)
+            num_iter -= 1
+        
+        # set alpha
+        alpha = b
+        
+        # enforce both constraints
+        # infinite loop possible! how & where??
+        num_iter = self.ls_max_iter
+        while ((phi(alpha) > lambda_(alpha)).any() or (dphi(alpha) < gamma).any()) and num_iter > 0:
+            alpha, a, b = self._refine( (a,b), phi, dphi, lambda_)
+            if abs(a-b) < 1e-14:
+                break
+            num_iter -= 1
+        
+        if (phi(alpha) >= phi_zero).any():
+            #warnings.warn('step size does not increase the function')
+            print 'WARNING: step size does not increase the function (phi(alpha)=%f)' % phi(alpha)
+            alpha = 0.0
+        
+        return alpha
+    
+    def _refine(self, (a,b), phi, dphi, lambda_):
+        D = b - a
+        if D < 1e-15:
+            print "WARNING: a ~= b (D=", D
+            #return a, a, b
+        
+        c = (phi(b) - phi(a) - D * dphi(a) ) / D**2
+        
+        # compute alpha
+        if (c > 0).any():
+            alpha = a - dphi(a) / (2*c)
+            alpha = min(max(alpha, a + 0.1 * D), b - 0.1 * D)
+        else:
+            alpha = (a+b)/2
+        
+        # adjust interval
+        if (phi(alpha) < lambda_(alpha)).any():
+            a = alpha
+        else:
+            b = alpha
+        
+        return alpha, a, b
+    
+    def gradient_descent(self, state, action):
+        """
+        """
+        in_state = self.plant.state_input(state)
+        num_iter = self.gd_max_iter
+        while True:
+            # Compute the gradient
+            action_nrm = self.normalizer.normalize_value('a_next', action)
+            i_inter = np.vstack((in_state, action_nrm)).T
+            x_inter = self.reservoir(i_inter, simulate=True)
+            x_inter = np.hstack((x_inter, i_inter)) # FIXME: Input/Output ESN Model
+            gradient = self._critic_deriv(x_inter)
+            
+            # Do line search and update the action
+            #step_size = self._line_search(state, action, gradient)
+            step_size=self.alpha(self.num_episode, self.num_step)
+            action = action + step_size * gradient
+            action = self._next_action_hook(action)
+            
+            # Exit condition
+            num_iter -= 1
+            if np.linalg.norm(gradient) < self.gd_tol or num_iter <= 0:
+                break
+        
+        #print num_iter
+        
+        return action
+
+
+class ActionRecomputation(CollectingADHDP):
+    """
+    """
+    def _step(self, s_curr, s_next, a_curr, reward):
+        
+        # ESN-critic, first instance: in(k) => J(k)
+        i_curr, x_curr, j_curr = self._critic_eval(s_curr, a_curr, False, 'a_curr')
+        
+        # Next action
+        deriv = self._critic_deriv(x_curr)
+        
+        # gradient training of action (acc. to eq. 10)
+        a_next = a_curr + self.alpha(self.num_episode, self.num_step) * deriv
+        a_next = self.momentum(a_curr, a_next, self.num_episode, self.num_step)
+        a_next = self._next_action_hook(a_next)
+        
+        # ESN-critic, second instance: in(k+1) => J(k+1)
+        i_next, x_next, j_next = self._critic_eval(s_next, a_next, True, 'a_next')
+        
+        # TD_error(k) = J(k) - U(k) - gamma * J(k+1)
+        err = reward + self.gamma(self.num_episode, self.num_step) * j_next - j_curr
+        
+        # One-step RLS training => Trained ESN
+        self.readout.train(x_curr, err=err)
+        
+        # Action re-computation
+        deriv2 = self._critic_deriv(x_next)
+        a_next = a_curr + self.alpha(self.num_episode, self.num_step) * deriv2
+        a_next = self.momentum(a_curr, a_next, self.num_episode, self.num_step)
+        a_next = self._next_action_hook(a_next)
+        
+        # increment hook
+        self._pre_increment_hook(
+            s_next,
+            reward=np.atleast_2d([reward]).T,
+            deriv2=deriv.T,
+            deriv=deriv.T,
+            err=err.T,
+            readout=self.readout.beta.T,
+            gamma=np.atleast_2d([self.gamma(self.num_episode, self.num_step)]).T,
+            i_curr=i_curr,
+            x_curr=x_curr,
+            j_curr=j_curr,
+            a_curr=a_curr.T,
+            i_next=i_next,
+            x_next=x_next,
+            j_next=j_next,
+            a_next=a_next.T
+            )
+        
+        # increment
+        return a_next
+
+
+class ActionBruteForce(CollectingADHDP):
+    """
+    """
+    def __init__(self, *args, **kwargs):
+        self.sample_step_size = kwargs.pop('sample_step_size', 0.1)
+        self.candidates = kwargs.pop('candidates', np.arange(0, 2*np.pi, self.sample_step_size))
+        super(MaxSample, self).__init__(*args, **kwargs)
+    
+    def _step(self, s_curr, s_next, a_curr, reward):
+        # ESN-critic, first instance: in(k) => J(k)
+        i_curr, x_curr, j_curr = self._critic_eval(s_curr, a_curr, False, 'a_curr')
+        
+        # Next action
+        # FIXME: Only valid for ePuck
+        a_next = a_curr
+        j_best = float('-inf')
+        in_state = self.plant.state_input(s_next)
+        for candidate in self.candidates:
+            candidate_nrm = self.normalizer.normalize_value('a_next', candidate)
+            i_cand = np.vstack((in_state, candidate_nrm)).T
+            x_cand = self.reservoir(i_cand, simulate=True)
+            j_cand = self.readout(x_cand)
+            if j_cand > j_best:
+                j_best = j_cand
+                a_next = np.atleast_2d(candidate)
+        
+        a_next = a_curr + self.alpha(self.num_episode, self.num_step) * (a_next - a_curr)
+        a_next = self._next_action_hook(a_next)
+        
+        # ESN-critic, second instance: in(k+1) => J(k+1)
+        i_next, x_next, j_next = self._critic_eval(s_next, a_next, True, 'a_next')
+        
+        # TD_error(k) = J(k) - U(k) - gamma * J(k+1)
+        err = reward + self.gamma(self.num_episode, self.num_step) * j_next - j_curr
+        
+        # One-step RLS training => Trained ESN
+        self.readout.train(x_curr, err=err) 
+        
+        # increment hook
+        self._pre_increment_hook(
+            s_next,
+            reward=np.atleast_2d([reward]).T,
+            err=err.T,
+            deriv=a_next-a_curr,
+            readout=self.readout.beta.T,
+            gamma=np.atleast_2d([self.gamma(self.num_episode, self.num_step)]).T,
+            i_curr=i_curr,
+            x_curr=x_curr,
+            j_curr=j_curr,
+            a_curr=a_curr.T,
+            i_next=i_next,
+            x_next=x_next,
+            j_next=j_next,
+            a_next=a_next.T
+            )
+        
+        # increment
+        return a_next

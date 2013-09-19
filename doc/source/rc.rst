@@ -4,11 +4,10 @@ Reservoir Computing
 
 .. contents::
 
-.. module:: rrl
-
 Introduction
 ------------
 
+.. automodule:: rrl.rc
 
 Example
 -------
@@ -17,29 +16,30 @@ Example
 Reference
 ---------
 
+.. module:: rrl
+
+.. autoclass:: ReservoirNode
+    :members:
+    :show-inheritance:
+
 .. autoclass:: PlainRLS
     :members:
-    :special-members:
+    :special-members: __call__
 
 .. autoclass:: StabilizedRLS
     :members:
     :show-inheritance:
 
-.. autoclass:: SparseReservoirNode
-    :members:
-    :show-inheritance:
 
+.. autofunction:: dense_w_in
+.. autofunction:: sparse_w_in
+.. autofunction:: dense_w_bias
+.. autofunction:: sparse_reservoir
 .. autofunction:: orthogonal_reservoir
+.. autofunction:: chain_of_neurons
+.. autofunction:: ring_of_neurons
 
-.. dense_w_in
-.. sparse_w_in
-.. dense_w_bias
-.. sparse_reservoir
-.. orthogonal_reservoir
-.. chain_of_neurons
-.. ring_of_neurons
-
-.. reservoir_memory
-.. query_reservoir_memory
-.. find_radius_for_mc
+.. autofunction:: reservoir_memory
+.. autofunction:: query_reservoir_memory
+.. autofunction:: find_radius_for_mc
 

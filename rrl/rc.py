@@ -1,13 +1,26 @@
 """
-Reservoir Computing code.
+As Reservoir Computing is uses in this module, an implementation of an
+Echo State Network is provided through a couple of functions. The
+reservoir is given through :py:class:`ReservoirNode`. Note that although
+the dependency has been removed, most part of the reservoir code is
+copied from [Oger]_ and [MDP]_. The reservoir has then be combined with
+a readout, usually a linear regression. For the offline case, a ridge
+regression would probably be incorporated (available in
+:py:class:`Oger.nodes.RidgeRegressionNode`). Since for this module, only
+the online case is relevant, a recursive least-squares filter is
+implemented in :py:class:`StabilizedRLS`. The reservoir and readout are
+easily combined by feeding the reservoir state as sample into the RLS
+(together with a training target).
 
-These mostly are some bugfixes and extensions on the Oger/mdp framework.
-At some point, some of this code might be merged back to Oger.
+In contrast to [Oger]_, the reservoir is set up through three external
+functions. These define how the weight matrices are initialized. The
+default approach is to use :py:func:`dense_w_in`, :py:func:`sparse_w_in`
+and :py:func:`dense_w_bias`. However, other reservoir setup functions
+are provided. Note the documentation in :py:class:`ReservoirNode` if
+a different initialization has to be implemented.
+
 
 """
-
-#import Oger
-#import mdp
 import warnings
 import numpy as np
 import scipy.sparse
@@ -16,7 +29,7 @@ import cPickle as _cPickle
 
 ## RESERVOIR BASE CLASS ##
 
-class SparseReservoirNode(object):
+class ReservoirNode(object):
     """
     
     .. todo::
@@ -59,9 +72,11 @@ class SparseReservoirNode(object):
         self.initial_state = np.array([])
         # Reservoir initialization
         if w is None:
+            warnings.warn('Reservoir init function (w) should be provided')
             density = kwargs.pop('fan_in_w', 20)
             w = lambda N, srad: sparse_reservoir(N, srad, density, rnd_fu=np.random.normal)
         if w_in is None:
+            warnings.warn('Reservoir input init function (w_in) should be provided')
             input_scaling = kwargs.pop('input_scaling', 1.0)
             if 'fan_in_i' in kwargs:
                 density = kwargs.pop('fan_in_i')
@@ -69,6 +84,7 @@ class SparseReservoirNode(object):
             else:
                 w_in = lambda N, M: dense_w_in(N, M, input_scaling)
         if w_bias is None:
+            warnings.warn('Bias init function (w_bias) should be provided')
             bias_scaling = kwargs.pop('bias_scaling', 0.0)
             w_bias = lambda N: dense_w_bias(N, bias_scaling)
         
@@ -294,11 +310,39 @@ class SparseReservoirNode(object):
                 _cPickle.dump(self, flh, protocol)
 
 
+class SparseReservoirNode(ReservoirNode):
+    """
+    
+    .. deprecated:: 1.0
+        Use :py:class:`ReservoirNode` instead
+    
+    """
+    def __init__(self, *args, **kwargs):
+        warnings.warn("This class is deprecated. Use 'SparseReservoirNode' instead")
+        super(SparseReservoirNode, self).__init__(*args, **kwargs)
+
 
 ## RESERVOIR SETUP FUNCTIONS ##
 
 def dense_w_in(out_size, in_size, scaling, rnd_fu=lambda **kwargs: np.random.uniform(**kwargs)*2.0-1.0):
-    """Dense input matrix."""
+    """Dense input matrix.
+    
+    .. todo::
+        documentation
+    
+    ``out_size``
+        
+    
+    ``in_size``
+        
+    
+    ``scaling``
+        
+    
+    ``rnd_fu``
+        
+    
+    """
     return scaling * rnd_fu(size=(out_size, in_size))
 
 def sparse_w_in(out_size, in_size, scaling, density, rnd_fu=lambda **kwargs: np.random.uniform(**kwargs)*2.0-1.0):
@@ -525,7 +569,7 @@ class PlainRLS(object):
         self._psi_inv = np.eye(input_dim, input_dim) * 10000.0
         self._stop_training = False
 
-    def train(self, sample, trg=None, err=None):
+    def train(self, sample, trg=None, err=None, d=None, e=None):
         """Train the regression on one or more samples.
         
         ``sample``
@@ -540,6 +584,14 @@ class PlainRLS(object):
         """
         if self._stop_training:
             return
+        
+        if d is not None:
+            warnings.warn("Use of argument 'd' is deprecated. Use 'trg' instead.")
+            trg = d
+        
+        if e is not None:
+            warnings.warn("Use of argument 'e' is deprecated. Use 'err' instead.")
+            err = e
         
         if self.with_bias:
             sample = self._add_constant(sample)
@@ -637,6 +689,14 @@ class StabilizedRLS(PlainRLS):
         """
         if self._stop_training:
             return
+        
+        if d is not None:
+            warnings.warn("Use of argument 'd' is deprecated. Use 'trg' instead.")
+            trg = d
+        
+        if e is not None:
+            warnings.warn("Use of argument 'e' is deprecated. Use 'err' instead.")
+            err = e
         
         if self.with_bias:
             sample = self._add_constant(sample)
@@ -779,3 +839,23 @@ def find_radius_for_mc(reservoir, num_steps, tol=1.0, max_settling_time=10000, t
         num_iter -= 1
     
     return rad
+
+
+
+class ESN:
+    """
+    
+    .. todo::
+        (Experimental) Interface, Implementation, Documentation
+    
+    """
+    def __init__(self, reservoir, readout):
+        pass
+    def execute(self):
+        pass
+    def train(self):
+        pass
+    def _preprocessing(self):
+        pass
+    def _postprocessing(self):
+        pass

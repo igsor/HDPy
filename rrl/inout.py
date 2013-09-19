@@ -1,4 +1,5 @@
-"""When storing experimental data in HDF5 files, some extra operations
+"""
+When storing experimental data in HDF5 files, some extra operations
 may be useful to process them on a low level. The operations in this
 file mangle HDF5 files directly (through h5py), without relying on
 higher-level functionality - but of course providing basics to the

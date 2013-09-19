@@ -2,13 +2,12 @@
 Reinforcement Learning
 ======================
 
-.. module:: rrl
-
 .. contents::
 
 Introduction
 ------------
 
+.. automodule:: rrl.rl
 
 Example
 -------
@@ -16,6 +15,9 @@ Example
 
 Reference
 ---------
+
+
+.. module:: rrl
 
 .. autoclass:: Plant
     :members:
