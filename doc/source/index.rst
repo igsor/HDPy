@@ -11,7 +11,8 @@ About this documentation
 ------------------------
 
 .. todo::
-    Where to find what (structure), reference to the in-python help system
+    Where to find what (structure), reference to the in-python help system, paths in examples
+    epoch/episode
 
 Contents
 --------

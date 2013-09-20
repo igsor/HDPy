@@ -1,6 +1,7 @@
 """
-ACD plants
 
+.. todo::
+    documentation
 
 """
 from rl import Plant
@@ -86,6 +87,7 @@ class TargetLocation(Plant):
     """A :py:class:`Plant` which gives negative reward proportional to
     the distance to point ``target`` in the xy plane. If the robot is
     closer than ``radius`` to the target, the reward will be 0.0.
+    
     """
     def __init__(self, target, radius=0.0, reward_noise=0.01):
         super(TargetLocation, self).__init__(state_space_dim=2)
@@ -99,8 +101,7 @@ class TargetLocation(Plant):
         assert self.target.shape == (2, 1)
     
     def state_input(self, state):
-        """Return the latest *GPS* (x,y) values.
-        """
+        """Return the latest *GPS* (x,y) values."""
         sio =  np.atleast_2d([
             self.normalization.normalize_value('puppyGPS_x', state['puppyGPS_x'][-10:]).mean(),
             self.normalization.normalize_value('puppyGPS_y', state['puppyGPS_y'][-10:]).mean()
@@ -111,8 +112,6 @@ class TargetLocation(Plant):
         """Return the distance between the current robot location and
         the target point.
         
-        .. todo::
-            Average location over multiple samples of the epoch.
         """
         x = epoch['puppyGPS_x'][-1]
         y = epoch['puppyGPS_y'][-1]
@@ -137,7 +136,10 @@ class TargetLocationLandmarks(TargetLocation):
     """A :py:class:`Plant` which gives negative reward proportional to
     the distance to point ``target`` in the xy plane. If the robot is
     closer than ``radius`` to the target, the reward will be 0.0.
-    The state is composed of the distance to predefined landmarks.
+    The state is composed of the distance to predefined ``landmarks``,
+    specified with their coordinates in the xy plane. Gaussian noise
+    will be added to the reward, if ``reward_noise`` is positive.
+    
     """
     def __init__(self, target, landmarks, radius=0.0, reward_noise=0.01):
         super(TargetLocationLandmarks, self).__init__(target, radius, reward_noise)
@@ -152,8 +154,7 @@ class TargetLocationLandmarks(TargetLocation):
             self.landmarks.append(mark)
     
     def state_input(self, state):
-        """Return the distance to the landmarks.
-        """
+        """Return the distance to the landmarks."""
         sio =  np.atleast_2d([
             state['puppyGPS_x'][-10:].mean(),
             state['puppyGPS_y'][-10:].mean()
@@ -165,9 +166,15 @@ class TargetLocationLandmarks(TargetLocation):
         return dist
     
 class DiffTargetLocationLandmarks(TargetLocationLandmarks):
-    """A :py:class:`Plant` which gives positive reward proportional to the absolute difference 
-    (between two episodes) in distance to point ``target`` in the xy plane.
-    The state is composed of the distance to predefined landmarks.
+    """A :py:class:`Plant` which gives positive reward proportional to
+    the absolute difference  (between two episodes) in distance to
+    point ``target`` in the xy plane. The state is composed of the
+    distance to predefined ``landmarks``,
+    specified with their coordinates in the xy plane. Gaussian noise
+    will be added to the reward, if ``reward_noise`` is positive.
+    
+    Before the first call, the distance is set to ``init_distance``.
+    
     """
     def __init__(self, target, landmarks, reward_noise=0.01, init_distance=100):
         super(DiffTargetLocationLandmarks, self).__init__(target, landmarks, 0.0, reward_noise)
@@ -175,8 +182,7 @@ class DiffTargetLocationLandmarks(TargetLocationLandmarks):
         self._last_target_distance = self.init_distance # TODO: what is good init value?
     
     def reward(self, epoch):
-        """
-        """
+        """Return the reward of ``epoch``."""
         x = epoch['puppyGPS_x'][-1]
         y = epoch['puppyGPS_y'][-1]
         point = np.atleast_2d([x, y]).T
@@ -193,11 +199,12 @@ class DiffTargetLocationLandmarks(TargetLocationLandmarks):
         return reward
     
     def reset(self):
+        """Reset the last distance to the initial one."""
         self._last_target_distance = self.init_distance
 
-
 class LandmarksTarLoc(TargetLocationLandmarks):
-    """
+    """A :py:class:`Plant` which gives negative reward proportional to
+    the distance to point ``target`` in the xy plane.
     
     .. deprecated:: 1.0
         Use :py:class:`TargetLocationLandmarks` instead.
@@ -208,7 +215,9 @@ class LandmarksTarLoc(TargetLocationLandmarks):
         super(LandmarksTarLoc, self).__init__(*args, **kwargs)
 
 class LandmarksTarLocDiff(DiffTargetLocationLandmarks):
-    """
+    """A :py:class:`Plant` which gives positive reward proportional to
+    the absolute difference  (between two episodes) in distance to
+    point ``target`` in the xy plane.
     
     .. deprecated:: 1.0
         Use :py:class:`DiffTargetLocationLandmarks` instead.

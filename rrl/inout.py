@@ -119,7 +119,7 @@ def remove_boundary_groups(pth):
     
     return f
 
-class H5CombinedFile:
+class H5CombinedFile(object):
     """Combine two HDF5 files which have the same groups on the root
     level but different datasets within these groups. The files are
     packed together such that they can be handled as if a single file
@@ -178,7 +178,7 @@ class H5CombinedFile:
         attrs1 = h5py.AttributeManager(self.fh1[key])
         return attrs0, attrs1
 
-class H5CombinedGroup:
+class H5CombinedGroup(object):
     """Combine two related HDF5 groups which store different datasets
     and present them as a single group. Instances to this class are
     typically exclusively created through :py:class:`H5CombinedFile`.

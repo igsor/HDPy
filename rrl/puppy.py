@@ -6,6 +6,9 @@ from hdp import CollectingADHDP
 from rl import Plant
 import numpy as np
 import warnings
+import h5py
+
+SENSOR_NAMES = ['trg0', 'trg1', 'trg2', 'trg3', 'accelerometer_x', 'accelerometer_y', 'accelerometer_z', 'compass_x', 'compass_y', 'compass_z', 'gyro_x', 'gyro_y', 'gyro_z', 'hip0', 'hip1', 'hip2', 'hip3', 'knee0', 'knee1', 'knee2', 'knee3', 'puppyGPS_x', 'puppyGPS_y', 'puppyGPS_z', 'touch0', 'touch0', 'touch1', 'touch2', 'touch3']
 
 class PuppyHDP(CollectingADHDP):
     """ADHDP subtype for simulations using Puppy in webots.
@@ -228,4 +231,126 @@ class OfflineCollector(CollectingADHDP):
             a_next = self.a_curr + np.random.normal(0.0, 0.15, size=self.a_curr.shape)
         
         return a_next
+
+def puppy_offline_playback(pth_data, critic, samples_per_action, ms_per_step, episode_start=None, episode_end=None, min_episode_len=0):
+    """Simulate an experiment run for the critic by using offline data.
+    The data has to be collected in webots, using the respective
+    robot and supervisor. Note that the behaviour of the simulation
+    should match what's expected by the critic. The critic is fed the
+    sensor data, in order. Of course, it can't react to it since
+    the next action is predefined.
+    
+    Additional to the sensor fields, the 'tumbling' dataset is expected
+    which indicates, if and when the robot has tumbled. It is used such
+    that the respective signals can be sent to the critic.
+    
+    The critic won't store any sensory data again.
+    
+    ``pth_data``
+        Path to the datafile with the sensory information (HDF5).
+    
+    ``critic``
+        PuppyHDP instance.
+    
+    ``samples_per_action``
+        Number of samples per control step. Must correspond to the data.
+    
+    ``ms_per_step``
+        Sensor sampling period.
+    
+    ``episode_start``
+        Defines a lower limit on the episode number. Passed as int,
+        is with respect to the episode index, not its identifier.
+    
+    ``episode_stop``
+        Defines an upper limit on the episode number. Passed as int,
+        is with respect to the episode index, not its identifier.
+    
+    ``min_episode_len``
+        Only pick episodes longer than this threshold.
+    
+    """
+    # Open data file, get valid experiments
+    f = h5py.File(pth_data,'r')
+    storages = map(str, sorted(map(int, f.keys())))
+    storages = filter(lambda s: len(f[s]) > 0, storages)
+    if min_episode_len > 0:
+        storages = filter(lambda s: f[s]['a_curr'].shape[0] > min_episode_len, storages)
+    
+    if episode_end is not None:
+        storages = storages[:episode_end]
+    
+    if episode_start is not None:
+        storages = storages[episode_start:]
+    
+    assert len(storages) > 0
+    
+    # Prepare critic; redirect hooks to avoid storing epoch data twice
+    # and feed the actions
+    next_action = None
+    episode = None
+    critic._pre_increment_hook_orig = critic._pre_increment_hook
+    critic._next_action_hook_orig = critic._next_action_hook
+    
+    def pre_increment_hook(epoch, **kwargs):
+        kwargs['offline_episode'] = np.array([episode])
+        critic._pre_increment_hook_orig(dict(), **kwargs)
+    def next_action_hook(a_next):
+        #print "(next)", a_next.T, next_action.T
+        return next_action
+    
+    critic._next_action_hook = next_action_hook
+    critic._pre_increment_hook = pre_increment_hook
+    
+    # Main loop, feed data to the critic
+    time_step_ms = ms_per_step * samples_per_action
+    time_start_ms = 0
+    for episode_idx, episode in enumerate(storages):
+        
+        data_grp = f[episode]
+        N = data_grp['trg0'].shape[0]
+        assert N % samples_per_action == 0
+        
+        # get tumbled infos
+        if 'tumbled' in data_grp:
+            time_tumbled = data_grp['tumbled'][0] * samples_per_action
+        else:
+            time_tumbled = -1
+        
+        # initial, empty call
+        if 'init_step' in data_grp:
+            print "Simulation was started/reverted"
+            time_start_ms = 0
+            critic(dict(), time_start_ms, time_start_ms + samples_per_action, ms_per_step)
+            time_tumbled -= samples_per_action
+        
+        # initial action
+        critic.a_curr = np.atleast_2d(data_grp['a_curr'][0]).T
+        
+        # loop through data, incrementally feed the critic
+        for num_iter in np.arange(0, N, samples_per_action):
+            # next action
+            next_action = np.atleast_2d(data_grp['a_next'][num_iter/samples_per_action]).T
+            
+            # get data
+            time_start_ms += time_step_ms
+            time_end_ms = time_start_ms + time_step_ms
+            chunk = dict([(k, data_grp[k][num_iter:(num_iter+samples_per_action)]) for k in SENSOR_NAMES])
+            
+            # send tumbled message
+            if num_iter == time_tumbled:
+                critic.event_handler(None, dict(), time_tumbled, 'tumbled_grace_start')
+            
+            # update critic
+            critic(chunk, time_start_ms, time_end_ms, time_step_ms)
+        
+        # send reset after episode has finished
+        if episode_idx < len(storages) - 1:
+            critic.event_handler(None, dict(), ms_per_step * N, 'reset')
+    
+    # cleanup
+    critic._pre_increment_hook = critic._pre_increment_hook_orig
+    critic._next_action_hook = critic._next_action_hook_orig
+    del critic._pre_increment_hook_orig
+    del critic._next_action_hook_orig
 

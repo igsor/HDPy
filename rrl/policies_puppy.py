@@ -1,7 +1,7 @@
 """
-ACD policies based on manipulating gait parameters. There are four
-parameters and four legs; Each parameter combination (one to four) may
-be controlled. Furthermore, legs may be grouped (All together,
+Puppy's ACD policies are based on manipulating gait parameters. There
+are four parameters and four legs; Each parameter combination (one to
+four) may be controlled. Furthermore, legs may be grouped (All together,
 Front/Rear, Left/Right) or individually controlled.
 
 The class naming scheme follows:

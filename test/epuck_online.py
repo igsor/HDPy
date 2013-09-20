@@ -121,44 +121,7 @@ acd = ExperimentingHDP(data_pth, reservoir, readout, plant, policy, gamma, alpha
 
 ## MAIN LOOP ##
 
-num_episode = 0
-while True:
-    
-    # init episode
-    acd.new_episode()
-    #robot.reset()
-    robot.reset_random(loc_lo=-9.0, loc_hi=9.0)
-    policy.action = policy.initial_action() # FIXME: Policy must be reset aswell... should this be intrinsic?
-    a_curr = np.atleast_2d([policy.action])
-    
-    num_step = 0 # k
-    while True:
-        
-        # Apply current action
-        collided = robot.take_action(a_curr)
-        
-        # Observe sensors
-        s_next = robot.read_sensors()
-        
-        # Execute ACD
-        a_next = acd(s_next, num_step, num_step+1, 1)
-        #a_next = policy.initial_action()
-        #a_next = a_next % (2*pi)
-        
-        # Iterate
-        num_step += 1
-        #if collided or num_step >= _max_step: break
-        if collided: break
-        acd.a_curr = a_curr = a_next
-    
-    if num_step <= 3:
-        print "Warning: episode ended prematurely"
-    
-    num_episode += 1
-    #acd.set_gamma(min(gamma + 0.05, 0.5))
-    
-    if num_episode >= _max_episodes: break
-
+simulation_loop(acd, robot, _max_step, _max_episodes, _max_total_iter)
 
 readout.save(readout_pth)
 

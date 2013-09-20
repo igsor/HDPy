@@ -352,8 +352,8 @@ class ActionGradient(CollectingADHDP):
         
         # enforce lower bound
         gamma = self.beta * dphi_zero
-        a=0
-        b=min(1.0, self.alpha_max)
+        a = 0
+        b = min(1.0, self.alpha_max)
         num_iter = self.ls_max_iter
         while b < self.alpha_max and (phi(b) <= lambda_(b)).any() and (dphi(b) <= gamma).any() and num_iter > 0:
             #print a,b
@@ -368,8 +368,8 @@ class ActionGradient(CollectingADHDP):
         # infinite loop possible! how & where??
         num_iter = self.ls_max_iter
         while ((phi(alpha) > lambda_(alpha)).any() or (dphi(alpha) < gamma).any()) and num_iter > 0:
-            alpha, a, b = self._refine( (a,b), phi, dphi, lambda_)
-            if abs(a-b) < 1e-14:
+            alpha, a, b = self._refine( (a, b), phi, dphi, lambda_)
+            if abs(a - b) < 1e-14:
                 break
             num_iter -= 1
         
@@ -380,7 +380,7 @@ class ActionGradient(CollectingADHDP):
         
         return alpha
     
-    def _refine(self, (a,b), phi, dphi, lambda_):
+    def _refine(self, (a, b), phi, dphi, lambda_):
         D = b - a
         if D < 1e-15:
             print "WARNING: a ~= b (D=", D
@@ -418,7 +418,7 @@ class ActionGradient(CollectingADHDP):
             
             # Do line search and update the action
             #step_size = self._line_search(state, action, gradient)
-            step_size=self.alpha(self.num_episode, self.num_step)
+            step_size = self.alpha(self.num_episode, self.num_step)
             action = action + step_size * gradient
             action = self._next_action_hook(action)
             
@@ -487,12 +487,19 @@ class ActionRecomputation(CollectingADHDP):
 
 
 class ActionBruteForce(CollectingADHDP):
+    """Find the optimal action by computing the expected return at
+    different sampled locations and picking the action which yields the
+    highest one.
+    
+    ``candidates``
+        Action samples. Must be a list of valid actions.
+    
+    .. todo::
+        Breaks old code
+    
     """
-    """
-    def __init__(self, *args, **kwargs):
-        self.sample_step_size = kwargs.pop('sample_step_size', 0.1)
-        self.candidates = kwargs.pop('candidates', np.arange(0, 2*np.pi, self.sample_step_size))
-        super(MaxSample, self).__init__(*args, **kwargs)
+    def __init__(self, candidates, *args, **kwargs):
+        super(ActionBruteForce, self).__init__(*args, **kwargs)
     
     def _step(self, s_curr, s_next, a_curr, reward):
         # ESN-critic, first instance: in(k) => J(k)

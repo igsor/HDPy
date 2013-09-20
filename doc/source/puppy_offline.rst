@@ -65,6 +65,7 @@ some time. All sensor readouts and simulation metadata will be stored
 in the file ``/tmp/puppy_offline_data.hdf5``. On this basis, a Critic
 should be trained next.
 
+$ webots_builder -c <robot.py> -s <supervisor.py> -t styrofoam -m fast /tmp/webots
 
 
 .. _offline-critic-training:
@@ -117,6 +118,64 @@ be required. The datafile mainly serves static training analysis.
 Creating example trajectories and Critic evaluation
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+When a Critic was trained, it is usually evaluated on a different
+dataset. One possibility is to train the Critic on a part of the
+training set and use the rest for testing. Then, it will be evaluated
+on action sequences, sampled as in the training dataset. If this is not
+desired, another set of offline data has to be acquired. In the
+following code, such a set is created by a predefined action sequence.
+
+Specifically, a main trajectory is defined, with some example
+actions executed at every k'th steps. For this, the robot's state at the
+k'th step must be identical for all example actions. As the robot cannot
+easily be reset in [Webots]_, an easier approach is to revert the
+simulation and keep the robot movement identical up to the k'th step.
+
+Three scripts are given to achieve this task. The first script creates
+a file which includes the action sequences and a reference to the one to
+be executed next. The other two scripts are a robot and supervisor
+controller for webots. Basically, an action sequence is loaded and
+executed, the measurements stored in a file in the same fashion as in
+the last section (:ref:`offline-data`). Hence, the file structure and
+called functions are the same as before.
+
+
+First, a number of action sequences is stored in a file at
+``/tmp/example_sequence.hdf5``.
+
+.. literalinclude:: ../../test/puppy_example_trajectory_sequence.py
+
+To collect the simulation data, again a supervisor and robot controller
+have to be created. As noted before, the simulation is to be reverted
+(not restarted!) after an action sequence has finished. In this example,
+this is implemented by two guards which react accordingly to a signal
+from the robot.
+
+.. literalinclude:: ../../test/puppy_example_trajectory_supervisor.py
+
+Hence, the main logic is implemented in the robot controller. A special
+case of an :py:class:`OfflineCollector` is defined, enforcing the action
+to follow a specified sequence. If the sequence has ended, a signal is
+sent to the supervisor. The action sequence is loaded from the HDF5
+file, which was written before and the file updated such that all the
+sequences will be executed. The initialization of the robot is then
+analoguous to the previous section.
+
+.. literalinclude:: ../../test/puppy_example_trajectory_robot.py
+
+With the scripts set up, [Webots]_ can be executed. It automatically
+quits after all trajectories have been handled. Note that the setup
+of the policy, the number of initial steps and robot timings have been
+set to the same values as in the training data collection process.
+
+$ webots_builder -c <robot.py> -s <supervisor.py> -t styrofoam -m fast /tmp/webots
+
+As with offline data acquisition, the robot data is written into a HDF5,
+in this example at ``/tmp/example_data.hdf5``. Note that once this data
+is available, it can be used for testing of several Critics (as for now,
+all data is offline). Hence, the same process can be repeated for
+several example trajectories to have a more representative testing
+dataset.
 
 
 
@@ -125,4 +184,54 @@ Creating example trajectories and Critic evaluation
 Critic analysis
 ^^^^^^^^^^^^^^^
 
+If the example was followed until here, several files should be
+available:
 
+- ``/tmp/puppy_readout.pic``, the trained Critic's readout weights
+- ``/tmp/puppy_reservoir.pic``, the Critic's reservoir
+- ``/tmp/example_data.hdf5``, the testing dataset
+
+With those, the Critic can finally be analyzed. To do so, the Critic
+is executed on the testing dataset and then the result is plotted. The
+first part works similar to the Critic's training. The testing data is
+replayed, but this time the Critic is loaded instead of trained. The
+following script achieves this, storing the evaluation result in
+``/tmp/example_eval.hdf5``. As before, plant and policy are initialized,
+then the reservoir and readout is loaded. Note that the readout training
+is disabled. After creation of the :py:class:`PuppyHDP`, it is executed
+on the testing data.
+
+.. literalinclude:: ../../test/puppy_example_trajectory_eval.py
+
+Now, the predicted return along the testing trajectory is stored in
+``/tmp/example_eval.hdf5``. Based on this file, the Critic behaviour
+can be analysed. It does not include the data collected during
+simulation, hence the experiment is only completely described by also
+considering ``/tmp/example_data.hdf5``. This is exactly what
+:py:class:`H5CombineFile` is for.
+
+Due to the initial behaviour of :py:class:`PuppyHDP` and
+:py:class:`OfflinePuppy`, the datasets in the two files have a different
+offset (indicated by ``obs_offset`` in the script). For the first epoch,
+sensor data is available but no actions or reward. They are only stored
+after the second step, hence are offset by one epoch (150 sensor samples
+in this case). The predicted return is delayed even more, as it is not
+stored during the whole initial phase (25 steps). The dataset can also
+be thought of being aligned backwards.
+
+The analysis script goes through all executions of the example
+trajectory (one for each sample action) and orders them according to the
+state in which the sample action execution started. For each of those
+states, the sample actions are plotted as lines, colored with respect
+to the respective predicted return. States itself are related by
+plotting a circle, colored according to the median return of actions
+executed from it.
+
+.. literalinclude:: ../../test/puppy_offline_analysis.py
+
+If it worked correctly, a plot should be generated which shows the
+example trajectory, the sampled actions and states with the color
+corresponding to the predicted return (darker is better).
+
+
+.. image:: ../../data/puppy_offline_result.png

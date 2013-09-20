@@ -674,7 +674,7 @@ class StabilizedRLS(PlainRLS):
     implementation instead of :py:class:`PlainRLS`.
     
     """
-    def train(self, sample, trg=None, err=None):
+    def train(self, sample, trg=None, err=None, d=None, e=None):
         """Train the regression on one or more samples.
         
         ``sample``

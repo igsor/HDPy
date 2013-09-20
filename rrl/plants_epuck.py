@@ -9,7 +9,12 @@ import warnings
 import numpy as np
 
 class CollisionAvoidanceFrontal(Plant):
-    """
+    """Plant for ePuck to realize collision avoidance. The state
+    consists of the three frontal infrared sensors. The reward is
+    negative, if one of the three frontal sensors reads a proximity
+    lower than ``theta``. Gaussian noise is added to the reward if
+    ``obs_noise`` is positive.
+    
     """
     def __init__(self, theta, obs_noise=0.0):
         super(CollisionAvoidanceFrontal, self).__init__(state_space_dim=3)
@@ -33,7 +38,12 @@ class CollisionAvoidanceFrontal(Plant):
         return ret
 
 class CollisionAvoidanceSideways(Plant):
-    """
+    """Plant for ePuck to realize collision avoidance. The state
+    consists of the frontal and two sideways infrared sensors. The
+    reward is negative, if one of those sensors reads a proximity
+    lower than ``theta``. Gaussian noise is added to the reward if
+    ``obs_noise`` is positive.
+    
     """
     def __init__(self, theta, obs_noise=0.0):
         super(CollisionAvoidanceSideways, self).__init__(state_space_dim=3)
@@ -56,7 +66,12 @@ class CollisionAvoidanceSideways(Plant):
         return ret
 
 class CollisionAvoidanceFull(Plant):
-    """
+    """Plant for ePuck to realize collision avoidance. The state
+    consists of all eight infrared sensors. The reward is
+    negative, if one of the sensors reads a proximity lower than
+    ``theta``. Gaussian noise is added to the reward if
+    ``obs_noise`` is positive.
+    
     """
     def __init__(self, theta, obs_noise=0.0):
         super(CollisionAvoidanceFull, self).__init__(state_space_dim=8)
@@ -77,26 +92,16 @@ class CollisionAvoidanceFull(Plant):
             ret += np.random.normal(scale=self.obs_sigma)
         return ret
 
-class Location(Plant):
-    """
-    """
-    def __init__(self, theta):
-        super(Location, self).__init__(state_space_dim=3)
-        self.theta = float(theta)
-    
-    def state_input(self, state):
-        """Return the state from observations ``state``"""
-        input_ = np.hstack((state['loc'], state['pose'])).T
-        return input_
-    
-    def reward(self, epoch):
-        """Return the reward produced by ``epoch``."""
-        ret = float(sum([min(ir - self.theta, 0) for ir in epoch['ir'].T]))
-        #ret += np.random.normal(scale=0.00001)
-        return ret
-
 class Attractor(Plant):
-    """
+    """Plant for ePuck to guide it to an ``attractor`` and away from a
+    ``repeller``. Both points are to be passed as tuples. The state
+    consists of the robot's location. The reward is inversely
+    proportional with factor ``scale`` to the distances to the
+    attractor and repeller, i.e.
+    
+    .. math::
+        r = \frac{s}{\Delta_a} - \frac{s}{\Delta_r}
+    
     """
     def __init__(self, attractor, repeller, scale):
         self.attractor = map(float, attractor)
@@ -106,7 +111,7 @@ class Attractor(Plant):
     
     def state_input(self, state):
         """Return the state from observations ``state``"""
-        input_ = np.atleast_2d(state['mdist']).T
+        input_ = np.atleast_2d(state['loc']).T
         return input_
     
     def _idist(self, pt0, pt1):
@@ -126,7 +131,8 @@ class Attractor(Plant):
 
 
 class Trivial(CollisionAvoidanceFrontal):
-    """
+    """Plant for ePuck to realize collision avoidance, using the three
+    frontal sensors.
     
     .. deprecated:: 1.0
         Use :py:class:`CollisionAvoidanceFrontal` instead
@@ -137,7 +143,8 @@ class Trivial(CollisionAvoidanceFrontal):
         super(Trivial, self).__init__(*args, **kwargs)
 
 class SidewaysTrivial(CollisionAvoidanceSideways):
-    """
+    """Plant for ePuck to realize collision avoidance, using the frontal
+    and two sideways sensors.
     
     .. deprecated:: 1.0
         Use :py:class:`CollisionAvoidanceFrontal` instead
@@ -148,7 +155,8 @@ class SidewaysTrivial(CollisionAvoidanceSideways):
         super(SidewaysTrivial, self).__init__(*args, **kwargs)
 
 class FullTrivial(CollisionAvoidanceFull):
-    """
+    """Plant for ePuck to realize collision avoidance, using the all
+    eight infrared sensors.
     
     .. deprecated:: 1.0
         Use :py:class:`CollisionAvoidanceFrontal` instead
