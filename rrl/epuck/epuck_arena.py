@@ -1,4 +1,10 @@
+"""
+The environment of the ePuck robot consists of several walls and
+obstacles. The difference between those two is that walls are isolated
+lines while obstacles are polygons, hence closed shapes. Some obstacles
+and arena arrangements have been prepared in this file.
 
+"""
 # open rectangle
 left, right = -1.0, 5.0
 bottom, top = -4.0, 20.0

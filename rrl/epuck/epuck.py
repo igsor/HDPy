@@ -1,14 +1,21 @@
 """
+For the ePuck robot, a small simulator is provided. It allows to place
+ePuck in an arena, with unpassable walls and obstacles at (almost)
+arbitrary locations. The class :py:class:`Robot` provides the
+implementation of the simulated ePuck. Obstacles are directly inserted
+into this instance, hence it combines the robot with the environment.
+As for other problems, a :py:class:`ADHDP` instance can be used on top
+of this to control the robot motion. Both of these parts are combined in
+the :py:func:`simulation_loop` function to run the simulation for a
+fixed amount of time.
 
 .. todo::
-    documentation
-    
+    where arenas can be found
 
 """
 import numpy as np
 import pylab
 import warnings
-#import epuck_arena
 
 
 def _intersect((o1x, o1y), (d1x, d1y), (o2x, o2y), (d2x, d2y)):
@@ -91,34 +98,64 @@ def _obs_intersect(((x0,y0), (x1,y1)), ((x2,y2), (x3,y3))):
         return False
 
 class Robot(object):
+    """Simulated ePuck robot.
+    
+    The robot may be steered by means of change in its orientation (i.e.
+    the heading relative to the robot). Every time an action is
+    executed, the robot turns to the target orientation, then moves
+    forward. How much it moves is proportional to the ``speed`` and
+    ``step_time``. In between, infrared sensor readouts can be taken.
+    The robot is placed in an arena, with some obstacles and walls it
+    can collide with but not pass. Upon collision, the robot stops
+    moving.
+    
+    ``walls``
+        List of wall lines which cannot be passed. The lines are to be
+        given by their endpoints.
+    
+    ``obstacles``
+        List of obstacles which cannot be passed. In contrast to walls,
+        the obstacles are closed polygons. They have to be given
+        as list of corner points. Obstacles may not include the origin
+        (0, 0).
+    
+    ``speed``
+        Speed of the robot.
+    
+    ``step_time``
+        Time quantum for movement, i.e. for how long the robot drives
+        forward.
+    
+    ``tol``
+        Minimal distance from any obstacle or wall which counts as
+        collision.
+    
+    .. note::
+        Obstacles may not include the origin (0, 0).
+    
+    .. todo::
+        wall tolerance does not operate correctly.
+    
     """
-    
-    obstacles are polygons, defined by the corner points
-    obstacle_line are single lines, not necessarily connected
-    
-    the robot cannot be reset within a polygon
-    polygons may not include the origin, (0, 0)
-    
-    """
-    def __init__(self, obstacle_line=None, obstacles=None, speed=0.5, step_time=1.0, tol=0.0):
+    def __init__(self, walls=None, obstacles=None, speed=0.5, step_time=1.0, tol=0.0):
         
         if obstacles is None:
             obstacles = []
         
-        if obstacle_line is None:
-            obstacle_line = []
+        if walls is None:
+            walls = []
         
-        obstacle_line = obstacle_line[:]
+        walls = walls[:]
         for obs in obstacles:
-            obstacle_line.extend([(x0,y0,x1,y1) for (x0,y0), (x1,y1) in zip(obs[:-1], obs[1:])])
-            obstacle_line.append((obs[-1][0], obs[-1][1], obs[0][0], obs[0][1]))
+            walls.extend([(x0,y0,x1,y1) for (x0,y0), (x1,y1) in zip(obs[:-1], obs[1:])])
+            walls.append((obs[-1][0], obs[-1][1], obs[0][0], obs[0][1]))
         
         if tol > 0.0:
             warnings.warn("tolerance > 0 doesn't work properly; It only works if the robot faces the wall (not when parallel or away from the wall).")
         
         self.sensors = [2*np.pi*i/8.0 for i in range(8)]
         #self.obstacles = [ (x0,y0,x1,y1) ]
-        self.obstacle_line = obstacle_line
+        self.obstacle_line = walls
         self._ir_max, self.tol = 15.0, tol
         self.obstacles = self._cmp_obstacles(self.obstacle_line)
         self.polygons = obstacles[:]
@@ -344,9 +381,11 @@ class Robot(object):
         pass
 
 class AbsoluteRobot(Robot):
-    """
+    """Simulated ePuck robot.
     
-    
+    In contrast to :py:class:`Robot`, the heading is with respect to
+    the arena instead of the robot - i.e. it is absolute, not relative
+    to the robot.
     
     """
     def take_action(self, action):
@@ -360,17 +399,26 @@ class AbsoluteRobot(Robot):
         return super(AbsoluteRobot, self).take_action(0.0)
 
 def simulation_loop(acd, robot, max_step=-1, max_episodes=-1, max_total_iter=-1):
-    """
+    """Simulate some episodes of the ePuck robot.
+    
+    This method handles data passing between the ``acd`` and ``robot``
+    instances in two loops, one for the episode and one for the whole
+    experiment.
     
     ``acd``
+        Actor-Critic instance (:py:class:`ADHDP`).
     
     ``robot``
+        Robot instance (:py:class:`Robot`).
     
     ``max_step``
+        Maximum number of steps in an episode. Negative means no limit.
     
     ``max_episodes``
+        Maximum number of episodes. Negative means no limit.
     
     ``max_total_iter``
+        Maximum number of steps in total. Negative means no limit.
     
     """
     if max_step < 0 and max_episodes < 0 and max_total_iter < 0:

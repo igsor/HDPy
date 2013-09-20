@@ -4,7 +4,7 @@
     documentation
 
 """
-from rl import Policy
+from ..rl import Policy
 import warnings
 import numpy as np
 

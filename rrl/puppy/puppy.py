@@ -1,9 +1,12 @@
 """
 HDP code for Puppy experiments
 
+.. todo::
+    documentation
+
 """
-from hdp import CollectingADHDP
-from rl import Plant
+from ..hdp import CollectingADHDP
+from ..rl import Plant
 import numpy as np
 import warnings
 import h5py

@@ -4,7 +4,7 @@
     documentation
 
 """
-from rl import Plant
+from ..rl import Plant
 import warnings
 import numpy as np
 
@@ -100,7 +100,7 @@ class Attractor(Plant):
     attractor and repeller, i.e.
     
     .. math::
-        r = \frac{s}{\Delta_a} - \frac{s}{\Delta_r}
+        r = \\frac{s}{\Delta_a} - \\frac{s}{\Delta_r}
     
     """
     def __init__(self, attractor, repeller, scale):

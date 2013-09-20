@@ -4,7 +4,7 @@
     documentation
 
 """
-from rl import Plant
+from ..rl import Plant
 import numpy as np
 import warnings
 
@@ -164,7 +164,7 @@ class TargetLocationLandmarks(TargetLocation):
         dist = np.atleast_2d(dist).T
         dist = self.normalization.normalize_value('landmark_dist', dist)
         return dist
-    
+
 class DiffTargetLocationLandmarks(TargetLocationLandmarks):
     """A :py:class:`Plant` which gives positive reward proportional to
     the absolute difference  (between two episodes) in distance to

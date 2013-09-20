@@ -7,6 +7,9 @@ ePuck
 Introduction
 ------------
 
+.. automodule:: rrl.epuck.epuck
+
+
 .. todo::
     epuck simulation (robot, arena)
     link to pp
@@ -24,3 +27,6 @@ Reference
 
 .. module:: rrl
 
+.. autoclass:: rrl.epuck.Robot
+
+.. autoclass:: rrl.epuck.AbsoluteRobot

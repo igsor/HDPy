@@ -309,7 +309,6 @@ class ReservoirNode(object):
             with open(filename, mode) as flh:
                 _cPickle.dump(self, flh, protocol)
 
-
 class SparseReservoirNode(ReservoirNode):
     """
     

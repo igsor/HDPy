@@ -30,16 +30,24 @@ as the Critic's function approximator [ESN-ACD]_.
 """
 from rc import *
 from rl import *
-from plants import *
 from analysis import *
-from analysis_epuck import *
-from analysis_puppy import *
 from puppy import *
 from inout import *
 from hdp import *
 
-import policies as policy
-from policies_puppy import FRA, LRA, LRP # Deprecated, don't use like this but through policy.puppy.{FRA,LRA,LRP}
+import puppy
+import epuck
+
+from epuck.analysis_epuck import *
+from puppy.analysis_puppy import *
+from puppy.puppy import *
+from puppy.policies import FRA, LRA, LRP
+
+#from plants import *
+#from analysis_epuck import *
+#from analysis_puppy import *
+#import policies as policy
+#from policies_puppy import FRA, LRA, LRP # Deprecated, don't use like this but through policy.puppy.{FRA,LRA,LRP}
 
 
 #__all__ = ['']
