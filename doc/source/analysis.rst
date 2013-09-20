@@ -7,7 +7,8 @@ Analysis
 Notes
 -----
 
-.. automodule:: rrl.analysis
+..
+    .. automodule:: rrl.analysis
 
 
 Reference
@@ -16,12 +17,9 @@ Reference
 .. autoclass:: Analysis
     :members:
 
-.. autofunction:: gen_query
+.. autofunction:: overview
 
+.. autofunction:: node_inspection
 
-Inheritance
------------
-
-.. inheritance-diagram::
-    rrl.PuppyHDP
+.. autofunction:: critic
 

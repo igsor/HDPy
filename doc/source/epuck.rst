@@ -8,7 +8,8 @@ Introduction
 ------------
 
 .. todo::
-    experiment setup
+    epuck simulation (robot, arena)
+    link to pp
 
 
 Example

@@ -23,11 +23,10 @@ some examples have already been implemented.
 Example
 -------
 
+.. module:: rrl
 
 Reference
 ---------
-
-.. module:: rrl
 
 .. autoclass:: Plant
 
@@ -36,8 +35,6 @@ Reference
 
 Puppy Plants
 ^^^^^^^^^^^^
-
-.. module:: rrl
 
 .. autoclass:: SpeedReward
 
@@ -53,8 +50,6 @@ Puppy Plants
 Puppy Policies
 ^^^^^^^^^^^^^^
 
-.. module:: rrl
-
 .. GaitPolicy
 
 .. automodule:: rrl.policy.puppy
@@ -63,11 +58,7 @@ Puppy Policies
 ePuck Plants
 ^^^^^^^^^^^^
 
-.. module:: rrl
-
 
 ePuck Policies
 ^^^^^^^^^^^^^^
-
-.. module:: rrl
 

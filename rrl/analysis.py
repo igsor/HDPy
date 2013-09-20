@@ -184,6 +184,7 @@ def gen_query(history):
         soon be removed.
     
     """
+    warnings.warn('This method is deprecated. Use class Analysis instead')
     query = lambda s: np.vstack([hep[s] for hep in history])
     return query
 
@@ -207,7 +208,7 @@ class Analysis:
     def __del__(self):
         """Close open files."""
         self.f.close()
-
+    
     def stack_all_data(self):
         """Return a :py:keyword:`dict` with all concatenated data,
         sorted by the data key."""

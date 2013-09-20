@@ -126,8 +126,8 @@ class Robot(object):
         self.reset()
     
     def _cmp_obstacles(self, lines):
-        """
-        """
+        """Convert lines given by their endpoints to their corresponding
+        vector representation"""
         obstacles = []
         for x0,y0,x1,y1 in lines:
             o_vec = (x1-x0, y1-y0)
@@ -139,8 +139,8 @@ class Robot(object):
         return obstacles
     
     def _cmp_obstacle_lines(self, obstacles):
-        """
-        """
+        """Convert lines given by as vector to their corresponding
+        endpoint representation."""
         lines = []
         for o_vec, o_base, o_limit in obstacles:
             x0, y0 = o_base
@@ -258,31 +258,40 @@ class Robot(object):
         self.trajectory.append(self.loc)
         return collide
     
-    def plot_trajectory(self, wait=False, with_tol=True, tol=None, full_view=True):
+    def plot_trajectory(self, wait=False, with_tol=True, tol=None, full_view=True, axis=None):
         """Plot the robot trajectory in a :py:mod:`pylab` figure.
         
-        .. todo::
-            pylab figure configurable
-        
         ``wait``
+            True for blocking until the figure is closed.
         
         ``with_tol``
+            Plot obstacle tolerance lines.
         
         ``tol``
+            Overwrite the obstacle tolerance.
         
         ``full_view``
+            Keep the original clipping of the window. If false, the
+            clipping will be adjusted to the data.
+        
+        ``axis``
+            A :py:mod:`pylab` axis, which should be used for plotting.
+            If not provided, the first axis of the first figure is used.
         
         """
-        pylab.clf()
-        self._plot_obstacles(with_tol, tol)
+        if axis is None:
+            axis = pylab.figure(1).axes[0]
+            
+        axis.clear()
+        self._plot_obstacles(axis, with_tol, tol)
         x,y = zip(*self.trajectory)
-        pylab.plot(x,y,'b-')
-        pylab.plot(x,y,'b*')
+        axis.plot(x,y,'b-')
+        axis.plot(x,y,'b*')
         if full_view:
-            x0,x1,y0,y1 = pylab.axis()
+            x0,x1,y0,y1 = axis.axis()
         else:
             x0,x1,y0,y1 = min(x), max(x), min(y), max(y)
-        pylab.axis((
+        axis.axis((
             x0 + x0*0.1,
             x1 + x1*0.1,
             y0 + y0*0.1,
@@ -291,23 +300,23 @@ class Robot(object):
         
         pylab.show(block=wait)
 
-    def _plot_obstacles(self, with_tol=True, tol=None):
+    def _plot_obstacles(self, axis, with_tol=True, tol=None):
         """Plot all obstacles and walls into a :py:mod:`pylab` figure.
         
-        .. todo::
-            pylab figure configurable
+        ``axis``
+            The axis where stuff is plotted into.
         
         ``with_tol``
-            
+            Plot obstacle tolerance lines.
         
         ``tol``
-            
+            Overwrite the obstacle tolerance.
         
         """
         if tol is None: tol = self.tol
         for vec, base, limit in self.obstacles:
             # obstacle line
-            pylab.plot((base[0], base[0]+limit*vec[0]), (base[1], base[1]+limit*vec[1]), 'k')
+            axis.plot((base[0], base[0]+limit*vec[0]), (base[1], base[1]+limit*vec[1]), 'k')
             
             if with_tol and tol > 0:
                 if vec[1] == 0.0:
@@ -320,8 +329,8 @@ class Robot(object):
                 base_tp = (base[0] + y[0], base[1] + y[1])
             
                 # obstacle tolerance
-                pylab.plot((base_tn[0], base_tn[0]+limit*vec[0]), (base_tn[1], base_tn[1]+limit*vec[1]), 'k:')
-                pylab.plot((base_tp[0], base_tp[0]+limit*vec[0]), (base_tp[1], base_tp[1]+limit*vec[1]), 'k:')
+                axis.plot((base_tn[0], base_tn[0]+limit*vec[0]), (base_tn[1], base_tn[1]+limit*vec[1]), 'k:')
+                axis.plot((base_tp[0], base_tp[0]+limit*vec[0]), (base_tp[1], base_tp[1]+limit*vec[1]), 'k:')
                 
                 # tolerance edges
                 # tip_hi = base+limit*vec+tol/nrm(vec)*vec

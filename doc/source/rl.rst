@@ -27,9 +27,11 @@ Reference
 
 .. autoclass:: Plant
     :members:
+    :noindex:
 
 .. autoclass:: Policy
     :members:
+    :noindex:
 
 .. autoclass:: ActorCritic
     :members:

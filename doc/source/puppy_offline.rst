@@ -52,7 +52,7 @@ In this case, the action is based on a gait and controlls the
 amplitudes of the left and right legs. The procedure to create an
 initial action is overwritten such that the initial action is randomly
 chosen. The same is achieved by subtyping :py:class:`OfflineCollector`
-and overwriting the :py:method:`OfflineCollector._next_action_hook` for
+and overwriting the :py:meth:`OfflineCollector._next_action_hook` for
 action selection during the experiment. Hence, actions are chosen
 randomly at all times, according to the respective schema. Note that
 the action selection schema may have a huge influence on Critic training

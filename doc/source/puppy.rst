@@ -10,9 +10,9 @@ Introduction
 ------------
 
 .. todo::
-    workflow, offline/online, analysis
-
-
+    online workflow, analysis
+    offline code documentation
+    link to policies, plants
 
 Example
 -------
@@ -24,7 +24,7 @@ Example
    puppy_online
 
 .. todo::
-    pick from puppy_data_gathering, puppy_hdp_landmarks, puppy_analysis, puppy_policy_eval
+    online; offline actor (puppy_policy_eval)
 
 
 Reference

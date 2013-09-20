@@ -27,8 +27,8 @@ Basics
    rl
    utils
 
-Others
-^^^^^^
+Platforms
+^^^^^^^^^
 
 .. toctree::
    :maxdepth: 1
