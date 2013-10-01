@@ -1,8 +1,15 @@
 """
-HDP code for Puppy experiments
+Puppy experiments are executed within the [Webots]_ simulator. This
+process is supported by :py:mod:`PuPy`. For this purpose, an adapted
+Actor-Critic is implemented in :py:class:`PuppyHDP`, handling Puppy
+specifics. It inherits from :py:class:`CollectingADHDP`, hance can be
+used in the same fashion.
 
-.. todo::
-    documentation
+Simulation with [Webots]_ is often time consuming. Therefore, a method
+is provided to collect data in the simulation and replay it later. This
+is implemented through :py:class:`OfflineCollector` and
+:py:func:`puppy_offline_playback`. An example of how to approach this
+is documented in :ref:`puppy_offline`.
 
 """
 from ..hdp import CollectingADHDP

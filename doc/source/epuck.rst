@@ -9,6 +9,8 @@ ePuck
 Introduction
 ------------
 
+.. automodule:: rrl.epuck
+
 .. automodule:: rrl.epuck.epuck
 
 .. automodule:: rrl.epuck.analysis_epuck

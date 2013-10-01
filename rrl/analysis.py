@@ -233,17 +233,21 @@ class Analysis:
             self.plot_grid(axis)
         return axis
     
-    def plot_node_weight_over_episode(self, axis, episode):
+    def plot_node_weight_over_episode(self, episode, axis=None, **kwargs):
         """Plot the readout weights of a single ``episode`` in ``axis``."""
         assert episode in self.experiments
+        if axis is None:
+            axis = pylab.figure().add_subplot(111)
+        
         data = self.f[episode]['readout'][:]
         N = data.shape[1]
+        kwargs.pop('label', 0)
         for i in range(N):
             if i == N-1:
                 lbl = 'Bias'
             else:
                 lbl = 'Node %i' % i
-            axis.plot(data[:, i], label=lbl)
+            axis.plot(data[:, i], label=lbl, **kwargs)
         
         axis.set_xlabel('step')
         axis.set_ylabel('Node weight')

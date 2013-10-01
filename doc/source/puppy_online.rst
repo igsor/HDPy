@@ -1,4 +1,5 @@
 
+.. _puppy_online:
 
 Puppy online workflow
 =====================

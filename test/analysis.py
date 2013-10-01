@@ -5,7 +5,7 @@ a = rrl.Analysis('esn_acd.hdf5')
 # Prediction plot
 fig = pylab.figure(1)
 ax = fig.add_axes([0.1, 0.1, 0.8, 0.8])
-a.plot_path_return_prediction(ax, '18')
+a.plot_path_return_prediction('18', ax)
 fig.suptitle('Predictor evaluation')
 # If all works well, you should see a figure with 5 lines in it,
 # according to the Analysis.plot_path_return_prediction documentation

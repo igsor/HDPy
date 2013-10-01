@@ -72,6 +72,8 @@ Reference
 .. autoclass:: Policy
 
 
+.. _plants_puppy:
+
 Puppy Plants
 ^^^^^^^^^^^^
 
@@ -86,6 +88,8 @@ Puppy Plants
 .. autoclass:: rrl.puppy.plant.DiffTargetLocationLandmarks
 
 
+.. _policies_puppy:
+
 Puppy Policies
 ^^^^^^^^^^^^^^
 
@@ -94,9 +98,13 @@ Puppy Policies
 .. automodule:: rrl.puppy.policy
 
 
+
+.. _plants_epuck:
+
 ePuck Plants
 ^^^^^^^^^^^^
 
+.. _policies_epuck:
 
 ePuck Policies
 ^^^^^^^^^^^^^^

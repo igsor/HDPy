@@ -1,4 +1,6 @@
 
+.. _puppy_offline:
+
 Puppy offline workflow
 ======================
 

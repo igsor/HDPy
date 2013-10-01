@@ -11,6 +11,12 @@ Puppy
 Introduction
 ------------
 
+.. automodule:: rrl.puppy
+
+.. automodule:: rrl.puppy.puppy
+
+.. automodule:: rrl.puppy.analysis_puppy
+
 .. todo::
     online workflow, analysis
     offline code documentation

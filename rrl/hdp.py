@@ -258,7 +258,9 @@ class CollectingADHDP(ADHDP):
 ## HDP VARIATIONS ##
 
 class ActionGradient(CollectingADHDP):
-    """
+    """Determine the next action by gradient ascent search.
+    The gradient ascent computes the action which maximizes the
+    predicted return for a fixed state.
     
     Additional keyword arguments:
     
@@ -278,8 +280,7 @@ class ActionGradient(CollectingADHDP):
         super(ActionGradient, self).__init__(*args, **kwargs)
     
     def _step(self, s_curr, s_next, a_curr, reward):
-        """
-        """
+        """Execute one step of the actor and return the next action."""
         # ESN-critic, first instance: in(k) => J(k)
         i_curr, x_curr, j_curr = self._critic_eval(s_curr, a_curr, simulate=False, action_name='a_curr')
         
@@ -322,17 +323,27 @@ class ActionGradient(CollectingADHDP):
         return a_next
     
     def _line_search(self, state, action, gradient):
+        """Line search algorithm to compute the step size parameter for
+        a gradient step at ``action`` into direction ``gradient``.
+        The ``state`` is still fixed, but must be provided.
+        
+        .. todo::
+            broken for some cases (no reduction, infinite loop)
+        
         """
-        0 < rho  < 0.5
-        rho < beta < 1.0
-        """
+        #0 < rho  < 0.5
+        #rho < beta < 1.0
+        warnings.warn('This code is unreliable. Use a fixed step size instead.')
         
         def phi(alpha):
+            """step-size centric gradient step representation."""
             action_query = action + alpha * gradient
             query_result = self._critic_eval(state, action_query, simulate=True, action_name='a_curr') # TODO: Check reservoir state!
             return - query_result[-1]
         
         def dphi(alpha):
+            """step-size centric gradient step representation, first
+            derivative."""
             # gradient * -derivative(action + alpha * gradient)
             action_query = action + alpha * gradient
             in_state = self.plant.state_input(state)
@@ -381,6 +392,9 @@ class ActionGradient(CollectingADHDP):
         return alpha
     
     def _refine(self, (a, b), phi, dphi, lambda_):
+        """Refinement part of the line search algorithm. Adjusts
+        alpha and narrows the interval [a,b].
+        """
         D = b - a
         if D < 1e-15:
             print "WARNING: a ~= b (D=", D
@@ -404,7 +418,9 @@ class ActionGradient(CollectingADHDP):
         return alpha, a, b
     
     def gradient_descent(self, state, action):
-        """
+        """Gradient ascent search to find the action which maximizes
+        the predicted return given a ``state``. The search starts at
+        ``action``.
         """
         in_state = self.plant.state_input(state)
         num_iter = self.gd_max_iter
@@ -431,12 +447,14 @@ class ActionGradient(CollectingADHDP):
         
         return action
 
-
 class ActionRecomputation(CollectingADHDP):
-    """
+    """Determine the next action the same way as the baseline algorithm
+    for critic training, then recompute it based on the updated critic
+    and with the latest state information.
+    
     """
     def _step(self, s_curr, s_next, a_curr, reward):
-        
+        """Execute one step of the actor and return the next action."""
         # ESN-critic, first instance: in(k) => J(k)
         i_curr, x_curr, j_curr = self._critic_eval(s_curr, a_curr, False, 'a_curr')
         
@@ -485,7 +503,6 @@ class ActionRecomputation(CollectingADHDP):
         # increment
         return a_next
 
-
 class ActionBruteForce(CollectingADHDP):
     """Find the optimal action by computing the expected return at
     different sampled locations and picking the action which yields the
@@ -500,13 +517,14 @@ class ActionBruteForce(CollectingADHDP):
     """
     def __init__(self, candidates, *args, **kwargs):
         super(ActionBruteForce, self).__init__(*args, **kwargs)
+        self.candidates = candidates
     
     def _step(self, s_curr, s_next, a_curr, reward):
+        """Execute one step of the actor and return the next action."""
         # ESN-critic, first instance: in(k) => J(k)
         i_curr, x_curr, j_curr = self._critic_eval(s_curr, a_curr, False, 'a_curr')
         
         # Next action
-        # FIXME: Only valid for ePuck
         a_next = a_curr
         j_best = float('-inf')
         in_state = self.plant.state_input(s_next)
