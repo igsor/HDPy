@@ -1,4 +1,6 @@
 
+.. _epuck:
+
 ePuck
 =====
 
@@ -9,6 +11,7 @@ Introduction
 
 .. automodule:: rrl.epuck.epuck
 
+.. automodule:: rrl.epuck.analysis_epuck
 
 .. todo::
     epuck simulation (robot, arena)
@@ -30,3 +33,10 @@ Reference
 .. autoclass:: rrl.epuck.Robot
 
 .. autoclass:: rrl.epuck.AbsoluteRobot
+
+
+.. autofunction:: epuck_plot_snapshot
+
+.. autofunction:: epuck_plot_value_over_action
+
+.. autofunction:: epuck_plot_all_trajectories

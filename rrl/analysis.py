@@ -1,195 +1,55 @@
 """
 Assuming that all relevant values have been written into a HDF5 file
-(e.g. using :py:class:`CollectingADHDP`), the intrinsics can be
-analyzed. Here are some function to help with this.
+(e.g. using :py:class:`CollectingADHDP`), the controller intrinsics can
+be analyzed. To work with such a file, some functions are provided.
 
 It's assumed that a group represents one episode. There may be several
 groups in a single HDF5 file, which would then be interpreted as several
 runs (episodes) of the same experiment.
 
-Quick plots
-~~~~~~~~~~~
+It is often usefull to look at the overall characteristics of a
+controller, for example development of the error. This analysis is
+limited, yet very quickly executed. To support this processes,
+:py:class:`Analysis` provides a collection of simple functions for
+plotting various data characteristics.
 
-- Sum of absolute readout weights: Information about converging
-  behaviour of the readout. If the weights grow indefinitely, an
-  overflow will eventually occur.
-
-- Error: According to the theory, the error should converge to zero.
-
-- Derivation per action: Action change
-
-- Reward: Desired to converte to the maximum (in the long run)
-
-- Accumulated reward per episode: Desired to converge to the maximum
-
-- Neuron activation: ?
-
-- Action: If the policy converges, the action should converge over several episodes
-
-If the controller is working, we should see that
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-* If training is executed on always the same sequence of actions,
-  the value prediction should become more accurate for earlier
-  steps with increasing number of experiments.
-  
-  > This is since for estimating the TD-Error, we're relying on the current
-    value to improve the estimate of the previous one.
-    
-  > More accurate = Error decreases
-  
-  ! ``plot_error_over_episodes``
-
-* If training is executed on always the same sequence of actions,
-  the predicted value at time t should approximate the return of this
-  action sequence (w.r.t. gamma)
-  
-  > The return prediction is the learning goal of the critic
-  
-  ! ``plot_predicted_return_over_episodes``
-
-* The accumulated reward should increase with increasing episode
-
-  > The return expresses the (expected) accumulated reward over time.
-    The critic approximates the return
-    If the policy converges to an optimal one, then the accumulated
-    reward should increase with the number of episodes
-  
-  ! ``plot_reward``
-
-* For several (known) action sequences, the predicted value of a state
-  should roughly be the average, recursively computed return of all
-  experiments which visited that state.
-  
-  > The return w.r.t. the policy is the average return over all action
-    sequences
-  
-  ! Not implemented
-
-* Any action besides the chosen one should yield a lower expected value
-
-  > After training for some episodes, the approximation of the value
-    should be reliable. Then, the policy should choose the next action
-    optimally, meaning that the value of the next state must be maximal.
-  
-  ! Not implemented
-
-* The TD-Error should decrease with the number of episodes, if all
-  states have been visited before.
-
-  > The Critic is trained on the TD Error, such that it is minimized.
-    With increasing training, the Error should converge to zero.
-  
-  ! Not implemented
-
-? The policy converges to an optimal policy; Given the estimate of the
-  value dependent on the action, the next action should be close to the
-  action maximizing the value function.
-  
-  ! Not implemented
-
-Plots from papers
-~~~~~~~~~~~~~~~~~
-
-* reward over time; one line per episode, received and predicted
-
-  > When the predicted return (?) is shown, it can be seen that (assuming
-    all works well) it propagates towards earlier timesteps in the episode
-    (assuming several runs with the same or similar action).
-
-* utility distribution estimated by critic at a specific time step
-
-  ? Not sure, how to interpret this (generally)
-
-* change of w_out over time
-
-  > Shows the effect of the critic learning
-
-* utility and prediction (and raw sensor values) over time
-
-  > The papers suggest that the prediction should display the form of the
-    utility a couple of timesteps earlier.
-
-
-Other ideas
-~~~~~~~~~~~
-
-* Show action selection fitness
-
-  > In every step, plot J(a|s), J(a|s_{t+1}). Also indicate a_t and a_{t+1} with vertical bars
-  
-  > At least with increasing episode count, the action a_{t+1} should be
-    close to the optimum of J(a|s_{t+1})
-
-  ? Maybe also annotate or plot the gradient
-
-* Given all paths of an experiment:
-
-  - Can compute the return of each path
-  - Can average return of a state, given all observed paths
-  - Can compare the average return of a state with the TD-predicted return (evaluating the critic for a sequence)
-  - Comparison is based on sequences
-
-* Reservoir inputs; Goes together with reservoir output (neuron potential)
-
-  > ``plot_reservoir_input``, ``plot_node_over_episode``
-
-* The ratio between the input and previous state of one reservoir node.
-
-* Snapshot (A):
-
-  * For some sample trajectories:
-  
-    - At each step, evaluate the Critic dependent on the action (finite, predefined set)
-    - For each evaluated action, plot a ray. Expected return is encoded as color or ray length
-    - Plot the action chosen by the algorithm (for a policy study)
-    
-  * At each point, the critic is evaluated dependent on the action
-  * The critic is somewhat also evaluated dependent on the state, since we have a trajectory.
-  * If the critic was properly trained, we should see that:
-  
-    - The predicted return may be "fuzzy" in the beginning (a lot of possible trajectories and returns)
-    - The predicted return should be more accurate (w.r.t. reward) for close-to final episode steps (few possible trajectories)
-    - The predicted return should somehow reflect the naturally expected return; Close to the wall gives a smaller return than far away
-    - The chosen action should be close to the best (evaluated) action
-
-
-* Snapshot (B):
-
-  * For some sample trajectories:
-  
-    - The action remains constant along the trajectory
-    - Evaluate the return at the last step (possibly dependent on the action)
-
-? Correctness of reward
-
-? Predicted return
-
-? Maybe an 'animation' (characteristics over time) may be informative
-
+More complex analysis is likely to be dependent on the concrete
+experiment. For the architectures defined in this module, more involved
+code is provided (see :ref:`epuck`, :ref:`puppy`). As a preliminary,
+:py:func:`critic` offers a compact representation of the learning
+machine.
 
 """
-
 import numpy as np
 import h5py
 import inout
 import warnings
-
-def gen_query(history):
-    """To generate the old *query* function.
-    
-    .. deprecated:: 0.0
-        Compatibility to the esn_acd history interface, also found in
-        :py:meth:`Analysis.get_history`. Should not be used and will
-        soon be removed.
-    
-    """
-    warnings.warn('This method is deprecated. Use class Analysis instead')
-    query = lambda s: np.vstack([hep[s] for hep in history])
-    return query
+import pylab
 
 class Analysis:
-    """Collection of functions to analyze a HDF5 data file at ``pth``.
+    """Collection of simple plotting functions to analyze a HDF5 data
+    file at ``pth``.
+    
+    The interface is similar for most plotting functions, consisting of
+    an ``axis`` argument and allowing additional keyword arguments.
+    If ``axis`` is :py:keyword:`None`, a new figure will be created,
+    otherwise the curve is plotted into the provided axis. The
+    additional keywords are passed to the :py:func:`pylab.plot`. Note
+    that some functions overwrite certain keywords (e.g. label or
+    color).
+    
+    ``pth``
+        Path to the HDF5 data file or :py:class:`DataMerge` instance.
+    
+    ``grid``
+        :py:keyword:`True` gray bars should be plotted, showing the
+        episode boundaries. 
+    
+    ``min_key_length``
+        Threshold for the number of datasets in an episode. This is
+        usually used to filter out episodes which terminated during
+        the initialization phase.
+    
     """
     def __init__(self, pth, grid=False, min_key_length=0):
         if isinstance(pth, inout.DataMerge):
@@ -209,6 +69,8 @@ class Analysis:
         """Close open files."""
         self.f.close()
     
+    ## Basis functions
+    
     def stack_all_data(self):
         """Return a :py:keyword:`dict` with all concatenated data,
         sorted by the data key."""
@@ -223,6 +85,12 @@ class Analysis:
         """Return a list of all data belonging to ``key``."""
         return [self.f[exp][key][:] for exp in self.experiments]
     
+    def stack_data(self, key):
+        """Return data related to ``key`` of all experiments in a single
+        array."""
+        data = [self.f[exp][key][:] for exp in self.experiments if key in self.f[exp]]
+        return np.concatenate(data)
+    
     def __getitem__(self, key):
         if isinstance(key, int):
             warnings.warn("Warning: access by int is w.r.t the experiment not the group")
@@ -234,43 +102,13 @@ class Analysis:
         return len(self.experiments)
     
     def get_episode(self, num):
+        """Return the raw data of episode ``num``."""
         assert num in self.experiments
         return self.f[num]
     
-    def get_history(self):
-        """Return the old ``history`` structure from the HDF5 data file.
-        
-        .. deprecated:: 0.0
-            Compatibility to the esn_acd history interface. Should not
-            be used and will soon be removed.
-        
-        """
-        all_keys = self.f[self.experiments[0]].keys()
-        history = {}
-        for key in all_keys:
-            history[key] = self.get_data(key)
-        
-        return history
-    
     def episode_len(self):
+        """Return the lengths of all episodes"""
         return np.array([len(self.f[e]['a_curr']) for e in self.experiments])
-    
-    def plot_episode_len(self, axis, **kwargs):
-        """Plot the length of the episodes in ``axis``."""
-        data = self.episode_len()
-        color = kwargs.pop('color', 'k')
-        axis.plot(data, color=color, **kwargs)
-        axis.set_xlabel('episode')
-        axis.set_ylabel('number of steps')
-        if self.always_plot_grid:
-            self.plot_grid(axis)
-        return axis
-    
-    def stack_data(self, key):
-        """Return data related to ``key`` of all experiments in a single
-        array."""
-        data = [self.f[exp][key][:] for exp in self.experiments if key in self.f[exp]]
-        return np.concatenate(data)
     
     def num_steps(self, key=None):
         """Return the number of steps per experiment."""
@@ -279,6 +117,21 @@ class Analysis:
         
         steps = [self.f[exp][key].shape[0] for exp in self.experiments]
         return steps
+    
+    ## Plotters
+    
+    def plot_episode_len(self, axis=None, **kwargs):
+        """Plot the length of the episodes in ``axis``."""
+        if axis is None:
+            axis = pylab.figure().add_subplot(111)
+        data = self.episode_len()
+        color = kwargs.pop('color', 'k')
+        axis.plot(data, color=color, **kwargs)
+        axis.set_xlabel('episode')
+        axis.set_ylabel('number of steps')
+        if self.always_plot_grid:
+            self.plot_grid(axis)
+        return axis
     
     def plot_grid(self, axis, key=None):
         """Add a vertical bar to ``axis`` to mark experiment
@@ -289,35 +142,41 @@ class Analysis:
         
         return axis
     
-    def plot_neuron_activation(self, axis):
+    def plot_neuron_activation(self, axis=None, **kwargs):
         """Plot the absolute sum of the neuron state (=activation
         potential) of the current (red) and next (blue) timestep in
         ``axis``."""
+        if axis is None:
+            axis = pylab.figure().add_subplot(111)
         x_curr = self.stack_data('x_curr')
         x_next = self.stack_data('x_next')
         N = x_curr.shape[1]
-        axis.plot(abs(x_curr).sum(axis=1)/N, 'r', label='Absolute Neuron Activation')
-        axis.plot(abs(x_next).sum(axis=1)/N, 'b', label='Absolute Neuron Activation')
+        lbl = kwargs.pop('label', 'Absolute Neuron Activation')
+        axis.plot(abs(x_curr).sum(axis=1)/N, 'r', label=lbl, **kwargs)
+        axis.plot(abs(x_next).sum(axis=1)/N, 'b', label=lbl, **kwargs)
         axis.set_xlabel('step')
         axis.set_ylabel('Absolute Neuron Activation')
         if self.always_plot_grid:
             self.plot_grid(axis)
         return axis
     
-    def plot_readout(self, axis, func=lambda i:i):
+    def plot_readout(self, axis=None, func=lambda i:i, **kwargs):
         """Plot the readout nodes as individual curves in ``axis``. The
         ``func`` allows for an operation to applied to the data before
         plotting. The main intention for this is :py:func:`abs`. Default
         is the identity."""
+        if axis is None:
+            axis = pylab.figure().add_subplot(111)
         data = self.stack_data('readout')
         N = data.shape[1]
+        kwargs.pop('label', 0)
         for i in range(N):
             if i == N-1:
                 lbl = 'Bias'
             else:
                 lbl = 'Readout %i' % i
             
-            axis.plot(func(data[:, i]), label=lbl)
+            axis.plot(func(data[:, i]), label=lbl, **kwargs)
         
         #axis.legend(loc=0)
         axis.set_xlabel('step')
@@ -326,8 +185,10 @@ class Analysis:
             self.plot_grid(axis)
         return axis
     
-    def plot_readout_sum(self, axis, **kwargs):
+    def plot_readout_sum(self, axis=None, **kwargs):
         """Plot the absolute readout weight over time in ``axis``."""
+        if axis is None:
+            axis = pylab.figure().add_subplot(111)
         data = self.stack_data('readout')
         color = kwargs.pop('color', 'k')
         axis.plot(abs(data).sum(axis=1), color=color, **kwargs)
@@ -337,23 +198,28 @@ class Analysis:
             self.plot_grid(axis)
         return axis
     
-    def plot_readout_diff(self, axis, **kwargs):
+    def plot_readout_diff(self, axis=None, **kwargs):
         """Plot the difference of absolute readout weights in
         ``axis``."""
+        if axis is None:
+            axis = pylab.figure().add_subplot(111)
         data = self.stack_data('readout')
         diff = data[1:] - data[:-1]
         diff = diff.sum(axis=1)**2
         color = kwargs.pop('color','k')
-        axis.plot(diff, color=color, label='Readout difference', **kwargs)
+        lbl = kwargs.pop('label', 'Readout difference')
+        axis.plot(diff, color=color, label=lbl, **kwargs)
         axis.set_xlabel('step')
         axis.set_ylabel('Readout difference')
         if self.always_plot_grid:
             self.plot_grid(axis)
         return axis
     
-    def plot_cumulative_readout_diff(self, axis, **kwargs):
+    def plot_cumulative_readout_diff(self, axis=None, **kwargs):
         """Plot the cumulative difference of absolute readout weights in
         ``axis``."""
+        if axis is None:
+            axis = pylab.figure().add_subplot(111)
         data = self.stack_data('readout')
         diff = data[1:] - data[:-1]
         diff = diff.sum(axis=1)**2
@@ -384,8 +250,10 @@ class Analysis:
         axis.legend(loc=0)
         return axis
     
-    def plot_reward(self, axis, **kwargs):
+    def plot_reward(self, axis=None, **kwargs):
         """Plot the reward over time in ``axis``."""
+        if axis is None:
+            axis = pylab.figure().add_subplot(111)
         data = self.stack_data('reward')
         color = kwargs.pop('color', 'k')
         axis.plot(data, color=color, **kwargs)
@@ -395,62 +263,69 @@ class Analysis:
             self.plot_grid(axis)
         return axis
     
-    def plot_derivative(self, axis):
+    def plot_derivative(self, axis=None, **kwargs):
         """Plot the derivative dJ/da over time in ``axis``."""
+        if axis is None:
+            axis = pylab.figure().add_subplot(111)
         data = self.stack_data('deriv')
-        axis.plot(data, 'k', label='dJ(k)/da')
+        lbl = kwargs.pop('label', 'dJ(k)/da')
+        col = kwargs.pop('color', 'k')
+        axis.plot(data, col, label=lbl, **kwargs)
         axis.set_xlabel('step')
         axis.set_ylabel('Derivative')
         if self.always_plot_grid:
             self.plot_grid(axis)
         return axis
     
-    def plot_actions(self, axis):
+    def plot_actions(self, axis=None, **kwargs):
         """Plot the current (blue) and next action (red) over time in
         ``axis``."""
+        if axis is None:
+            axis = pylab.figure().add_subplot(111)
         a_curr = self.stack_data('a_curr')
         a_next = self.stack_data('a_next')
-        axis.plot(a_curr, 'b', label='a_curr')
-        axis.plot(a_next, 'r', label='a_next')
-        #axis.legend(loc=0)
+        kwargs.pop('color', 0)
+        kwargs.pop('label', 0)
+        axis.plot(a_curr, 'b', label='a_curr', **kwargs)
+        axis.plot(a_next, 'r', label='a_next', **kwargs)
         axis.set_xlabel('step')
         axis.set_ylabel('Action')
         if self.always_plot_grid:
             self.plot_grid(axis)
         return axis
     
-    def plot_absolute_error(self, axis, episode_marker=False):
+    def plot_absolute_error(self, axis=None, **kwargs):
         """Plot the absolute error over time in ``axis``."""
+        if axis is None:
+            axis = pylab.figure().add_subplot(111)
         data = abs(self.stack_data('err'))
-        axis.plot(data, 'k', label='error')
+        lbl = kwargs.pop('label', 'error')
+        col = kwargs.pop('color', 'k')
+        axis.plot(data, col, label=lbl, **kwargs)
         axis.set_xlabel('step')
         axis.set_ylabel('TD-error')
         if self.always_plot_grid:
             self.plot_grid(axis)
-        if episode_marker:
-            episode_lengths = np.cumsum([self.f[exp]['err'].shape[0] for exp in self.experiments])
-            ylim = axis.get_ylim()
-            for l in episode_lengths:
-                axis.plot([l,l], ylim, ':k')    
         return axis
     
-    def plot_error(self, axis, episode_marker=False):
+    def plot_error(self, axis=None, **kwargs):
         """Plot the error over time in ``axis``."""
+        if axis is None:
+            axis = pylab.figure().add_subplot(111)
         data = self.stack_data('err')
-        axis.plot(data, 'k', label='error')
+        col = kwargs.pop('color', 'k')
+        lbl = kwargs.pop('label', 'error')
+        axis.plot(data, col, label=lbl, **kwargs)
         axis.set_xlabel('step')
         axis.set_ylabel('TD-error')
         if self.always_plot_grid:
             self.plot_grid(axis)
-        if episode_marker:
-            episode_lengths = np.cumsum([self.f[exp]['err'].shape[0] for exp in self.experiments])
-            ylim = axis.get_ylim()
-            for l in episode_lengths:
-                axis.plot([l,l], ylim, ':k')   
         return axis
     
-    def plot_accumulated_reward(self, axis, **kwargs):
+    def plot_accumulated_reward(self, axis=None, **kwargs):
         """Plot the accumulated reward per episode in ``axis``."""
+        if axis is None:
+            axis = pylab.figure().add_subplot(111)
         reward = self.get_data('reward')
         data = [r.sum() for r in reward]
         color = kwargs.pop('color', 'k')
@@ -460,27 +335,61 @@ class Analysis:
         axis.set_ylabel('Accumulated reward')
         return axis
     
-    def plot_mean_reward(self, axis):
+    def plot_input(self, axis=None, **kwargs):
+        """Plot the reservoir input in ``axis``."""
+        if axis is None:
+            axis = pylab.figure().add_subplot(111)
+        data = self.stack_data('i_curr')
+        lbl = kwargs.pop('label', 'Input')
+        axis.plot(data, label=lbl, **kwargs)
+        axis.set_xlabel('step')
+        axis.set_ylabel('Input')
+        return axis
+    
+    def plot_reservoir_input(self, axis=None, **kwargs):
+        """Plot the reservoir input over time in ``axis``. Per input,
+        one line is drawn."""
+        if axis is None:
+            axis = pylab.figure().add_subplot(111)
+        data = self.stack_data('i_curr')
+        N = data.shape[1]
+        kwargs.pop('label', 0)
+        for i in range(N):
+            axis.plot(data[:, i], label='Input %i' % i, **kwargs)
+        
+        axis.set_xlabel('step')
+        axis.set_ylabel('Input')
+        axis.legend(loc=0)
+        return axis
+    
+    def plot_mean_reward(self, axis=None, **kwargs):
         """Plot the accumulated reward per episode in ``axis``."""
+        if axis is None:
+            axis = pylab.figure().add_subplot(111)
         reward = self.get_data('reward')
         data = [r.mean() for r in reward]
-        axis.plot(data, 'k', label='Accumulated reward')
-        #axis.set_xticks(self.experiments)
+        lbl = kwargs.pop('label', 'Accumulated reward')
+        col = kwargs.pop('color', 'k')
+        axis.plot(data, col, label=lbl, **kwargs)
         axis.set_xlabel('episode')
         axis.set_ylabel('Accumulated reward')
         return axis
     
-    def plot_return_prediction(self, axis, plot=('j_curr', 'j_next')):
+    def plot_return_prediction(self, axis=None, plot=('j_curr', 'j_next'), **kwargs):
         """Plot the predicted return of the current (red) and next
         (blue) state/action pair in ``axis``. ``plot`` defines which
         of the two predicted return are plotted."""
+        if axis is None:
+            axis = pylab.figure().add_subplot(111)
+        kwargs.pop('color', 0)
+        kwargs.pop('label', 0)
         if 'j_curr' in plot:
             j_curr = self.stack_data('j_curr')
-            axis.plot(j_curr, 'r', label='j_curr')
+            axis.plot(j_curr, 'r', label='j_curr', **kwargs)
         
         if 'j_next' in plot:
             j_next = self.stack_data('j_next')
-            axis.plot(j_next, 'b', label='j_next')
+            axis.plot(j_next, 'b', label='j_next', **kwargs)
         
         axis.set_xlabel('step')
         axis.set_ylabel('predicted return')
@@ -491,7 +400,7 @@ class Analysis:
             self.plot_grid(axis)
         return axis
     
-    def plot_path_return_prediction(self, axis, expno):
+    def plot_path_return_prediction(self, expno, axis=None, **kwargs):
         """Plot the predicted return of a simulated path.
         
         The return prediction is specific to the path of the experiment
@@ -521,6 +430,8 @@ class Analysis:
             Online TD prediction
         
         """
+        if axis is None:
+            axis = pylab.figure().add_subplot(111)
         
         if expno not in self.experiments:
             raise Exception('expno is not a valid experiment id')
@@ -555,16 +466,19 @@ class Analysis:
             olr_nb.train(src, dst)
         
         #axis.plot(lin_reg(x_curr), 'b', label='Offline MSE')
-        axis.plot(olr_nb(x_curr), 'c--', label='Online MSE (no bias)')
-        axis.plot(olr_wb(x_curr), 'c:', label='Online MSE (bias)')
-        axis.plot(j_curr, 'r', label='Predicted Value')
-        axis.plot(trg, 'k', label='target')
+        kwargs.pop('color', 0)
+        kwargs.pop('linestyle', 0)
+        kwargs.pop('label', 0)
+        axis.plot(olr_nb(x_curr), 'c--', label='Online MSE (no bias)', **kwargs)
+        axis.plot(olr_wb(x_curr), 'c:', label='Online MSE (bias)', **kwargs)
+        axis.plot(j_curr, 'r', label='Predicted Value', **kwargs)
+        axis.plot(trg, 'k', label='target', **kwargs)
         axis.legend(loc=0)
         axis.set_xlabel('step')
         axis.set_ylabel('return')
         return axis
     
-    def plot_predicted_return_over_episodes(self, axis, step=1):
+    def plot_predicted_return_over_episodes(self, axis=None, step=1):
         """Plot the evolution of the predicted return over multiple
         episodes.
         
@@ -572,6 +486,8 @@ class Analysis:
         was applied in all experiments.
         
         """
+        if axis is None:
+            axis = pylab.figure().add_subplot(111)
         j_curr = self.get_data('j_curr')
         reward = self.get_data('reward')[0]
         gamma = self.get_data('gamma')[0]
@@ -592,13 +508,15 @@ class Analysis:
         axis.set_ylabel('Predicted return')
         return axis
     
-    def plot_error_over_episodes(self, axis, step=1):
+    def plot_error_over_episodes(self, axis=None, step=1):
         """Plot the evolution of the error over multiple episodes.
         
         This function assumes that the same path (same action sequence)
         was applied in all experiments.
         
         """
+        if axis is None:
+            axis = pylab.figure().add_subplot(111)
         err = self.get_data('err')
         for lbl, j_per_episode in zip(self.experiments[::step], err[::step]):
             axis.plot(j_per_episode, label='Episode ' + lbl)
@@ -608,54 +526,35 @@ class Analysis:
         axis.set_ylabel('TD-Error')
         return axis
     
-    def plot_error_avg_over_episodes(self, axis, step=1, median=False):
+    def plot_error_avg_over_episodes(self, axis=None, step=1, median=False):
         """Plot the evolution of the error over multiple episodes.
         
         This function assumes that the same path (same action sequence)
         was applied in all experiments.
         
         """
+        if axis is None:
+            axis = pylab.figure().add_subplot(111)
         err = self.get_data('err')
         err = err[::step]
         err_mat = np.empty([len(err), max([e.shape[0] for e in err])])
         
         for i, j_per_episode in enumerate(err):
-            err_mat[i,:j_per_episode.shape[0]] = j_per_episode[:,0]
-            err_mat[i,j_per_episode.shape[0]:] = np.nan
+            err_mat[i, :j_per_episode.shape[0]] = j_per_episode[:, 0]
+            err_mat[i, j_per_episode.shape[0]:] = np.nan
         print err_mat
         if median:
             err_avg = np.empty([err_mat.shape[1]])
             for i in range(err_mat.shape[1]):
-                err_avg[i] = np.median(err_mat[np.negative(np.isnan(err_mat[:,i])),i])
+                err_avg[i] = np.median(err_mat[np.negative(np.isnan(err_mat[:, i])), i])
             axis.plot(err_avg, 'b')
         else:
-            err_avg = np.nansum(err_mat,0) / err_mat.shape[0]
+            err_avg = np.nansum(err_mat, 0) / err_mat.shape[0]
             axis.plot(err_avg, 'k')
         print err_avg
         
         axis.set_xlabel('step')
         axis.set_ylabel('Avg TD-Error')
-        return axis
-    
-    def plot_reservoir_input(self, axis):
-        """Plot the reservoir input over time in ``axis``. Per input,
-        one line is drawn."""
-        data = self.stack_data('i_curr')
-        N = data.shape[1]
-        for i in range(N):
-            axis.plot(data[:, i], label='Input %i' % i)
-        
-        axis.set_xlabel('step')
-        axis.set_ylabel('Input')
-        axis.legend(loc=0)
-        return axis
-    
-    def plot_input(self, axis):
-        """Plot the reservoir input in ``axis``."""
-        data = self.stack_data('i_curr')
-        axis.plot(data, label='Input')
-        axis.set_xlabel('step')
-        axis.set_ylabel('Input')
         return axis
     
     def plot_input_over_episode(self, axis, episode):
@@ -734,7 +633,16 @@ class Analysis:
         return axis
 
 def overview(analysis, figure):
-    """Plot some characteristics of ``analysis`` in ``figure``."""
+    """Plot some characteristics of ``analysis`` in ``figure``.
+    
+    - Sum of readout weights
+    - Reward
+    - Derivative
+    - Actions
+    - TD error
+    - Accumulated reward
+    
+    """
     analysis.plot_readout_sum(figure.add_subplot(321))
     analysis.plot_reward(figure.add_subplot(322))
     analysis.plot_derivative(figure.add_subplot(323))

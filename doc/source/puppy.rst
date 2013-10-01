@@ -1,4 +1,6 @@
 
+.. _puppy:
+
 Puppy
 =====
 
@@ -30,6 +32,9 @@ Example
 Reference
 ---------
 
+
+.. automodule::
+    rrl.puppy
 
 .. PuppyHDP
 .. OfflineCollector

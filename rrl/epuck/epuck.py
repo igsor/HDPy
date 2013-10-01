@@ -1,16 +1,14 @@
 """
 For the ePuck robot, a small simulator is provided. It allows to place
 ePuck in an arena, with unpassable walls and obstacles at (almost)
-arbitrary locations. The class :py:class:`Robot` provides the
+arbitrary locations. Some environment objects are predefined in
+:py:mod:`rrl.epuck.env`. The class :py:class:`Robot` provides the
 implementation of the simulated ePuck. Obstacles are directly inserted
 into this instance, hence it combines the robot with the environment.
 As for other problems, a :py:class:`ADHDP` instance can be used on top
 of this to control the robot motion. Both of these parts are combined in
 the :py:func:`simulation_loop` function to run the simulation for a
 fixed amount of time.
-
-.. todo::
-    where arenas can be found
 
 """
 import numpy as np
@@ -73,7 +71,7 @@ def _in_obstacle(loc, obstacle):
     if any([loc == obs for obs in obstacle]):
         return True
     
-    faces = [(p0,p1) for p0,p1 in zip(obstacle[:-1], obstacle[1:])]
+    faces = [(p0, p1) for p0, p1 in zip(obstacle[:-1], obstacle[1:])]
     faces.append((obstacle[-1], obstacle[0]))
     
     num_intersect = sum([_obs_intersect((loc, (0.0, 0.0)), line) for line in faces])
@@ -82,7 +80,7 @@ def _in_obstacle(loc, obstacle):
     else:
         return True
 
-def _obs_intersect(((x0,y0), (x1,y1)), ((x2,y2), (x3,y3))):
+def _obs_intersect(((x0, y0), (x1, y1)), ((x2, y2), (x3, y3))):
     """Check if two lines intersect. The boundaries don't count as
     intersection."""
     base1 = (x0, y0)
@@ -147,7 +145,7 @@ class Robot(object):
         
         walls = walls[:]
         for obs in obstacles:
-            walls.extend([(x0,y0,x1,y1) for (x0,y0), (x1,y1) in zip(obs[:-1], obs[1:])])
+            walls.extend([(x0, y0, x1, y1) for (x0, y0), (x1, y1) in zip(obs[:-1], obs[1:])])
             walls.append((obs[-1][0], obs[-1][1], obs[0][0], obs[0][1]))
         
         if tol > 0.0:
@@ -160,17 +158,20 @@ class Robot(object):
         self.obstacles = self._cmp_obstacles(self.obstacle_line)
         self.polygons = obstacles[:]
         self.speed, self.step_time = speed, step_time
+        self.loc = (0.0, 0.0)
+        self.pose = 0.0
+        self.trajectory = []
         self.reset()
     
     def _cmp_obstacles(self, lines):
         """Convert lines given by their endpoints to their corresponding
         vector representation"""
         obstacles = []
-        for x0,y0,x1,y1 in lines:
+        for x0, y0, x1, y1 in lines:
             o_vec = (x1-x0, y1-y0)
             if o_vec[0] == 0.0 and o_vec[1] == 0.0:
                 raise Exception('Obstacle line must have a direction')
-            o_base = (x0,y0)
+            o_base = (x0, y0)
             o_limit = 1.0
             obstacles.append((o_vec, o_base, o_limit))
         return obstacles
@@ -185,7 +186,7 @@ class Robot(object):
                 raise Exception('Infinite lines not supported')
             x1 = o_base[0] + o_limit * o_vec[0]
             y1 = o_base[1] + o_limit * o_vec[1]
-            lines.append((x0,y0,x1,y1))
+            lines.append((x0, y0, x1, y1))
         return lines
     
     def reset(self):
@@ -256,7 +257,8 @@ class Robot(object):
         
         """
         # turn
-        if isinstance(action, np.ndarray): action = action.flatten()[0]
+        if isinstance(action, np.ndarray):
+            action = action.flatten()[0]
         self.pose = (self.pose + action) % (2*np.pi)
         #self.pose = action % (2*np.pi)
         
@@ -266,8 +268,8 @@ class Robot(object):
         # Collision detection
         eps = 0.00001
         r_vec = (np.cos(self.pose), np.sin(self.pose))
-        wall_dists = [(idx, _intersect(self.loc, r_vec, o_base, o_vec)) for idx, (o_vec, o_base, o_limit) in enumerate(self.obstacles)]
-        wall_dists = [(idx, r_dist) for idx, (r_dist, o_dist) in wall_dists if r_dist >= 0.0 and r_dist < float('inf') and -eps <= o_dist and o_dist <= 1.0 + eps] # FIXME: Replace 1.0 by o_limit
+        wall_dists = [(idx, _intersect(self.loc, r_vec, o_base, o_vec), o_limit) for idx, (o_vec, o_base, o_limit) in enumerate(self.obstacles)]
+        wall_dists = [(idx, r_dist) for idx, (r_dist, o_dist, o_limit) in wall_dists if r_dist >= 0.0 and r_dist < float('inf') and -eps <= o_dist and o_dist <= o_limit + eps]
         if len(wall_dists) > 0:
             # Distance to the wall
             wall_idx, min_wall_dist = min(wall_dists, key=lambda (idx, dist): dist)
@@ -321,13 +323,13 @@ class Robot(object):
             
         axis.clear()
         self._plot_obstacles(axis, with_tol, tol)
-        x,y = zip(*self.trajectory)
-        axis.plot(x,y,'b-')
-        axis.plot(x,y,'b*')
+        x, y = zip(*self.trajectory)
+        axis.plot(x, y, 'b-')
+        axis.plot(x, y, 'b*')
         if full_view:
-            x0,x1,y0,y1 = axis.axis()
+            x0, x1, y0, y1 = axis.axis()
         else:
-            x0,x1,y0,y1 = min(x), max(x), min(y), max(y)
+            x0, x1, y0, y1 = min(x), max(x), min(y), max(y)
         axis.axis((
             x0 + x0*0.1,
             x1 + x1*0.1,
@@ -350,7 +352,9 @@ class Robot(object):
             Overwrite the obstacle tolerance.
         
         """
-        if tol is None: tol = self.tol
+        if tol is None:
+            tol = self.tol
+        
         for vec, base, limit in self.obstacles:
             # obstacle line
             axis.plot((base[0], base[0]+limit*vec[0]), (base[1], base[1]+limit*vec[1]), 'k')
@@ -368,17 +372,6 @@ class Robot(object):
                 # obstacle tolerance
                 axis.plot((base_tn[0], base_tn[0]+limit*vec[0]), (base_tn[1], base_tn[1]+limit*vec[1]), 'k:')
                 axis.plot((base_tp[0], base_tp[0]+limit*vec[0]), (base_tp[1], base_tp[1]+limit*vec[1]), 'k:')
-                
-                # tolerance edges
-                # tip_hi = base+limit*vec+tol/nrm(vec)*vec
-                # line from base_tn+limit*vec to tip_hi
-                # line from base_tp+limit*vec to tip_hi
-                # 
-                # tip_lo = base - tol/nrm(vec)*vec
-                # line from base_tn to tip_lo
-                # line from base_tp to tip_lo
-                
-        pass
 
 class AbsoluteRobot(Robot):
     """Simulated ePuck robot.
@@ -394,7 +387,8 @@ class AbsoluteRobot(Robot):
         :py:keyword:`True` if the robot collided.
         
         """
-        if isinstance(action, np.ndarray): action = action.flatten()[0]
+        if isinstance(action, np.ndarray):
+            action = action.flatten()[0]
         self.pose = action % (2*np.pi)
         return super(AbsoluteRobot, self).take_action(0.0)
 

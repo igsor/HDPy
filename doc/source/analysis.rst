@@ -4,11 +4,13 @@ Analysis
 
 .. module:: rrl
 
-Notes
------
+Introduction
+------------
 
-..
-    .. automodule:: rrl.analysis
+.. automodule:: rrl.analysis
+
+Example
+-------
 
 
 Reference

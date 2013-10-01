@@ -1,17 +1,27 @@
 """
-Analysis tools, specific for the *epuck* experiment.
-"""
+The analysis of ePuck experiments is conducted by looking at isolated
+time steps of a testing or training situation. Three tools have been
+implemented to support this procedure:
+:py:func:`epuck_plot_all_trajectories` plots all training trajectories,
+:py:func:`epuck_plot_value_over_action` creates a graph of the expected
+return in a state as a function of the action.
+:py:func:`epuck_plot_snapshot` plots the predicted return over an
+example trajectory for several actions.
 
+"""
 import pylab
 import numpy as np
 
-def epuck_plot_all_trajectories(analysis, axis, key='loc'):
+def epuck_plot_all_trajectories(analysis, axis=None, key='loc'):
     """Plot trajectories of all episodes in ``analysis`` in the same
     plot ``axis``. The later an episode, the darker its trajectory is
     displayed. The trajectory data must be stored as ``key`` (default
     *loc*), a two-dimensional array. This function is intended to be
     used for analysis of **ePuck** experiments.
     """
+    if axis is None:
+        axis = pylab.figure().add_subplot(111)
+    
     data = analysis.get_data(key)
     N = len(data)-1.0
     if N == 0.0:
@@ -36,13 +46,15 @@ def _plot_line(axis, origin, angle, size_hi, size_lo=0.0, **kwargs):
     trg = (origin[0] + np.cos(angle) * size_hi, origin[1] + np.sin(angle) * size_hi)
     axis.plot((src[0], trg[0]), (src[1], trg[1]), **kwargs)
 
-def epuck_plot_value_over_action(critic, state, axis, a_range=np.arange(0.0, 2*np.pi, 0.01)):
+def epuck_plot_value_over_action(critic, state, axis, a_range=None):
     """Given a trained ``critic``, plot the expected return as function
     of the action, given a ``state`` into ``axis``. Assuming 1-d action
-    (otherwise, it becomes messy to plot).
+    (otherwise, it becomes messy to plot). The default sampled actions
+    range ``a_range`` is :math:`[0, 2\pi]` with step size 0.01.
     """
+    if a_range is None:
+        a_range = np.arange(0.0, 2*np.pi, 0.01)
     exp_return = np.vstack([critic(state, action%(2*np.pi), simulate=True) for action in a_range])
-    #axis.plot([action%(2*np.pi) for action in a_range], exp_return, label='J(a|s)')
     axis.plot(a_range, exp_return, label='J(a|s)')
     axis.set_xlabel('action')
     axis.set_ylabel('Expected return')
@@ -99,11 +111,8 @@ def epuck_plot_snapshot(axis, robot, critic, trajectory, sample_actions, init_st
     robot_color = (0.0, 0.0, 0.0, 0.0) # white
     ray_len = robot_radius + 0.05
     
-    #robot.reset()
     for i in range(init_steps): # initialize
-        #robot.take_action(0.0)
         robot.take_action(robot.pose)
-        # FIXME: init critic?
     
     rays = []
     for num_step, (action_ex, action_chosen) in enumerate(zip(trajectory, traj_chosen)):
@@ -140,13 +149,11 @@ def epuck_plot_snapshot(axis, robot, critic, trajectory, sample_actions, init_st
             
             for action_eval, predicted_return in p_returns:
                 length = ray_len + 0.1 * (predicted_return - r_offset) / r_scale
-                #length = ray_len + abs(predicted_return)
-                #rays.append((loc_robot, (pose+action_eval) % (2*np.pi), length, predicted_return))
-                rays.append((loc_robot, (action_eval) % (2*np.pi), length, predicted_return))
+                #rays.append((loc_robot, (pose+action_eval) % (2*np.pi), length, predicted_return)) # relative heading
+                rays.append((loc_robot, (action_eval) % (2*np.pi), length, predicted_return)) # absolute heading
 
         if num_step in inspected_steps:
             fig_inspected = pylab.figure()
-            #epuck_plot_value_over_action(critic, s_curr, fig_inspected.add_subplot(111), a_range=np.arange(-np.pi/2.0, np.pi/2.0, 0.01))
             epuck_plot_value_over_action(critic, s_curr, fig_inspected.add_subplot(111), a_range=np.arange(-2.0*np.pi, 2.0*np.pi, 0.01))
             fig_inspected.suptitle('Expected return in after %i steps (%s)' % (num_step, str(loc_robot)))
         
@@ -163,18 +170,8 @@ def epuck_plot_snapshot(axis, robot, critic, trajectory, sample_actions, init_st
     # plot rays
     for (loc, ori, length, predicted_return) in rays:
         nrm_return = (predicted_return - r_offset) / r_scale
-        #nrm_return *= 0.7
-        #col = pylab.cm.hot(nrm_return) # for the report
-        col = pylab.cm.spectral(nrm_return*0.25) # for the presentation
-        # other schemas (not used)
-        #col = pylab.cm.Spectral(nrm_return*0.8)
-        #col = pylab.cm.gray(nrm_return)
-        #col = pylab.cm.winter(nrm_return)
-        #col = pylab.cm.gist_heat(nrm_return*0.9)
-        #col = pylab.cm.Accent(nrm_return) # ok
-        #col = pylab.cm.Dark2(nrm_return) # ok, a bit indifferent
-        #col = pylab.cm.RdGy(nrm_return) # ok, a bit indifferent
-        #col = pylab.cm.RdYlBu(nrm_return) # ok
+        col = pylab.cm.hot(0.7 * nrm_return) # for the report
+        #col = pylab.cm.spectral(nrm_return*0.25) # for the presentation
         
         # plot ray
         _plot_line(axis, loc, ori, size_hi=length+0.03, size_lo=robot_radius+0.03, color=col, linewidth=4)
