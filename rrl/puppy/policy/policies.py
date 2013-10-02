@@ -24,7 +24,7 @@ If several parameters are controlled at once, the <Param> identifier is
 repeated. The order is A, P, F, O
 
 """
-from ..rl import Policy
+from ...rl import Policy
 import numpy as np
 
 ## Base class

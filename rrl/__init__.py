@@ -41,7 +41,7 @@ import epuck
 from epuck.analysis_epuck import *
 from puppy.analysis_puppy import *
 from puppy.puppy import *
-from puppy.policies import FRA, LRA, LRP
+from puppy.policy import FRA, LRA, LRP
 
 #from plants import *
 #from analysis_epuck import *

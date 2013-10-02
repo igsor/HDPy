@@ -6,6 +6,6 @@
 """
 from epuck import *
 from analysis_epuck import *
-import plants as plant
-import policies as policy
+import plant
+import policy
 import epuck_arena as env

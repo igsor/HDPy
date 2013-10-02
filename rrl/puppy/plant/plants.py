@@ -4,7 +4,7 @@
     documentation
 
 """
-from ..rl import Plant
+from ...rl import Plant
 import numpy as np
 import warnings
 
