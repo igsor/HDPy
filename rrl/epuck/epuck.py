@@ -253,7 +253,7 @@ class Robot(object):
     def take_action(self, action):
         """Execute an ``action`` and move forward
         (speed * step_time units or until collision). Return
-        :py:keyword:`True` if the robot collided.
+        :py:const:`True` if the robot collided.
         
         """
         # turn
@@ -384,7 +384,7 @@ class AbsoluteRobot(Robot):
     def take_action(self, action):
         """Execute an ``action`` and move forward
         (speed * step_time units or until collision). Return
-        :py:keyword:`True` if the robot collided.
+        :py:const:`True` if the robot collided.
         
         """
         if isinstance(action, np.ndarray):

@@ -26,7 +26,7 @@ class PuppyHDP(CollectingADHDP):
     This class adds some code considering restarts of Puppy. It adds
     an optional argument ``tumbled_reward``. The reward will be forced
     to this value after the supervisor detected tumbling. If
-    :py:keyword:`None` (the default) is used, the reward remains
+    :py:const:`None` (the default) is used, the reward remains
     unchanged.
     
     """

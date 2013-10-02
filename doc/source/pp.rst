@@ -62,7 +62,6 @@ in turn produces the sequence of motor targets, as requested by
 Example
 -------
 
-.. module:: rrl
 
 Reference
 ---------

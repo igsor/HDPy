@@ -91,7 +91,7 @@ def epuck_plot_snapshot(axis, robot, critic, trajectory, sample_actions, init_st
     ``traj_chosen``
         Represents the sequence of actions which was chosen by the
         algorithm at each step of the trajectory. If it is
-        :py:keyword:`None`, it will be ignored. If not, it must be a
+        :py:const:`None`, it will be ignored. If not, it must be a
         list at least as long as ``trajectory``. 
     
     ``inspected_steps``

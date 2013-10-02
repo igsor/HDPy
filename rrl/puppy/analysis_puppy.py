@@ -192,7 +192,7 @@ def puppy_plot_action(analysis, episode, critic, reservoir, inspect_epochs, acti
     ``epoch_actions``
         A list of actually executed actions (as tuple), for each
         inspected epoch. The action is indicated in the plot by a
-        marker. The argument or list items may be :py:keyword:`None`,
+        marker. The argument or list items may be :py:const:`None`,
         in which case nothing is plotted.
     
     """

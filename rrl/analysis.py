@@ -32,7 +32,7 @@ class Analysis:
     
     The interface is similar for most plotting functions, consisting of
     an ``axis`` argument and allowing additional keyword arguments.
-    If ``axis`` is :py:keyword:`None`, a new figure will be created,
+    If ``axis`` is :py:const:`None`, a new figure will be created,
     otherwise the curve is plotted into the provided axis. The
     additional keywords are passed to the :py:func:`pylab.plot`. Note
     that some functions overwrite certain keywords (e.g. label or
@@ -42,7 +42,7 @@ class Analysis:
         Path to the HDF5 data file or :py:class:`DataMerge` instance.
     
     ``grid``
-        :py:keyword:`True` gray bars should be plotted, showing the
+        :py:const:`True` gray bars should be plotted, showing the
         episode boundaries. 
     
     ``min_key_length``
@@ -692,7 +692,7 @@ def critic(plant, reservoir, readout, norm=None):
     def critic_fu(state, action, simulate):
         """Return the expected return according to the *critic* with
         input ``state`` and ``action``. If
-        ``simulate`` = :py:keyword:`True`, the output is computed but
+        ``simulate`` = :py:const:`True`, the output is computed but
         the reservoir not updated."""
         in_state = plant.state_input(state)
         action_nrm = norm.normalize_value('a_curr', action)
