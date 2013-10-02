@@ -1,27 +1,40 @@
 """
-Puppy's ACD policies are based on manipulating gait parameters. There
-are four parameters and four legs; Each parameter combination (one to
-four) may be controlled. Furthermore, legs may be grouped (All together,
-Front/Rear, Left/Right) or individually controlled.
+Puppy's policies are based on manipulating gait parameters. There
+are four parameters and four legs, hence a total of 16 parameters. The
+parameters under control may be reduced (one to four) and legs may be
+grouped (All together, Front/Rear, Left/Right).
 
-The class naming scheme follows:
+The class naming scheme is as follows:
 
 [<Group>][<Param>]{1,4}
 
 with <Group>:
-AA = All together
-FR = Front/Rear
-LR = Left/Right
-II = Individually
+
++----+--------------+
+| AA | All together |
++----+--------------+
+| FR | Front/Rear   |
++----+--------------+
+| LR | Left/Right   |
++----+--------------+
+| II | Individually |
++----+--------------+
+
 
 and <Param>:
-A = Amplitude
-P = Phase
-F = Frequency
-O = Offset
+
++---+-----------+
+| A | Amplitude |
++---+-----------+
+| P | Phase     |
++---+-----------+
+| F | Frequency |
++---+-----------+
+| O | Offset    |
++---+-----------+
 
 If several parameters are controlled at once, the <Param> identifier is
-repeated. The order is A, P, F, O
+repeated up to four times. The order is A, P, F, O.
 
 """
 from ...rl import Policy

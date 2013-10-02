@@ -26,7 +26,7 @@ abstract learning target, a problem designer has in mind. The
 implementation of a plant is quite straight-forward. The two functions
 :py:meth:`Plant.state_input` and :py:meth:`Plant.reward` are called
 whenever the state or reward is requested. They are expected to return
-a vector (:math:`N \\times 1`) and scalar, respectively. The state space
+a vector (:math:`N \times 1`) and scalar, respectively. The state space
 dimension :math:`N` may be announced through the plant's constructor and
 later queried by calling :py:meth:`Plant.state_space_dim`. If the
 plant is dependent on the episode, the :py:meth:`reset` method can be
@@ -53,7 +53,7 @@ for initial behaviour (i.e. before the actor was in operation). The
 other two define the behaviour during the experiment. After an action
 has been selected, the :py:meth:`Policy.update` method is called,
 which should note the new action and update internal structures. As with
-the state, the action is passed as :math:`M \\times 1` vector. This
+the state, the action is passed as :math:`M \times 1` vector. This
 will be followed by a call to :py:meth:`Policy.get_iterator`, which
 in turn produces the sequence of motor targets, as requested by
 :py:class:`WebotsRobotMixin`.
@@ -67,8 +67,10 @@ Reference
 ---------
 
 .. autoclass:: Plant
+    :members:
 
 .. autoclass:: Policy
+    :members:
 
 
 .. _plants_puppy:
@@ -87,6 +89,7 @@ Puppy Plants
 .. autoclass:: rrl.puppy.plant.DiffTargetLocationLandmarks
 
 
+
 .. _policies_puppy:
 
 Puppy Policies
@@ -94,8 +97,18 @@ Puppy Policies
 
 .. GaitPolicy
 
-.. automodule:: rrl.puppy.policy
+.. automodule:: rrl.puppy.policy.policies
 
+
+Examples:
+
+.. autoclass:: rrl.puppy.policy.FRA
+
+.. autoclass:: rrl.puppy.policy.LRA
+
+.. autoclass:: rrl.puppy.policy.LRP
+
+.. autoclass:: rrl.puppy.policy.IIAPFO
 
 
 .. _plants_epuck:
@@ -103,8 +116,27 @@ Puppy Policies
 ePuck Plants
 ^^^^^^^^^^^^
 
+.. autoclass:: rrl.epuck.plant.CollisionAvoidanceFrontal
+    :show-inheritance:
+
+.. autoclass:: rrl.epuck.plant.CollisionAvoidanceSideways
+    :show-inheritance:
+
+.. autoclass:: rrl.epuck.plant.CollisionAvoidanceFull
+    :show-inheritance:
+
+.. autoclass:: rrl.epuck.plant.Attractor
+    :show-inheritance:
+
+
+
 .. _policies_epuck:
 
 ePuck Policies
 ^^^^^^^^^^^^^^
 
+.. autoclass:: rrl.epuck.policy.Heading
+    :show-inheritance:
+
+.. autoclass:: rrl.epuck.policy.HeadingRandInit
+    :show-inheritance:

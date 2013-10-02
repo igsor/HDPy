@@ -7,15 +7,39 @@ Heuristic Dynamic Programming in Python
 .. automodule:: rrl
 
 
-About this documentation
-------------------------
+This documentation gives an overview over the module's functionality,
+gives an usage example and lists the interfaces. This order is kept
+constant over all (i.e. most) pages. The first four pages
+(:ref:`idx_basics`) list the basic interfaces and describe the methods
+which implement Reservoir Computing and Reinforcement Learning. These
+structures are independent on the experimental platform. 
+
+This package was originally implemented for two platforms, the Puppy
+and ePuck robots. The corresponding (and hence platform dependent) code
+is documented in the second section (:ref:`idx_platforms`).
+
+The third section (:ref:`idx_resources`) provides further information
+and download and installation resources.
+
+Note that some of the examples write files. In this case, the paths are
+usually hardcoded and valid for a unix-like file tree. As data is
+temporary, it is hence stored in ``/tmp``. When working on other
+systems, the paths have to be adapted.
+
+Furthermore, due to Python's magnificent online help, the interface
+documentation is also available from within the interactive interpreter
+(e.g. IPython):
+
+>>> import rrl
+>>> help(rrl)
 
 .. todo::
-    Where to find what (structure), reference to the in-python help system, paths in examples
     epoch/episode
 
 Contents
 --------
+
+.. _idx_basics:
 
 Basics
 ^^^^^^
@@ -26,6 +50,9 @@ Basics
    rc
    rl
    utils
+   analysis
+
+.. _idx_platforms:
 
 Platforms
 ^^^^^^^^^
@@ -34,12 +61,13 @@ Platforms
    :maxdepth: 1
 
    pp
-   analysis
    epuck
    puppy
 
-Module metapages
-^^^^^^^^^^^^^^^^
+.. _idx_resources:
+
+Resources
+^^^^^^^^^
 
 .. toctree::
    :maxdepth: 1
@@ -47,7 +75,7 @@ Module metapages
    todopg
    download
    license
-   resources
+   references
 
 
 Indices and tables

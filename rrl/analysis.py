@@ -657,9 +657,10 @@ def overview(analysis, figure):
     return figure
 
 def node_inspection(analysis, figure, episode, node):
-    """Plot input/output of reservoir node ``node`` at ``episode``
-    according to ``analysis`` in ``figure``."""
-    
+    """Plot input and output of reservoir node ``node`` at ``episode``
+    according to ``analysis`` in ``figure``. Note that this function
+    assumes :math:`tanh` as reservoir node function.
+    """
     # plots
     ax_main = analysis.plot_node_over_episode(figure.add_subplot(221), episode, node)
     ax_out = analysis.plot_node_over_episode_time_output(figure.add_subplot(222), episode, node)

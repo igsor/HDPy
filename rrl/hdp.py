@@ -186,9 +186,9 @@ class ADHDP(ActorCritic):
 class CollectingADHDP(ADHDP):
     """Actor-Critic design with data collector.
     
-    A :py:class:`PuPy.PuppyCollector` instance is created for recording
-    sensor data and actor-critic internals together. The file is stored
-    at ``expfile``.
+    A *collector* (:py:class:`PuPy.PuppyCollector` instance) is created
+    for recording sensor data and actor-critic internals together.
+    The file is stored at ``expfile``.
     """
     def __init__(self, expfile, *args, **kwargs):
         self.expfile = expfile

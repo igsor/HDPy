@@ -19,6 +19,10 @@ and :py:func:`dense_w_bias`. However, other reservoir setup functions
 are provided. Note the documentation in :py:class:`ReservoirNode` if
 a different initialization has to be implemented.
 
+To test reservoir memory, two functions are provided,
+:py:func:`reservoir_memory` and :py:func:`find_radius_for_mc`. Both of
+them measure the settling time of the impulse response, which is related
+to the spectral radius.
 
 """
 import warnings
@@ -30,18 +34,75 @@ import cPickle as _cPickle
 ## RESERVOIR BASE CLASS ##
 
 class ReservoirNode(object):
-    """
+    """Reservoir of neurons.
     
-    .. todo::
-        Documentation:
+    This class is mainly copied from [Oger]_, with some modifications.
+    Mainly, the initialization is done differently (yet, compatibility
+    maintained through additional keyword arguments) and the reservoir
+    state can be computed without affecting the class instance
+    (:py:meth:`execute`'s simulate argument).
+    
+    ``input_dim``
+        Number of inputs.
+    
+    ``output_dim``
+        Reservoir size.
+    
+    ``spectral_radius``
+        Spectral radius of the reservoir. The spectral radius of a
+        matrix is its largest absolute eigenvalue.
+    
+    ``nonline_func``
+        Reservoir node function, often nonlinear (tanh or sigmoid).
+        Default is tanh.
+    
+    ``reset_states``
+        Reset the states to the initial one after a call to
+        :py:meth:`execute`. The default is :py:const:`False`, which is
+        appropriate in most situations where learning is online.
+    
+    ``w``
+        Reservoir initialization routine. The callback is executed
+        on two arguments, the number of nodes and the spectral radius.
         
-        * Density of input and reservoir matrix
-        * Execution is able to simulate a step
-        * Matrices outsourced to functions; mention defaults
+        The default is :py:func:`sparse_reservoir`, with normally
+        distributed weights and density of 20% or ``fan_in_w``
+        (see below).
+    
+    ``w_in``
+        Reservoir input weights initialization routine. The callback
+        is executed on two arguments, the reservoir and input size.
+        
+        The default is a dense matrix :py:func:`dense_w_in`, with
+        input scaling of 1.0. If ``fan_in_i`` is provided, a sparse
+        matrix is created, instead.
+    
+    ``w_bias``
+        Reservoir bias initialization routine. The callback
+        is executed on one argument, the reservoir size. The default
+        is :py:func:`dense_w_bias`, with the scaling 0.0 (i.e. no bias)
+        or ``bias_scaling`` (if provided).
+    
+    For compatibility with [Oger]_, some additional keyword arguments
+    may be provided. These affect the matrix initialization routines
+    above and are only used if the respective initialization callback
+    is not specified.
+    
+    ``fan_in_i``
+        Density of the input matrix, in percent.
+    
+    ``fan_in_w``
+        Density of the reservoir, in percent.
+    
+    ``input_scaling``
+        Scaling of the input weights.
+    
+    ``bias_scaling``
+        Scaling of the bias.
     
     """
     def __init__(self, input_dim=None, output_dim=None, spectral_radius=0.9,
-             nonlin_func=np.tanh, reset_states=True,
+             nonlin_func=np.tanh, reset_states=False,
              w_bias=None, w=None, w_in=None, **kwargs):
         
         # initialize basic attributes
@@ -208,7 +269,7 @@ class ReservoirNode(object):
             self.states = states
         # Return the updated reservoir state
         return states
-
+    
     def reset(self):
         """Reset the reservoir states to the initial value."""
         self.states = np.zeros((1, self.output_dim))
@@ -323,28 +384,28 @@ class SparseReservoirNode(ReservoirNode):
 
 ## RESERVOIR SETUP FUNCTIONS ##
 
-def dense_w_in(out_size, in_size, scaling, rnd_fu=lambda **kwargs: np.random.uniform(**kwargs)*2.0-1.0):
+def dense_w_in(out_size, in_size, scaling, rnd_fu=None):
     """Dense input matrix.
     
-    .. todo::
-        documentation
-    
     ``out_size``
-        
+        Number of reservoir nodes.
     
     ``in_size``
-        
+        Number of reservoir inputs.
     
     ``scaling``
-        
+        Input scaling.
     
     ``rnd_fu``
-        
+        Callback for random number generation. Expects the argument
+        *size*. Default is a uniform distribution in [-1,1].
     
     """
+    if rnd_fu is None:
+        rnd_fu = lambda **kwargs: np.random.uniform(**kwargs)*2.0-1.0
     return scaling * rnd_fu(size=(out_size, in_size))
 
-def sparse_w_in(out_size, in_size, scaling, density, rnd_fu=lambda **kwargs: np.random.uniform(**kwargs)*2.0-1.0):
+def sparse_w_in(out_size, in_size, scaling, density, rnd_fu=None):
     """Sparse, random reservoir input. The density is exactly as
     defined by ``density``, given in percent (0-100). The values are
     drawn from an uniform distribution.
@@ -368,6 +429,8 @@ def sparse_w_in(out_size, in_size, scaling, density, rnd_fu=lambda **kwargs: np.
         distribution between -1.0 and 1.0.
     
     """ 
+    if rnd_fu is None:
+        rnd_fu = lambda **kwargs: np.random.uniform(**kwargs)*2.0-1.0
     # Initialize reservoir weight matrix
     nrentries = np.int32(out_size * in_size * density / 100.0)
     idx = np.random.choice(out_size*in_size, nrentries, False)
@@ -376,7 +439,7 @@ def sparse_w_in(out_size, in_size, scaling, density, rnd_fu=lambda **kwargs: np.
     w = scaling * scipy.sparse.csc_matrix((datavec, locs), shape=(out_size, in_size))
     return w
 
-def dense_w_bias(out_size, scaling, rnd_fu=lambda **kwargs: np.random.rand(**kwargs)*2.0-1.0):
+def dense_w_bias(out_size, scaling, rnd_fu=None):
     """Dense reservoir node bias. The weights are picked from a random
     number generator ``rnd_fu`` and scaled according to ``scaling``.
     
@@ -390,20 +453,23 @@ def dense_w_bias(out_size, scaling, rnd_fu=lambda **kwargs: np.random.rand(**kwa
         Random number generator for the weights. Default is normal
         distribution in [-1.0, 1.0].
     """
+    if rnd_fu is None:
+        rnd_fu = lambda **kwargs: np.random.rand(**kwargs)*2.0-1.0
     return scaling * rnd_fu(size=(1, out_size))
 
-def sparse_reservoir(out_size, specrad, density, rnd_fu=np.random.normal):
-    """:py:meth:`Oger.nodes.SparseReservoirNode.sparse_w` with
-    density correction. Now, the density is exactly as set by
-    ``fan_in_w``, given in percent (0-100). The non-zero locations
-    are uniformly distributed and the values are drawn from a normal
-    distribution by default.
+def sparse_reservoir(out_size, specrad, density, rnd_fu=None):
+    """Reservoir with sparse connected neurons and random connection
+    weights. The non-zero weights are uniformly distributed, the
+    values drawn from a random distribution.
     
     ``out_size``
         Number of reservoir nodes.
     
     ``specrad``
         Spectral radius.
+    
+    ``density``
+        Reservoir density, given in percent (0-100). 
     
     ``rnd_fu``
         Random number generator for the weight values. Must take
@@ -412,6 +478,8 @@ def sparse_reservoir(out_size, specrad, density, rnd_fu=np.random.normal):
         distribution.
     
     """
+    if rnd_fu is None:
+        rnd_fu = np.random.normal
     from scipy.sparse.linalg import eigs, ArpackNoConvergence
     converged = False
     # Initialize reservoir weight matrix
@@ -480,7 +548,9 @@ def orthogonal_reservoir(out_size, specrad, density, rnd_fu=None):
     return w
 
 def chain_of_neurons(out_size, specrad, rnd_fu=None):
-    """
+    """Reservoir setup where the nodes are arranged in a chain.
+    Except for the first and last node, each one has exactly one
+    predecessor and one successor.
     
     ``out_size``
         Reservoir matrix dimension.
@@ -498,7 +568,8 @@ def chain_of_neurons(out_size, specrad, rnd_fu=None):
     return w
 
 def ring_of_neurons(out_size, specrad, rnd_fu=None):
-    """
+    """Reservoir setup where the nodes are arranged in a ring. Each node
+    has exactly one predecessor and one successor.
     
     ``out_size``
         Reservoir matrix dimension.
@@ -523,14 +594,15 @@ def ring_of_neurons(out_size, specrad, rnd_fu=None):
 class PlainRLS(object):
     """Compute online least-square, multivariate linear regression.
     
-    The interface is based on :py:class:`OnlineLinearRegression` with
-    two major changes:
+    The interface is based on [MDP]_ and [Oger]_ with two major
+    differences:
     
-    1) There's no inheritance from any mdp or Oger class
+    1) There's no inheritance from any [MDP]_ or [Oger]_ class
     2) The error as well as a target may be passed to the :py:meth:`train`
        function
     
-    The implementation follows the original algorithm given in [FB98]_.
+    The implementation follows the algorithm given in [FB98]_
+    (least-squares filter).
     
     ``with_bias``
         Add a constant to the linear equation. This internally increases
@@ -780,7 +852,7 @@ def query_reservoir_memory(reservoir, steps=1000, max_settling_time=10000):
     return query
 
 def find_radius_for_mc(reservoir, num_steps, tol=1.0, max_settling_time=10000, tol_settling=0.5, num_iter=100):
-    """Find a spectral radius for ``reservoir`` such that the step
+    """Find a spectral radius for ``reservoir`` such that the impulse
     response time is ``num_steps`` with tolerance ``tol``.
     
     This implementation linearizes the memory capacity function locally
