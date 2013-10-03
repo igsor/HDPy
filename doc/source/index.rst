@@ -33,9 +33,6 @@ documentation is also available from within the interactive interpreter
 >>> import rrl
 >>> help(rrl)
 
-.. todo::
-    epoch/episode
-
 Contents
 --------
 
