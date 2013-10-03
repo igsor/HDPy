@@ -93,7 +93,7 @@ in the file ``/tmp/puppy_critic.hdf5``. Note that in this configuration,
 sensor data is not copied, i.e. they are not included in the Critic's
 data file, which is very convenient to save disk space.
 
-Finally, the function :py:func:`puppy_offline_playback` is invoked. This
+Finally, the function :py:func:`puppy.offline_playback` is invoked. This
 function replays the offline data such that the Critic sees it as if it
 was run online in [Webots]_. Hence, the Critic is trained as in the
 simulator. Only the data file has to be specified and optionally the
@@ -236,4 +236,4 @@ example trajectory, the sampled actions and states with the color
 corresponding to the predicted return (darker is better).
 
 
-.. image:: ../../data/puppy_offline_result.png
+.. image:: ../../data/doc/puppy_offline_result.png

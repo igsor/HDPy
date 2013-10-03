@@ -1,14 +1,15 @@
 """
-Puppy experiments are executed within the [Webots]_ simulator. This
-process is supported by :py:mod:`PuPy`. For this purpose, an adapted
-Actor-Critic is implemented in :py:class:`PuppyHDP`, handling Puppy
-specifics. It inherits from :py:class:`CollectingADHDP`, hance can be
-used in the same fashion.
+Puppy experiments are executed within the [Webots]_ simulator. Since
+this module is linked to :py:mod:`PuPy` through the class
+:py:class:`ActorCritic`, this is the native approach. For the purpose of
+Puppy, an adapted Actor-Critic is implemented in :py:class:`PuppyHDP`,
+handling Puppy specifics. It inherits from :py:class:`CollectingADHDP`,
+hence can be used in the same fashion.
 
 Simulation with [Webots]_ is often time consuming. Therefore, a method
 is provided to collect data in the simulation and replay it later. This
 is implemented through :py:class:`OfflineCollector` and
-:py:func:`puppy_offline_playback`. An example of how to approach this
+:py:func:`puppy.offline_playback`. An example of how to approach this
 is documented in :ref:`puppy_offline`.
 
 """
@@ -131,7 +132,7 @@ class OfflineCollector(CollectingADHDP):
     
     Some extra metadata is stored in the datafile, which allows
     processing of the experiment in an offline fashion through the
-    function :py:func:`puppy_offline_playback`.
+    function :py:func:`puppy.offline_playback`.
     
     """
     def __init__(self, *args, **kwargs):
@@ -242,7 +243,7 @@ class OfflineCollector(CollectingADHDP):
         
         return a_next
 
-def puppy_offline_playback(pth_data, critic, samples_per_action, ms_per_step, episode_start=None, episode_end=None, min_episode_len=0):
+def offline_playback(pth_data, critic, samples_per_action, ms_per_step, episode_start=None, episode_end=None, min_episode_len=0):
     """Simulate an experiment run for the critic by using offline data.
     The data has to be collected in webots, using the respective
     robot and supervisor. Note that the behaviour of the simulation
@@ -364,3 +365,15 @@ def puppy_offline_playback(pth_data, critic, samples_per_action, ms_per_step, ep
     del critic._pre_increment_hook_orig
     del critic._next_action_hook_orig
 
+
+## DEPRECATED ##
+
+def puppy_offline_playback(*args, **kwargs):
+    """Alias of offline_playback.
+    
+    .. deprecated:: 1.0
+        Use :py:func:`offline_playback` instead
+        
+    """
+    warnings.warn("This function is deprecated. Use 'offline_playback' instead")
+    return offline_playback(*args, **kwargs)

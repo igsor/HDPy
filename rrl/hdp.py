@@ -9,6 +9,13 @@ embedded in the :py:mod:`PuPy` framework through
 :py:class:`ActorCritic`. Hence the collector works in the same fashion
 as :py:class:`PuPy.RobotCollector`.
 
+If a new specialisation of an :py:class:`ActorCritic` is created,
+typically its :py:meth:`ActorCritic._step` method is adapted (this is
+for example the case in :py:class:`ADHDP`). If so, the two methods
+:py:meth:`ActorCritic._pre_increment_hook` (before returning) and
+:py:meth:`ActorCritic._next_action_hook` (after computation of the
+next action) should be called as other structures may rely on those.
+
 Some variations of the baseline algorithm are implemented as well in
 :py:class:`ActionGradient`, :py:class:`ActionRecomputation` and
 :py:class:`ActionBruteForce`. They fulfill the same purpose but approach
@@ -101,6 +108,19 @@ class ADHDP(ActorCritic):
     def _step(self, s_curr, s_next, a_curr, reward):
         """Execute one step of the actor and return the next action.
         
+        This is the baseline ADHDP algorithm. The next action is
+        computed as
+        
+        .. math::
+            a_{t+1} = m a_t + (1-m) \left( a_t + \\alpha \\frac{\\partial J(s_t, a_t)}{\\partial a} \\right)
+        
+        with :math:`m` the momentum and :math:`\\alpha` the step size.
+        The critic trained on the TD error with discount rate
+        :math:`\gamma`:
+        
+        .. math::
+            err = r + \gamma J(s_{t+1}, a_{t+1}) - J(s_t, a_t)
+        
         ``s_next``
             Latest observed state. :py:keyword:`dict`, same as ``s_next``
             of the :py:meth:`__call__`.
@@ -168,10 +188,7 @@ class ADHDP(ActorCritic):
             trajectory.
         """
         if self.num_step > 1:
-            in_state = self.plant.state_input(self.s_curr)
-            a_curr_nrm = self.normalizer.normalize_value('a_curr', self.a_curr)
-            i_curr = np.vstack((in_state, a_curr_nrm)).T
-            x_curr = self.reservoir(i_curr, simulate=False)
+            i_curr, x_curr, j_curr = self._critic_eval(self.s_curr, self.a_curr, False, 'a_curr')
             self._pre_increment_hook(
                 epoch,
                 x_curr=x_curr,

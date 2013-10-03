@@ -1,7 +1,8 @@
 """
 
-.. todo::
-    documentation
+.. automodule:: rrl.puppy.puppy
+
+.. automodule:: rrl.puppy.analysis_puppy
 
 """
 from puppy import *

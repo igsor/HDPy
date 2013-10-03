@@ -5,9 +5,16 @@ arbitrary locations. Some environment objects are predefined in
 :py:mod:`rrl.epuck.env`. The class :py:class:`Robot` provides the
 implementation of the simulated ePuck. Obstacles are directly inserted
 into this instance, hence it combines the robot with the environment.
+
 As for other problems, a :py:class:`ADHDP` instance can be used on top
-of this to control the robot motion. Both of these parts are combined in
-the :py:func:`simulation_loop` function to run the simulation for a
+of this to control the robot motion. A plant and a policy have to be
+provided (see :ref:`plants-and-policies`). Due to historical reasons,
+the interpretation of the policy (i.e. action) is done in the robot.
+In :py:class:`Robot`, the action is a relative heading,
+:py:class:`AbsoluteRobot` implements an absolute one.
+
+The robot and adhdp instances are combined in the
+:py:func:`simulation_loop` function to run the simulation for a
 fixed amount of time.
 
 """
@@ -269,7 +276,7 @@ class Robot(object):
         eps = 0.00001
         r_vec = (np.cos(self.pose), np.sin(self.pose))
         wall_dists = [(idx, _intersect(self.loc, r_vec, o_base, o_vec), o_limit) for idx, (o_vec, o_base, o_limit) in enumerate(self.obstacles)]
-        wall_dists = [(idx, r_dist) for idx, (r_dist, o_dist, o_limit) in wall_dists if r_dist >= 0.0 and r_dist < float('inf') and -eps <= o_dist and o_dist <= o_limit + eps]
+        wall_dists = [(idx, r_dist) for idx, (r_dist, o_dist), o_limit in wall_dists if r_dist >= 0.0 and r_dist < float('inf') and -eps <= o_dist and o_dist <= o_limit + eps]
         if len(wall_dists) > 0:
             # Distance to the wall
             wall_idx, min_wall_dist = min(wall_dists, key=lambda (idx, dist): dist)
@@ -426,7 +433,6 @@ def simulation_loop(acd, robot, max_step=-1, max_episodes=-1, max_total_iter=-1)
         # init episode
         acd.new_episode()
         robot.reset()
-        #robot.reset_random(loc_lo=-9.0, loc_hi=9.0)
         policy.reset()
         a_curr = np.atleast_2d([policy.action])
         

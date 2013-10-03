@@ -1,9 +1,3 @@
-"""
-
-.. todo::
-    documentation
-
-"""
 from ...rl import Plant
 import warnings
 import numpy as np

@@ -11,26 +11,26 @@ bound_gait = {
     'phase'     : (0.0, 0.0, 0.5, 0.5)
 }
 
-policy = rrl.LRA(PuPy.Gait(bound_gait))
+policy = rrl.puppy.policy.LRA(PuPy.Gait(bound_gait))
 
 # Create a plant
 landmarks = [i for i in itertools.product((-10.0, -3.3, 3.3, 10.0), (-10.0, -3.3, 3.3, 10.0))]
 target_loc = (6.0, 4.0)
-plant = rrl.TargetLocationLandmarks(target_loc, landmarks, reward_noise=0.0)
+plant = rrl.puppy.plant.TargetLocationLandmarks(
+    target_loc,
+    landmarks,
+    reward_noise    = 0.0
+)
 
 # Load the normalization
-nrm = PuPy.Normalization('rrl/data/puppy_unit.json')
+nrm = PuPy.Normalization('../data/puppy_unit.json')
 
 # Create a reservoir
-reservoir = rrl.SparseReservoirNode(
-    output_dim=1000,
-    input_dim=policy.action_space_dim() + plant.state_space_dim(),
-    reset_states=False,
-    spectral_radius=0.98,
-    input_scaling=1.0,
-    bias_scaling=0.0,
-    fan_in_i=100,
-    fan_in_w=20,
+reservoir = rrl.ReservoirNode(
+    output_dim      = 10,
+    input_dim       = policy.action_space_dim() + plant.state_space_dim(),
+    spectral_radius = 0.98,
+    w               = rrl.sparse_reservoir(20),
 )
 
 reservoir.initialize()
@@ -38,35 +38,35 @@ reservoir.save('/tmp/puppy_reservoir.pic')
 
 # Create a readout
 readout = rrl.StabilizedRLS(
-    with_bias=True,
-    input_dim=reservoir.get_output_dim() + reservoir.get_input_dim(), # FIXME: Input/Output ESN Model
-    output_dim=1,
-    lambda_=1.0
+    with_bias       = True,
+    input_dim       = reservoir.get_output_dim() + reservoir.get_input_dim(),
+    output_dim      = 1,
+    lambda_         = 1.0
 )
 
 # Initialize the Critic
 critic = rrl.PuppyHDP(
-    tumbled_reward=0.0,
-    expfile='/tmp/puppy_critic.hdf5',
-    reservoir=reservoir,
-    readout=readout,
-    plant=plant,
-    policy=policy,
-    gamma=0.5,
-    alpha=1.0,
-    init_steps=25,
-    norm=nrm
+    tumbled_reward  = 0.0,
+    expfile         = '/tmp/puppy_critic.hdf5',
+    reservoir       = reservoir,
+    readout         = readout,
+    plant           = plant,
+    policy          = policy,
+    gamma           = 0.5,
+    alpha           = 1.0,
+    init_steps      = 10,
+    norm            = nrm
 )
 
 # Train the critic on offline data
-rrl.puppy_offline_playback(
+rrl.puppy.offline_playback(
     '/tmp/puppy_offline_data.hdf5',
     critic,
-    samples_per_action=150,
-    ms_per_step=20,
-    episode_start=0,
-    episode_end=1000,
-    min_episode_len=30
+    samples_per_action  = 150,
+    ms_per_step         = 20,
+    episode_start       = 0,
+    episode_end         = 1000,
+    min_episode_len     = 30
 )
 
 # Store the readout for later use

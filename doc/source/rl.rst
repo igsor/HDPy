@@ -13,12 +13,6 @@ Introduction
 
 .. automodule:: rrl.hdp
 
-Example
--------
-
-.. todo::
-    testcase
-
 Reference
 ---------
 
@@ -46,7 +40,7 @@ Reference
 
 .. autoclass:: ADHDP
     :show-inheritance:
-    :members: _critic_eval, _critic_deriv, init_episode
+    :members: _critic_eval, _critic_deriv, init_episode, _step
 
 .. autoclass:: CollectingADHDP
     :show-inheritance:

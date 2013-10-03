@@ -24,17 +24,14 @@ If you're using `distutils <http://docs.python.org/distutils/>`_, type::
     #rm -R .                        # remove source. If desired, uncomment this line.
     #cd .. && rmdir rrl*            # remove working directory. If desired, uncomment this line.
 
-Make sure, `scipy <http://www.scipy.org/>`_ and `numpy <http://numpy.scipy.org/>`_ are
-installed on your system.
-
-.. todo::
-    Also dependent on Oger and mdp
+Make sure, [numpy]_ and [scipy]_ are
+installed on your system. For plotting, [matplotlib]_ is required.
 
 Getting started
 ---------------
 
-Again, make sure that besides the `RRL <http://www.igsor.net/research/rrl/>`_, the packages `scipy <http://www.scipy.org/>`_
-and `numpy <http://numpy.scipy.org/>`_ are installed on your system.
+Again, make sure that besides the `RRL <http://www.igsor.net/research/rrl/>`_, the packages [scipy]_
+[numpy]_ and [matplotlib]_ are installed on your system.
 
 .. todo::
     Explanations and examples

@@ -22,9 +22,10 @@ the functions :py:func:`puppy_plot_trajectory` and
 import pylab
 import numpy as np
 import itertools
+import warnings
 from puppy import SENSOR_NAMES
 
-def puppy_plot_trajectory(analysis, axis, episode, step_width=1, offset=0, legend=True, **kwargs):
+def plot_trajectory(analysis, axis, episode, step_width=1, offset=0, legend=True, **kwargs):
     """Plot the trajectory of an episode
     """
     gps_x = analysis[episode]['puppyGPS_x'][offset+step_width-1::step_width]
@@ -43,7 +44,7 @@ def puppy_plot_trajectory(analysis, axis, episode, step_width=1, offset=0, legen
     
     return axis
 
-def puppy_plot_all_trajectories(analysis, axis, step_width=1, **kwargs):
+def plot_all_trajectories(analysis, axis, step_width=1, **kwargs):
     """Plot all trajectories in ``analysis`` into ``axis``.
     """
     gps_x = analysis.get_data('puppyGPS_x')
@@ -61,7 +62,7 @@ def puppy_plot_all_trajectories(analysis, axis, step_width=1, **kwargs):
     
     return axis
 
-def puppy_plot_linetarget(axis, origin=(2.0, 0.0), direction=(1.0, 1.0), range_=(-5.0, 5.0)):
+def plot_linetarget(axis, origin=(2.0, 0.0), direction=(1.0, 1.0), range_=(-5.0, 5.0)):
     """Plot a line given by ``origin`` and ``direction``. The ``range_``
     may be supplid, which corresponds to the length of the line (from
     the origin).
@@ -74,7 +75,7 @@ def puppy_plot_linetarget(axis, origin=(2.0, 0.0), direction=(1.0, 1.0), range_=
     axis.plot(line_x, line_y, 'k', label='Target')
     return axis
 
-def puppy_plot_locationtarget(axis, target=(4.0, 4.0), distance=0.5, **kwargs):
+def plot_locationtarget(axis, target=(4.0, 4.0), distance=0.5, **kwargs):
     """Plot the ``target`` location with a sphere of radius ``distance``
     into ``axis`` to mark the target location. ``kwargs`` will be passed
     to all :py:mod:`pylab` calls."""
@@ -89,7 +90,7 @@ def puppy_plot_locationtarget(axis, target=(4.0, 4.0), distance=0.5, **kwargs):
 
     return axis
 
-def puppy_plot_landmarks(axis, landmarks, **kwargs):
+def plot_landmarks(axis, landmarks, **kwargs):
     """Plot markers at ``landmark`` locations in ``axis``."""
     color = kwargs.pop('color', 'k')
     lbl = kwargs.pop('label', '')
@@ -98,14 +99,14 @@ def puppy_plot_landmarks(axis, landmarks, **kwargs):
         axis.plot([x], [y], marker=marker, color=color, label=lbl, **kwargs)
     return axis
 
-def _puppy_action_eval(grp, reservoir, critic, trg_epoch, obs_offset, step_width, actions_range_x, actions_range_y):
+def _action_eval(grp, reservoir, critic, trg_epoch, obs_offset, step_width, actions_range_x, actions_range_y):
     """Evaluate a set of two-dimensional actions [``action_range_x``,
     ``actions_range_y``] at a specific state ``trg_epoch`` and return
     the matrix of predicted returns.
     
     ``grp``
         Observed data of the underlying experiment. Usually a
-        :py:class:`DataMergeGroup` or [HDF5]_ group (e.g. through
+        :py:class:`H5CombinedGroup` or [HDF5]_ group (e.g. through
         :py:class:`Analysis`).
     
     ``critic``
@@ -145,7 +146,7 @@ def _puppy_action_eval(grp, reservoir, critic, trg_epoch, obs_offset, step_width
     
     return a_ret
 
-def puppy_plot_action(analysis, episode, critic, reservoir, inspect_epochs, actions_range_x, actions_range_y, step_width, obs_offset, epoch_actions=None):
+def plot_action(analysis, episode, critic, reservoir, inspect_epochs, actions_range_x, actions_range_y, step_width, obs_offset, epoch_actions=None):
     """Along a trajectory ``episode`` of a conducted experiment given
     by ``analysis``, plot the predicted return over a 2D-action at some
     fixed states. For each of the states (given by ``inspect_epochs``),
@@ -203,7 +204,7 @@ def puppy_plot_action(analysis, episode, critic, reservoir, inspect_epochs, acti
     for trg_epoch, actions in zip(inspect_epochs, epoch_actions):
         
         # simulate the actions
-        a_ret = _puppy_action_eval(grp, reservoir, critic, trg_epoch, obs_offset, step_width, actions_range_x, actions_range_y)
+        a_ret = _action_eval(grp, reservoir, critic, trg_epoch, obs_offset, step_width, actions_range_x, actions_range_y)
         
         # plot results
         fig = pylab.figure()
@@ -225,7 +226,7 @@ def puppy_plot_action(analysis, episode, critic, reservoir, inspect_epochs, acti
     
     return fig
 
-def puppy_plot_inspected_trajectory(analysis, episode_idx, step_width, axis, inspect_epochs, obs_offset):
+def plot_inspected_trajectory(analysis, episode_idx, step_width, axis, inspect_epochs, obs_offset):
     """Plot the robot trajectory of the experiment ``episode_idx``
     found in ``analysis`` and a marker at all ``inspect_epochs``. This
     function was created to support :py:func:`puppy_plot_action` by
@@ -250,7 +251,7 @@ def puppy_plot_inspected_trajectory(analysis, episode_idx, step_width, axis, ins
     axis.plot(trg_x, trg_y, 'k*', label='Inspected states')
     return axis
 
-class PuppyActionVideo:
+class ActionVideo:
     """Set up a structure such that the predicted return over 2D
     actions can be successively plotted in the same figure.
     
@@ -259,7 +260,7 @@ class PuppyActionVideo:
     
     ``data``
         Observed data of the underlying experiment. Usually a
-        :py:class:`DataMergeGroup` or [HDF5]_ group (e.g. through
+        :py:class:`H5CombinedGroup` or [HDF5]_ group (e.g. through
         :py:class:`Analysis`).
     
     ``critic``
@@ -359,7 +360,7 @@ class PuppyActionVideo:
         be present in ``actions``.
         """
         # evaluate the actions
-        a_ret = _puppy_action_eval(
+        a_ret = _action_eval(
             self.data,
             self.reservoir,
             self.critic,
@@ -398,6 +399,79 @@ class PuppyActionVideo:
         loc_y = self.data['puppyGPS_y'][self.obs_offset+self.step_width*epoch_idx+self.step_width-1]
         loc_marker.set_data([loc_x], [loc_y])
         return self
+
+
+## DEPRECATED ##
+
+def puppy_plot_trajectory(*args, **kwargs):
+    """Alias of plot_trajectory.
+    
+    .. deprecated:: 1.0
+        Use :py:func:`plot_trajectory` instead
+        
+    """
+    warnings.warn("This function is deprecated. Use 'plot_trajectory' instead")
+    return plot_trajectory(*args, **kwargs)
+
+def puppy_plot_all_trajectories(*args, **kwargs):
+    """Alias of plot_all_trajectories.
+    
+    .. deprecated:: 1.0
+        Use :py:func:`plot_all_trajectories` instead
+        
+    """
+    warnings.warn("This function is deprecated. Use 'plot_all_trajectories' instead")
+    return plot_all_trajectories(*args, **kwargs)
+
+def puppy_plot_linetarget(*args, **kwargs):
+    """Alias of plot_linetarget.
+    
+    .. deprecated:: 1.0
+        Use :py:func:`plot_linetarget` instead
+        
+    """
+    warnings.warn("This function is deprecated. Use 'plot_linetarget' instead")
+    return plot_linetarget(*args, **kwargs)
+
+def puppy_plot_locationtarget(*args, **kwargs):
+    """Alias of plot_locationtarget.
+    
+    .. deprecated:: 1.0
+        Use :py:func:`plot_locationtarget` instead
+        
+    """
+    warnings.warn("This function is deprecated. Use 'plot_locationtarget' instead")
+    return plot_locationtarget(*args, **kwargs)
+
+def puppy_plot_landmarks(*args, **kwargs):
+    """Alias of plot_landmarks.
+    
+    .. deprecated:: 1.0
+        Use :py:func:`plot_landmarks` instead
+        
+    """
+    warnings.warn("This function is deprecated. Use 'plot_landmarks' instead")
+    return plot_landmarks(*args, **kwargs)
+
+def puppy_plot_action(*args, **kwargs):
+    """Alias of plot_action.
+    
+    .. deprecated:: 1.0
+        Use :py:func:`plot_action` instead
+        
+    """
+    warnings.warn("This function is deprecated. Use 'plot_action' instead")
+    return plot_action(*args, **kwargs)
+
+def puppy_plot_inspected_trajectory(*args, **kwargs):
+    """Alias of plot_inspected_trajectory.
+    
+    .. deprecated:: 1.0
+        Use :py:func:`plot_inspected_trajectory` instead
+        
+    """
+    warnings.warn("This function is deprecated. Use 'plot_inspected_trajectory' instead")
+    return plot_inspected_trajectory(*args, **kwargs)
 
 def puppy_vid_init(actions_range_x, actions_range_y, with_actions=True):
     """
@@ -440,7 +514,7 @@ def puppy_vid_action(image, (a_line, a_marker, px, py), grp, critic, reservoir, 
         
     """
     warnings.warn('deprecated, use PuppyActionVideo instead')
-    a_ret = _puppy_action_eval(grp, reservoir, critic, epoch, obs_offset, step_width, actions_range_x, actions_range_y)
+    a_ret = _action_eval(grp, reservoir, critic, epoch, obs_offset, step_width, actions_range_x, actions_range_y)
     
     # update plot
     image.set_data(a_ret)
@@ -467,3 +541,4 @@ def puppy_vid_inspected_trajectory(grp, step_width, loc_marker, epoch_idx, obs_o
     loc_y = grp['puppyGPS_y'][obs_offset+step_width*epoch_idx+step_width-1]
     loc_marker.set_data([loc_x], [loc_y])
     return loc_marker
+

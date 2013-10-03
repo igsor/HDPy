@@ -238,7 +238,7 @@ class ActorCritic(PuPy.PuppyActor):
     
     ``reservoir``
         A reservoir instance compliant with the interface of
-        :py:class:`SparseReservoirNode`. Specifically, must provide
+        :py:class:`ReservoirNode`. Specifically, must provide
         a *reset* method and *reset_states* must be :py:const:`False`.
         The input dimension must be compliant with the specification
         of the ``action``.
@@ -340,12 +340,13 @@ class ActorCritic(PuPy.PuppyActor):
     
     def __call__(self, epoch, time_start_ms, time_end_ms, step_size_ms):
         """One round in the actor-critic cycle. The current observations
-        are given in *epoch* and the timing information in the rest of
+        are given in ``epoch`` and the timing information in the rest of
         the parameters. For a detailed description of the parameters,
         see :py:class:`PuPy.PuppyActor`.
         
-        .. todo::
-            Detailed description of the algorithm.
+        This routine computes the reward from the *epoch* and manages
+        consecutive epochs, then lets :py:meth:`_step` compute the next
+        action.
         
         """
         if self.num_step <= self._init_steps:
@@ -379,6 +380,12 @@ class ActorCritic(PuPy.PuppyActor):
     
     def _step(self, s_curr, s_next, a_curr, reward):
         """Execute one step of the actor and return the next action.
+        
+        When overloading this method, it must be ensured that
+        :py:meth:`_next_action_hook` is executed as soon as the next
+        action is determined and also :py:meth:`_pre_increment_hook`
+        should be called before the method returns (passing relevant
+        intermediate results).
         
         ``s_curr``
             Previous observed state. :py:keyword:`dict`, same as ``epoch``

@@ -39,7 +39,7 @@ class Analysis:
     color).
     
     ``pth``
-        Path to the HDF5 data file or :py:class:`DataMerge` instance.
+        Path to the HDF5 data file or :py:class:`H5CombinedFile` instance.
     
     ``grid``
         :py:const:`True` gray bars should be plotted, showing the
@@ -52,7 +52,7 @@ class Analysis:
     
     """
     def __init__(self, pth, grid=False, min_key_length=0):
-        if isinstance(pth, inout.DataMerge):
+        if isinstance(pth, inout.H5CombinedFile):
             self.pth = pth.pth0
             self.f = pth
         else:
@@ -429,9 +429,6 @@ class Analysis:
         towards the expected value but doesn't exclusively define it.
         The target is the discounted return for any step in the path
         of *expno*.
-        
-        .. todo::
-            Online TD prediction
         
         """
         if axis is None:

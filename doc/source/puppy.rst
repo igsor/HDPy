@@ -13,15 +13,6 @@ Introduction
 
 .. automodule:: rrl.puppy
 
-.. automodule:: rrl.puppy.puppy
-
-.. automodule:: rrl.puppy.analysis_puppy
-
-.. todo::
-    online workflow, analysis
-    offline code documentation
-    link to policies, plants
-
 Example
 -------
 
@@ -31,21 +22,33 @@ Example
    puppy_offline
    puppy_online
 
-.. todo::
-    online; offline actor (puppy_policy_eval)
-
-
 Reference
 ---------
 
+.. autoclass:: rrl.puppy.PuppyHDP
+    :members: new_episode, init_episode, _step, event_handler
+    :show-inheritance:
 
-.. automodule::
-    rrl.puppy
+.. autoclass:: rrl.puppy.OfflineCollector
+    :members: new_episode, __call__, _next_action_hook, event_handler
+    :show-inheritance:
 
-.. PuppyHDP
-.. OfflineCollector
+.. autofunction:: rrl.puppy.offline_playback
 
 
-.. Puppy Analysis
-.. Puppy Policies
+.. autofunction:: rrl.puppy.plot_trajectory
 
+.. autofunction:: rrl.puppy.plot_all_trajectories
+
+.. autofunction:: rrl.puppy.plot_linetarget
+
+.. autofunction:: rrl.puppy.plot_locationtarget
+
+.. autofunction:: rrl.puppy.plot_landmarks
+
+.. autofunction:: rrl.puppy.plot_action
+
+.. autofunction:: rrl.puppy.plot_inspected_trajectory
+
+.. autoclass:: rrl.puppy.ActionVideo
+    :members:

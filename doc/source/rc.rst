@@ -12,9 +12,13 @@ Introduction
 Example
 -------
 
-.. todo::
-    testcase
+.. literalinclude:: ../../test/rc_example.py
 
+>>> Sparse         	0.004785	0.744121
+>>> Orthogonal     	0.004858	0.749770
+>>> Ring of Neurons	0.004827	0.747397
+
+.. image:: ../../data/doc/rc_example.png
 
 Reference
 ---------
@@ -22,10 +26,10 @@ Reference
 .. module:: rrl
 
 .. autoclass:: ReservoirNode
-    :members: copy, input_dim, output_dim, reset, save, _post_update_hook, __call__
+    :members: execute, copy, input_dim, output_dim, reset, save, _post_update_hook, __call__
 
 .. autoclass:: PlainRLS
-    :members: train, __call__, save, stop_training
+    :members: train, __call__, save, stop_training, copy
 
 .. autoclass:: StabilizedRLS
     :members:

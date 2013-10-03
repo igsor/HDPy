@@ -144,7 +144,7 @@ class H5CombinedFile(object):
         self.keys_common = [k for k in self.keys0 if k in self.keys1]
     
     def __getitem__(self, key):
-        """Return a :py:class:`DataMergeGroup` instance, binding the
+        """Return a :py:class:`H5CombinedGroup` instance, binding the
         groups ``key`` of the two files together.
         """
         if key not in self.keys_common:

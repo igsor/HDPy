@@ -36,7 +36,7 @@ class TrajectoryFollower(rrl.OfflineCollector):
         return a_next
 
 # Load the sequence file
-f = h5py.File(sequence_file,'a')
+f = h5py.File('/tmp/example_sequence.hdf5','a')
 # Get the index of the trajectory to be executed
 idx = f['idx'][()]
 grp_name = 'traj_%03i' % idx
@@ -64,18 +64,18 @@ f.close()
 
 # Initialize the actor
 actor = TrajectoryFollower(
-    trajectory=trajectory,
-    expfile='/tmp/example_data.hdf5',
-    policy=policy,
-    init_steps=25,
+    trajectory  = trajectory,
+    expfile     = '/tmp/example_data.hdf5',
+    policy      = policy,
+    init_steps  = 10,
 )
 
 # Initialize the robot, bind it to webots
 r = PuPy.robotBuilder(
     Robot,
     actor,
-    sampling_period_ms=20,
-    ctrl_period_ms=3000,
+    sampling_period_ms  = 20,
+    ctrl_period_ms      = 3000,
 )
 
 # Register robot in actor for signalling

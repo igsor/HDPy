@@ -11,34 +11,28 @@ Introduction
 
 .. automodule:: rrl.epuck
 
-.. automodule:: rrl.epuck.epuck
-
-.. automodule:: rrl.epuck.analysis_epuck
-
-.. todo::
-    epuck simulation (robot, arena)
-    link to pp
-
-
 Example
 -------
 
-.. todo::
-    pick from rrl_epuck
+.. literalinclude:: ../../test/epuck_online.py
+
+.. image:: ../../data/doc/epuck_result.png
 
 Reference
 ---------
 
-
 .. module:: rrl
 
 .. autoclass:: rrl.epuck.Robot
+    :members: read_sensors, take_action, reset, reset_random, plot_trajectory
 
 .. autoclass:: rrl.epuck.AbsoluteRobot
+    :show-inheritance:
 
+.. autofunction:: rrl.epuck.simulation_loop
 
-.. autofunction:: epuck_plot_snapshot
+.. autofunction:: rrl.epuck.epuck_plot_snapshot
 
-.. autofunction:: epuck_plot_value_over_action
+.. autofunction:: rrl.epuck.epuck_plot_value_over_action
 
-.. autofunction:: epuck_plot_all_trajectories
+.. autofunction:: rrl.epuck.epuck_plot_all_trajectories

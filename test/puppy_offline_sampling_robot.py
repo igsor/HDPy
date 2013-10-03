@@ -11,7 +11,7 @@ bound_gait = {
     'phase'     : (0.0, 0.0, 0.5, 0.5)
 }
 
-policy = rrl.LRA(PuPy.Gait(bound_gait))
+policy = rrl.puppy.policy.LRA(PuPy.Gait(bound_gait))
 
 def random_initial_action():
     """Select a random action initially instead of a fixed one,
@@ -26,7 +26,7 @@ def random_initial_action():
 policy.initial_action = random_initial_action
 
 # Offline data collector setup
-class OfflinePuppy(rrl.OfflineCollector):
+class OfflinePuppy(rrl.puppy.OfflineCollector):
     def _next_action_hook(self, a_next):
         """Define the schema according to which actions will be selected.
         Hence, this function defines the action and state space sampling
@@ -42,18 +42,18 @@ class OfflinePuppy(rrl.OfflineCollector):
 
 # actor instantiation
 actor = OfflinePuppy(
-    expfile='/tmp/puppy_offline_data.hdf5',
-    policy=policy,
-    init_steps=25,
+    expfile     = '/tmp/puppy_offline_data.hdf5',
+    policy      = policy,
+    init_steps  = 10,
 )
 
 # robot instantiation
 r = PuPy.robotBuilder(
     Robot,
     actor,
-    sampling_period_ms=20,
-    ctrl_period_ms=3000,
-    event_handlers=actor.event_handler,
+    sampling_period_ms  = 20,
+    ctrl_period_ms      = 3000,
+    event_handlers      = actor.event_handler,
 )
 
 # invoke the main loop, starts the simulation

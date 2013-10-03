@@ -1,7 +1,10 @@
 """
 
-.. todo::
-    documentation
+.. automodule:: rrl.epuck.epuck
+
+.. .. automodule:: rrl.epuck.epuck_arena
+
+.. automodule:: rrl.epuck.analysis_epuck
 
 """
 from epuck import *

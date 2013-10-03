@@ -12,7 +12,7 @@ step_width_plotting = 50
 # thus, the sensor data must be shifted by one step_width
 obs_offset = step_width
 # The analysis experiments are always reverted, hence there's only one initial sample
-# (check out puppy_offline_playback:"if 'init_step' in data_grp: [...]", ActorCritic.__call__ and PuppyHDP.init_episode)
+# (check out puppy.offline_playback:"if 'init_step' in data_grp: [...]", ActorCritic.__call__ and PuppyHDP.init_episode)
 # For this initial sample, nothing is written into the analysis_critic_pth file. Hence, there's an offset
 # of one epoch for data in analysis_data_pth and analysis_critic_pth.
 # Note that if the experiments are restarted instead of reverted, this offset would be =2
@@ -21,14 +21,15 @@ robot_radius = 0.2
 
 
 # Open files
-a = rrl.Analysis(rrl.DataMerge('/tmp/example_eval.hdf5', '/tmp/example_data.hdf5'))
+a = rrl.Analysis(rrl.H5CombinedFile('/tmp/example_eval.hdf5', '/tmp/example_data.hdf5'))
 
 # Create figure
 fig = pylab.figure()
 axis = fig.add_subplot(111)
 
 # Plot target
-rrl.puppy_plot_locationtarget(axis, target=target_loc, distance=0.5)
+target_loc = (6.0, 4.0)
+rrl.puppy.plot_locationtarget(axis, target=target_loc, distance=0.5)
 axis.invert_xaxis() # positive x-axis in webots goes to the left!
 pylab.show(block=False)
 
@@ -36,11 +37,12 @@ pylab.show(block=False)
 grp = a['0'] # this is assumed to be the main trajectory
 main_pth = grp['a_curr'][:]
 main_len = main_pth.shape[0] * step_width
-rrl.puppy_plot_trajectory(a, axis, '0', step_width, offset=step_width*25, label='Initial trajectory')
+rrl.puppy.plot_trajectory(a, axis, '0', step_width, offset=step_width*25, label='Initial trajectory')
 pylab.show(block=False)
 
 def find_offset(a0, a1):
-    """
+    """Return the number of steps for which the sequences ``a0`` and
+    ``a1`` are identical.
     """
     offset = min(a0.shape[0], a1.shape[0])
     while not (a0[:offset] == a1[:offset]).all():
@@ -103,5 +105,5 @@ for data_offset in pth_data:
         col = 1.0 - col
         col = col[0]
         
-        axis.plot(data_x_plot, data_y_plot, linewidth=2, label=lbl, color=str(col))
+        axis.plot(data_x_plot, data_y_plot, linewidth=1, label=lbl, color=str(col))
         pylab.draw()

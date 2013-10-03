@@ -11,10 +11,6 @@ Introduction
 
 .. automodule:: rrl.inout
 
-Example
--------
-
-
 Reference
 ---------
 

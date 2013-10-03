@@ -18,3 +18,11 @@ References
 .. [MDP] http://mdp-toolkit.sourceforge.net/
 
 .. [Webots] http://www.cyberbotics.com/
+
+.. [HDF5] http://www.hdfgroup.org/HDF5/
+
+.. [matplotlib] http://matplotlib.org/
+
+.. [scipy] http://scipy.org/
+
+.. [numpy] http://www.numpy.org/

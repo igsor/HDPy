@@ -10,9 +10,10 @@ example trajectory for several actions.
 
 """
 import pylab
+import warnings
 import numpy as np
 
-def epuck_plot_all_trajectories(analysis, axis=None, key='loc'):
+def plot_all_trajectories(analysis, axis=None, key='loc'):
     """Plot trajectories of all episodes in ``analysis`` in the same
     plot ``axis``. The later an episode, the darker its trajectory is
     displayed. The trajectory data must be stored as ``key`` (default
@@ -46,7 +47,7 @@ def _plot_line(axis, origin, angle, size_hi, size_lo=0.0, **kwargs):
     trg = (origin[0] + np.cos(angle) * size_hi, origin[1] + np.sin(angle) * size_hi)
     axis.plot((src[0], trg[0]), (src[1], trg[1]), **kwargs)
 
-def epuck_plot_value_over_action(critic, state, axis, a_range=None):
+def plot_value_over_action(critic, state, axis, a_range=None):
     """Given a trained ``critic``, plot the expected return as function
     of the action, given a ``state`` into ``axis``. Assuming 1-d action
     (otherwise, it becomes messy to plot). The default sampled actions
@@ -60,12 +61,15 @@ def epuck_plot_value_over_action(critic, state, axis, a_range=None):
     axis.set_ylabel('Expected return')
     return axis
 
-def epuck_plot_snapshot(axis, robot, critic, trajectory, sample_actions, init_steps=1, traj_chosen=None, inspected_steps=None):
+def plot_snapshot(axis, robot, critic, trajectory, sample_actions, init_steps=1, traj_chosen=None, inspected_steps=None):
     """Plot a snapshot of an *ePuck* experiment. The plot shows an
     example trajectory of the ``robot``, together with the expected
     return - i.e. evaluation of the ``critic`` at each state for some
     ``sample_actions``. Obviously, the ``critic`` needs to be
     pre-trained for this to make sense.
+    
+    .. note::
+        The action is assumed to represent the absolute heading.
     
     ``axis``
         A :py:class:`pylab.Axis` to draw into.
@@ -130,9 +134,6 @@ def epuck_plot_snapshot(axis, robot, critic, trajectory, sample_actions, init_st
             # plot the robot orientation
             _plot_line(axis, loc_robot, pose, robot_radius, color='k')
         
-        #if action_chosen is not None:
-        #    _plot_line(axis, loc_robot, pose+action_chosen, robot_radius+0.1, robot_radius, color='k', linewidth='2')
-        
         if num_step % 2 == 0:
             # evaluate the critic on the actions
             p_returns = []
@@ -179,3 +180,34 @@ def epuck_plot_snapshot(axis, robot, critic, trajectory, sample_actions, init_st
     return axis
 
 
+## DEPRECATED ##
+
+def epuck_plot_all_trajectories(*args, **kwargs):
+    """Alias of :py:func:`plot_all_trajectories`
+    
+    .. deprecated:: 1.0
+        Use :py:func:`plot_all_trajectories` instead
+    
+    """
+    warnings.warn("Deprecated. Use 'plot_all_trajectories' instead")
+    return plot_all_trajectories(*args, **kwargs)
+
+def epuck_plot_value_over_action(*args, **kwargs):
+    """Alias of :py:func:`plot_value_over_action`
+    
+    .. deprecated:: 1.0
+        Use :py:func:`plot_value_over_action` instead
+    
+    """
+    warnings.warn("Deprecated. Use 'plot_value_over_action' instead")
+    return plot_value_over_action(*args, **kwargs)
+
+def epuck_plot_snapshot(*args, **kwargs):
+    """Alias of :py:func:`plot_snapshot`
+    
+    .. deprecated:: 1.0
+        Use :py:func:`plot_snapshot` instead
+    
+    """
+    warnings.warn("Deprecated. Use 'plot_snapshot' instead")
+    return plot_snapshot(*args, **kwargs)

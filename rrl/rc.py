@@ -29,7 +29,256 @@ import warnings
 import numpy as np
 import scipy.sparse
 import copy as _copy
-import cPickle as _cPickle
+import pickle as _cPickle
+
+
+## RESERVOIR SETUP FUNCTIONS ##
+
+class dense_w_in(object):
+    """Dense input matrix.
+    
+    ``scaling``
+        Input scaling.
+    
+    ``rnd_fu``
+        Callback for random number generation. Expects the argument
+        *size*. Default is a uniform distribution in [-1,1].
+    
+    """
+    def __init__(self, scaling, rnd_fu=None):
+        self._scaling = scaling
+        self._rnd_fu = rnd_fu
+    
+    def _rnd_gen(self, **kwargs):
+        if self._rnd_fu is not None:
+            return self._rnd_fu(**kwargs)
+        else:
+            return np.random.uniform(**kwargs)*2.0-1.0
+    
+    def __call__(self, out_size, in_size):
+        """Return a dense connection matrix for ``in_size`` inputs
+        to a reservoir of ``out_size`` nodes."""
+        return scipy.sparse.csc_matrix(self._scaling * self._rnd_gen(size=(out_size, in_size)))
+
+class sparse_w_in(object):
+    """Sparse, random reservoir input. The density is exactly as
+    defined by ``density``, given in percent (0-100). The values are
+    drawn from an uniform distribution.
+    
+    ``scaling``
+        Scaling of input weights.
+    
+    ``density``
+        Percentage of non-trivial connection weights, [0-100].
+    
+    ``rnd_fu``
+        Random number generator for the weight values. Must take
+        the scalar argument *size* that determines the length of
+        the generated random number list. The default is the uniform
+        distribution between -1.0 and 1.0.
+    
+    """ 
+    def __init__(self, scaling, density, rnd_fu=None):
+        self._scaling = scaling
+        self._density = density
+        self._rnd_fu = rnd_fu
+    
+    def _rnd_gen(self, **kwargs):
+        if self._rnd_fu is not None:
+            return self._rnd_fu(**kwargs)
+        else:
+            return np.random.uniform(**kwargs)*2.0-1.0
+    
+    def __call__(self, out_size, in_size):
+        """Return a sparse connection matrix for ``in_size`` inputs
+        to a reservoir of ``out_size`` nodes."""
+        nrentries = np.int32(out_size * in_size * self._density / 100.0)
+        idx = np.random.choice(out_size*in_size, nrentries, False)
+        locs = np.array(zip(*map(lambda i: (i/in_size, i%in_size), idx)))
+        datavec = self._rnd_gen(size=nrentries)
+        w = self._scaling * scipy.sparse.csc_matrix((datavec, locs), shape=(out_size, in_size))
+        return w
+
+class dense_w_bias(object):
+    """Dense reservoir node bias. The weights are picked from a random
+    number generator ``rnd_fu`` and scaled according to ``scaling``.
+    
+    ``scaling``
+        Scale of the bias weights
+    
+    ``rnd_fu``
+        Random number generator for the weights. Default is normal
+        distribution in [-1.0, 1.0].
+    """
+    def __init__(self, scaling, rnd_fu=None):
+        self._scaling = scaling
+        self._rnd_fu = rnd_fu
+    
+    def _rnd_gen(self, **kwargs):
+        if self._rnd_fu is not None:
+            return self._rnd_fu(**kwargs)
+        else:
+            return np.random.normal(**kwargs)*2.0-1.0
+    
+    def __call__(self, out_size):
+        """Return a dense bias matrix for ``out_size`` reservoir nodes."""
+        return self._scaling * self._rnd_gen(size=(1, out_size))
+
+class sparse_reservoir(object):
+    """Reservoir with sparse connected neurons and random connection
+    weights. The non-zero weights are uniformly distributed, the
+    values drawn from a random distribution.
+    
+    ``density``
+        Reservoir density, given in percent (0-100). 
+    
+    ``rnd_fu``
+        Random number generator for the weight values. Must take
+        the scalar argument *size* that determines the length of
+        the generated random number list. The default is the normal
+        distribution.
+    
+    """
+    def __init__(self, density, rnd_fu=None):
+        self._density = density
+        self._rnd_fu = rnd_fu
+    
+    def _rnd_gen(self, **kwargs):
+        if self._rnd_fu is not None:
+            return self._rnd_fu(**kwargs)
+        else:
+            return np.random.normal(**kwargs)
+    
+    def __call__(self, out_size, specrad):
+        """Return a sparse reservoir matrix of size ``out_size`` with
+        spectral radius ``specrad``."""
+        from scipy.sparse.linalg import eigs, ArpackNoConvergence
+        converged = False
+        # Initialize reservoir weight matrix
+        nrentries = int((out_size**2 * self._density)/100.0)
+        out_size = int(out_size)
+        # Keep generating random matrices until convergence
+        num_iter = 1000
+        while not converged:
+            try:
+                idx = np.random.choice(out_size**2, nrentries, False)
+                locs = np.array(zip(*map(lambda i: (i/out_size, i%out_size), idx)))
+                datavec = self._rnd_gen(size=nrentries)
+                w = scipy.sparse.csc_matrix((datavec, locs), shape=(out_size, out_size))
+                eigvals = eigs(w, return_eigenvectors=False, k=3)
+                converged = True
+                w *= (specrad / np.amax(np.absolute(eigvals)))
+            except ArpackNoConvergence:
+                num_iter -= 1
+                if num_iter < 1:
+                    raise Exception('Reservoir matrix could not be built')
+        return w
+
+class dense_reservoir(object):
+    """Reservoir with densely connected neurons and random connection
+    weights.
+    
+    ``rnd_fu``
+        Random number generator for the weight values. Must take
+        the scalar argument *size* that determines the length of
+        the generated random number list. The default is the normal
+        distribution.
+    
+    """
+    def __init__(self, rnd_fu=None):
+        self._rnd_fu = rnd_fu
+    
+    def _rnd_fu(self, **kwargs):
+        if self._rnd_fu is not None:
+            return self._rnd_fu(**kwargs)
+        else:
+            return np.random.normal(**kwargs)
+    
+    def __call__(self, out_size, specrad):
+        """Return a dense reservoir matrix of size ``out_size`` with
+        spectral radius ``specrad``.
+        
+        .. todo::
+            implementation
+        
+        """
+        raise NotImplementedError()
+
+class orthogonal_reservoir(object):
+    """Orthogonal reservoir construction algorithm.
+    
+    The algorithm starts off with a diagonal matrix, then multiplies
+    it with random orthogonal matrices (meaning that the product
+    will again be orthogonal). For details, see [TS12]_.
+    
+    All absolute eigenvalues of the resulting matrix will be
+    identical to ``specrad``.
+    
+    ``density``
+        Reservoir density, given in percent (0-100).
+    
+    """
+    def __init__(self, density):
+        self._density = density
+    
+    def __call__(self, out_size, specrad):
+        """Return a random, orthogonal reservoir matrix of size
+        ``out_size`` and spectral radius ``specrad``."""
+        num_entries = int((out_size**2 * self._density)/100.0)
+        w = np.random.permutation(np.eye(out_size))
+        w = scipy.sparse.csc_matrix(w)
+        while w.nnz < num_entries:
+            phi = np.random.uniform(0, 2*np.pi)
+            i = j = 0
+            while i == j:
+                i, j = np.random.randint(0, out_size, size=2)
+            
+            rot = scipy.sparse.eye(out_size, out_size, format='lil')
+            rot[i, i] = np.cos(phi)
+            rot[j, j] = np.cos(phi)
+            rot[i, j] = -np.sin(phi)
+            rot[j, i] = np.sin(phi)
+            
+            if np.random.randint(0, 2) == 0:
+                w = rot.tocsc().dot(w)
+            else:
+                w = w.dot(rot.tocsc())
+            
+        # Scale to desired spectral radius
+        w = specrad * w
+        return w
+
+def chain_of_neurons(out_size, specrad):
+    """Reservoir setup where the nodes are arranged in a chain.
+    Except for the first and last node, each one has exactly one
+    predecessor and one successor.
+    
+    ``out_size``
+        Reservoir matrix dimension.
+    
+    ``specrad``
+        Desired spectral radius.
+    
+    """
+    w = scipy.sparse.diags([1.0]*(out_size-1), -1, format='csc')
+    w = specrad * w
+    return w
+
+def ring_of_neurons(out_size, specrad):
+    """Reservoir setup where the nodes are arranged in a ring. Each node
+    has exactly one predecessor and one successor.
+    
+    ``out_size``
+        Reservoir matrix dimension.
+    
+    ``specrad``
+        Desired spectral radius.
+    
+    """
+    w = scipy.sparse.diags([1.0]*(out_size-1), -1, format='lil')
+    w[0, -1] = 1.0
+    w = specrad * w
+    return w.tocsc()
 
 ## RESERVOIR BASE CLASS ##
 
@@ -133,22 +382,25 @@ class ReservoirNode(object):
         self.initial_state = np.array([])
         # Reservoir initialization
         if w is None:
-            warnings.warn('Reservoir init function (w) should be provided')
+            if 'fan_in_w' in kwargs:
+                warnings.warn('Reservoir init function (w) should be provided')
             density = kwargs.pop('fan_in_w', 20)
-            w = lambda N, srad: sparse_reservoir(N, srad, density, rnd_fu=np.random.normal)
+            w = sparse_reservoir(density)
         if w_in is None:
-            warnings.warn('Reservoir input init function (w_in) should be provided')
+            if 'input_scaling' in kwargs or 'fan_in_i' in kwargs:
+                warnings.warn('Reservoir input init function (w_in) should be provided')
             input_scaling = kwargs.pop('input_scaling', 1.0)
             if 'fan_in_i' in kwargs:
                 density = kwargs.pop('fan_in_i')
-                w_in = lambda N, M: sparse_w_in(N, M, input_scaling, density)
+                w_in = sparse_w_in(input_scaling, density)
             else:
-                w_in = lambda N, M: dense_w_in(N, M, input_scaling)
+                w_in = dense_w_in(input_scaling)
         if w_bias is None:
-            warnings.warn('Bias init function (w_bias) should be provided')
+            if 'bias_scaling' in kwargs:
+                warnings.warn('Bias init function (w_bias) should be provided')
+            
             bias_scaling = kwargs.pop('bias_scaling', 0.0)
-            w_bias = lambda N: dense_w_bias(N, bias_scaling)
-        
+            w_bias = dense_w_bias(bias_scaling)
         self.w_initial = w
         self.w_in_initial = w_in
         self.w_bias_initial = w_bias
@@ -223,7 +475,7 @@ class ReservoirNode(object):
         """
         pass
     
-    def _execute(self, x, simulate=False):
+    def execute(self, x, simulate=False):
         """Executes simulation with input vector ``x``.
         
         ``x``
@@ -273,6 +525,11 @@ class ReservoirNode(object):
     def reset(self):
         """Reset the reservoir states to the initial value."""
         self.states = np.zeros((1, self.output_dim))
+    
+    def __call__(self, x, *args, **kwargs):
+        """Calling an instance of `Node` is equivalent to calling
+        its `execute` method."""
+        return self.execute(x, *args, **kwargs)
     
     ## GETTERS, SETTERS, LEFTOVERS FROM MDP/OGER ##
     
@@ -380,213 +637,6 @@ class SparseReservoirNode(ReservoirNode):
     def __init__(self, *args, **kwargs):
         warnings.warn("This class is deprecated. Use 'SparseReservoirNode' instead")
         super(SparseReservoirNode, self).__init__(*args, **kwargs)
-
-
-## RESERVOIR SETUP FUNCTIONS ##
-
-def dense_w_in(out_size, in_size, scaling, rnd_fu=None):
-    """Dense input matrix.
-    
-    ``out_size``
-        Number of reservoir nodes.
-    
-    ``in_size``
-        Number of reservoir inputs.
-    
-    ``scaling``
-        Input scaling.
-    
-    ``rnd_fu``
-        Callback for random number generation. Expects the argument
-        *size*. Default is a uniform distribution in [-1,1].
-    
-    """
-    if rnd_fu is None:
-        rnd_fu = lambda **kwargs: np.random.uniform(**kwargs)*2.0-1.0
-    return scaling * rnd_fu(size=(out_size, in_size))
-
-def sparse_w_in(out_size, in_size, scaling, density, rnd_fu=None):
-    """Sparse, random reservoir input. The density is exactly as
-    defined by ``density``, given in percent (0-100). The values are
-    drawn from an uniform distribution.
-    
-    ``out_size``
-        Number of reservoir nodes.
-    
-    ``in_size``
-        Number of input nodes.
-    
-    ``scaling``
-        Scaling of input weights.
-    
-    ``density``
-        Percentage of non-trivial connection weights, [0-100].
-    
-    ``rnd_fu``
-        Random number generator for the weight values. Must take
-        the scalar argument *size* that determines the length of
-        the generated random number list. The default is the uniform
-        distribution between -1.0 and 1.0.
-    
-    """ 
-    if rnd_fu is None:
-        rnd_fu = lambda **kwargs: np.random.uniform(**kwargs)*2.0-1.0
-    # Initialize reservoir weight matrix
-    nrentries = np.int32(out_size * in_size * density / 100.0)
-    idx = np.random.choice(out_size*in_size, nrentries, False)
-    locs = np.array(zip(*map(lambda i: (i/in_size, i%in_size), idx)))
-    datavec = rnd_fu(size=nrentries)
-    w = scaling * scipy.sparse.csc_matrix((datavec, locs), shape=(out_size, in_size))
-    return w
-
-def dense_w_bias(out_size, scaling, rnd_fu=None):
-    """Dense reservoir node bias. The weights are picked from a random
-    number generator ``rnd_fu`` and scaled according to ``scaling``.
-    
-    ``out_size``
-        Number of reservoir nodes.
-    
-    ``scaling``
-        Scale of the bias weights
-    
-    ``rnd_fu``
-        Random number generator for the weights. Default is normal
-        distribution in [-1.0, 1.0].
-    """
-    if rnd_fu is None:
-        rnd_fu = lambda **kwargs: np.random.rand(**kwargs)*2.0-1.0
-    return scaling * rnd_fu(size=(1, out_size))
-
-def sparse_reservoir(out_size, specrad, density, rnd_fu=None):
-    """Reservoir with sparse connected neurons and random connection
-    weights. The non-zero weights are uniformly distributed, the
-    values drawn from a random distribution.
-    
-    ``out_size``
-        Number of reservoir nodes.
-    
-    ``specrad``
-        Spectral radius.
-    
-    ``density``
-        Reservoir density, given in percent (0-100). 
-    
-    ``rnd_fu``
-        Random number generator for the weight values. Must take
-        the scalar argument *size* that determines the length of
-        the generated random number list. The default is the normal
-        distribution.
-    
-    """
-    if rnd_fu is None:
-        rnd_fu = np.random.normal
-    from scipy.sparse.linalg import eigs, ArpackNoConvergence
-    converged = False
-    # Initialize reservoir weight matrix
-    nrentries = int((out_size**2 * density)/100.0)
-    out_size = int(out_size)
-    # Keep generating random matrices until convergence
-    num_iter = 1000
-    while not converged:
-        try:
-            idx = np.random.choice(out_size**2, nrentries, False)
-            locs = np.array(zip(*map(lambda i: (i/out_size, i%out_size), idx)))
-            datavec = rnd_fu(size=nrentries)
-            w = scipy.sparse.csc_matrix((datavec, locs), shape=(out_size, out_size))
-            eigvals = eigs(w, return_eigenvectors=False, k=3)
-            converged = True
-            w *= (specrad / np.amax(np.absolute(eigvals)))
-        except ArpackNoConvergence:
-            num_iter -= 1
-            if num_iter < 1:
-                raise Exception('Reservoir matrix could not be built')
-    return w
-
-def orthogonal_reservoir(out_size, specrad, density, rnd_fu=None):
-    """Orthogonal reservoir construction algorithm.
-    
-    The algorithm starts off with a diagonal matrix, then multiplies
-    it with random orthogonal matrices (meaning that the product
-    will again be orthogonal). For details, see [TS12]_.
-    
-    All absolute eigenvalues of the resulting matrix will be
-    identical to ``specrad``.
-    
-    ``out_size``
-        Reservoir matrix dimension.
-    
-    ``specrad``
-        Desired spectral radius.
-    
-    ``rnd_fu``
-        This argument is obsolete in this function, but present for
-        compatibility only.
-    
-    """
-    num_entries = int((out_size**2 * density)/100.0)
-    w = np.random.permutation(np.eye(out_size))
-    w = scipy.sparse.csc_matrix(w)
-    while w.nnz < num_entries:
-        phi = np.random.uniform(0, 2*np.pi)
-        i = j = 0
-        while i == j:
-            i, j = np.random.randint(0, out_size, size=2)
-        
-        rot = scipy.sparse.eye(out_size, out_size, format='lil')
-        rot[i, i] = np.cos(phi)
-        rot[j, j] = np.cos(phi)
-        rot[i, j] = -np.sin(phi)
-        rot[j, i] = np.sin(phi)
-        
-        if np.random.randint(0, 2) == 0:
-            w = rot.tocsc().dot(w)
-        else:
-            w = w.dot(rot.tocsc())
-        
-    # Scale to desired spectral radius
-    w = specrad * w
-    return w
-
-def chain_of_neurons(out_size, specrad, rnd_fu=None):
-    """Reservoir setup where the nodes are arranged in a chain.
-    Except for the first and last node, each one has exactly one
-    predecessor and one successor.
-    
-    ``out_size``
-        Reservoir matrix dimension.
-    
-    ``specrad``
-        Desired spectral radius.
-    
-    ``rnd_fu``
-        This argument is obsolete in this function, but present for
-        compatibility only.
-    
-    """
-    w = scipy.sparse.diags([1.0]*(out_size-1), -1, format='csc')
-    w = specrad * w
-    return w
-
-def ring_of_neurons(out_size, specrad, rnd_fu=None):
-    """Reservoir setup where the nodes are arranged in a ring. Each node
-    has exactly one predecessor and one successor.
-    
-    ``out_size``
-        Reservoir matrix dimension.
-    
-    ``specrad``
-        Desired spectral radius.
-    
-    ``rnd_fu``
-        This argument is obsolete in this function, but present for
-        compatibility only.
-    
-    """
-    w = scipy.sparse.diags([1.0]*(out_size-1), -1, format='lil')
-    w[0, -1] = 1.0
-    w = specrad * w
-    return w.tocsc()
-
 
 ## RLS ##
 
@@ -735,6 +785,11 @@ class PlainRLS(object):
     def stop_training(self):
         """Disable filter adaption for future calls to ``train``."""
         self._stop_training = True
+    
+    def copy(self):
+        """Return a deep copy of the node."""
+        return _copy.deepcopy(self)
+    
 
 class StabilizedRLS(PlainRLS):
     """Compute online least-square, multivariate linear regression.
