@@ -1,6 +1,6 @@
 
-import rrl,pylab
-a = rrl.Analysis('esn_acd.hdf5')
+import HDPy,pylab
+a = HDPy.Analysis('esn_acd.hdf5')
 
 # Prediction plot
 fig = pylab.figure(1)

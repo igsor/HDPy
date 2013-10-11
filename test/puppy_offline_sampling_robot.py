@@ -1,5 +1,5 @@
 from controller import Robot
-import rrl
+import HDPy
 import PuPy
 import numpy as np
 
@@ -11,7 +11,7 @@ bound_gait = {
     'phase'     : (0.0, 0.0, 0.5, 0.5)
 }
 
-policy = rrl.puppy.policy.LRA(PuPy.Gait(bound_gait))
+policy = HDPy.puppy.policy.LRA(PuPy.Gait(bound_gait))
 
 def random_initial_action():
     """Select a random action initially instead of a fixed one,
@@ -26,7 +26,7 @@ def random_initial_action():
 policy.initial_action = random_initial_action
 
 # Offline data collector setup
-class OfflinePuppy(rrl.puppy.OfflineCollector):
+class OfflinePuppy(HDPy.puppy.OfflineCollector):
     def _next_action_hook(self, a_next):
         """Define the schema according to which actions will be selected.
         Hence, this function defines the action and state space sampling

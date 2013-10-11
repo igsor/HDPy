@@ -2,7 +2,7 @@
 The environment of the ePuck robot consists of several walls and
 obstacles. The difference between those two is that walls are isolated
 lines while obstacles are polygons, hence closed shapes. Some obstacles
-and arena arrangements have been prepared in :py:mod:`rrl.epuck.env`.
+and arena arrangements have been prepared in :py:mod:`HDPy.epuck.env`.
 
 """
 # open rectangle

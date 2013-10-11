@@ -1,8 +1,8 @@
 """
 
-.. automodule:: rrl.puppy.puppy
+.. automodule:: HDPy.puppy.puppy
 
-.. automodule:: rrl.puppy.analysis_puppy
+.. automodule:: HDPy.puppy.analysis_puppy
 
 """
 from puppy import *

@@ -2,12 +2,12 @@
 Analysis
 ========
 
-.. module:: rrl
+.. module:: HDPy
 
 Introduction
 ------------
 
-.. automodule:: rrl.analysis
+.. automodule:: HDPy.analysis
 
 Example
 -------

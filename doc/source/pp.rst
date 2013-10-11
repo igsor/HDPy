@@ -10,7 +10,7 @@ Plants and Policies
 Introduction
 ------------
 
-.. module:: rrl
+.. module:: HDPy
 
 As described in :ref:`Reinforcement Learning <reinforcement-learning>`,
 the learning problem formulation is achieved by specifying a
@@ -74,15 +74,15 @@ Reference
 Puppy Plants
 ^^^^^^^^^^^^
 
-.. autoclass:: rrl.puppy.plant.SpeedReward
+.. autoclass:: HDPy.puppy.plant.SpeedReward
 
-.. autoclass:: rrl.puppy.plant.LineFollower
+.. autoclass:: HDPy.puppy.plant.LineFollower
 
-.. autoclass:: rrl.puppy.plant.TargetLocation
+.. autoclass:: HDPy.puppy.plant.TargetLocation
 
-.. autoclass:: rrl.puppy.plant.TargetLocationLandmarks
+.. autoclass:: HDPy.puppy.plant.TargetLocationLandmarks
 
-.. autoclass:: rrl.puppy.plant.DiffTargetLocationLandmarks
+.. autoclass:: HDPy.puppy.plant.DiffTargetLocationLandmarks
 
 
 
@@ -93,18 +93,18 @@ Puppy Policies
 
 .. GaitPolicy
 
-.. automodule:: rrl.puppy.policy.policies
+.. automodule:: HDPy.puppy.policy.policies
 
 
 Examples:
 
-.. autoclass:: rrl.puppy.policy.FRA
+.. autoclass:: HDPy.puppy.policy.FRA
 
-.. autoclass:: rrl.puppy.policy.LRA
+.. autoclass:: HDPy.puppy.policy.LRA
 
-.. autoclass:: rrl.puppy.policy.LRP
+.. autoclass:: HDPy.puppy.policy.LRP
 
-.. autoclass:: rrl.puppy.policy.IIAPFO
+.. autoclass:: HDPy.puppy.policy.IIAPFO
 
 
 .. _plants_epuck:
@@ -112,16 +112,16 @@ Examples:
 ePuck Plants
 ^^^^^^^^^^^^
 
-.. autoclass:: rrl.epuck.plant.CollisionAvoidanceFrontal
+.. autoclass:: HDPy.epuck.plant.CollisionAvoidanceFrontal
     :show-inheritance:
 
-.. autoclass:: rrl.epuck.plant.CollisionAvoidanceSideways
+.. autoclass:: HDPy.epuck.plant.CollisionAvoidanceSideways
     :show-inheritance:
 
-.. autoclass:: rrl.epuck.plant.CollisionAvoidanceFull
+.. autoclass:: HDPy.epuck.plant.CollisionAvoidanceFull
     :show-inheritance:
 
-.. autoclass:: rrl.epuck.plant.Attractor
+.. autoclass:: HDPy.epuck.plant.Attractor
     :show-inheritance:
 
 
@@ -131,8 +131,8 @@ ePuck Plants
 ePuck Policies
 ^^^^^^^^^^^^^^
 
-.. autoclass:: rrl.epuck.policy.Heading
+.. autoclass:: HDPy.epuck.policy.Heading
     :show-inheritance:
 
-.. autoclass:: rrl.epuck.policy.HeadingRandInit
+.. autoclass:: HDPy.epuck.policy.HeadingRandInit
     :show-inheritance:

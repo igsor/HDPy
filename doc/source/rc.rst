@@ -7,7 +7,7 @@ Reservoir Computing
 Introduction
 ------------
 
-.. automodule:: rrl.rc
+.. automodule:: HDPy.rc
 
 Example
 -------
@@ -23,7 +23,7 @@ Example
 Reference
 ---------
 
-.. module:: rrl
+.. module:: HDPy
 
 .. autoclass:: ReservoirNode
     :members: execute, copy, input_dim, output_dim, reset, save, _post_update_hook, __call__

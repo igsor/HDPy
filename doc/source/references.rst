@@ -9,7 +9,7 @@ References
 .. [ESN-ACD] P. Koprinkova-Hristova et al; Adaptive Critic Design with Echo State Network, 2010
              M. Oubbati et al.; Anticipating rewards in continuous time and space with echo state networks and actor-critic design, 2011
              M. Oubbati et al; Adaptive Learning in Continuous Environment Using Actor-Critic Design and Echo-State Networks, 2012
-             P. Koprinkova‐Hristova; Heuristic dynamic programming using echo state network as online trainable adaptive critic, 2012
+             P. Koprinkova-Hristova; Heuristic dynamic programming using echo state network as online trainable adaptive critic, 2012
 
 .. [RL] Sutton, Barto; Reinforcement Learning: An Introduction, 1998
 

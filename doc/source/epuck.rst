@@ -9,7 +9,7 @@ ePuck
 Introduction
 ------------
 
-.. automodule:: rrl.epuck
+.. automodule:: HDPy.epuck
 
 Example
 -------
@@ -21,18 +21,18 @@ Example
 Reference
 ---------
 
-.. module:: rrl
+.. module:: HDPy
 
-.. autoclass:: rrl.epuck.Robot
+.. autoclass:: HDPy.epuck.Robot
     :members: read_sensors, take_action, reset, reset_random, plot_trajectory
 
-.. autoclass:: rrl.epuck.AbsoluteRobot
+.. autoclass:: HDPy.epuck.AbsoluteRobot
     :show-inheritance:
 
-.. autofunction:: rrl.epuck.simulation_loop
+.. autofunction:: HDPy.epuck.simulation_loop
 
-.. autofunction:: rrl.epuck.epuck_plot_snapshot
+.. autofunction:: HDPy.epuck.epuck_plot_snapshot
 
-.. autofunction:: rrl.epuck.epuck_plot_value_over_action
+.. autofunction:: HDPy.epuck.epuck_plot_value_over_action
 
-.. autofunction:: rrl.epuck.epuck_plot_all_trajectories
+.. autofunction:: HDPy.epuck.epuck_plot_all_trajectories

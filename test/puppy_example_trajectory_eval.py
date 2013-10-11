@@ -1,4 +1,4 @@
-import rrl
+import HDPy
 import pickle
 import os
 import sys
@@ -27,12 +27,12 @@ bound_gait = {
     'phase'     : (0.0, 0.0, 0.5, 0.5)
 }
 
-policy = rrl.LRA(PuPy.Gait(bound_gait))
+policy = HDPy.puppy.policy.LRA(PuPy.Gait(bound_gait))
 
 # Create a plant
 landmarks = [i for i in itertools.product((-10.0, -3.3, 3.3, 10.0), (-10.0, -3.3, 3.3, 10.0))]
 target_loc = (6.0, 4.0)
-plant = rrl.puppy.plant.TargetLocationLandmarks(
+plant = HDPy.puppy.plant.TargetLocationLandmarks(
     target_loc,
     landmarks,
     reward_noise = 0.0
@@ -42,7 +42,7 @@ plant = rrl.puppy.plant.TargetLocationLandmarks(
 nrm = PuPy.Normalization('../data/puppy_unit.json')
 
 # Create HDP instance
-actor = rrl.PuppyHDP(
+actor = HDPy.PuppyHDP(
     tumbled_reward  =0.0,
     expfile         = '/tmp/example_eval.hdf5',
     reservoir       = reservoir,
@@ -55,7 +55,7 @@ actor = rrl.PuppyHDP(
     norm            = nrm
 )
 
-rrl.puppy.offline_playback(
+HDPy.puppy.offline_playback(
     '/tmp/example_data.hdf5',
     actor,
     150,

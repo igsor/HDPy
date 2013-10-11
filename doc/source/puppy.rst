@@ -6,12 +6,12 @@ Puppy
 
 .. contents::
 
-.. module:: rrl
+.. module:: HDPy
 
 Introduction
 ------------
 
-.. automodule:: rrl.puppy
+.. automodule:: HDPy.puppy
 
 Example
 -------
@@ -25,30 +25,30 @@ Example
 Reference
 ---------
 
-.. autoclass:: rrl.puppy.PuppyHDP
+.. autoclass:: HDPy.puppy.PuppyHDP
     :members: new_episode, init_episode, _step, event_handler
     :show-inheritance:
 
-.. autoclass:: rrl.puppy.OfflineCollector
+.. autoclass:: HDPy.puppy.OfflineCollector
     :members: new_episode, __call__, _next_action_hook, event_handler
     :show-inheritance:
 
-.. autofunction:: rrl.puppy.offline_playback
+.. autofunction:: HDPy.puppy.offline_playback
 
 
-.. autofunction:: rrl.puppy.plot_trajectory
+.. autofunction:: HDPy.puppy.plot_trajectory
 
-.. autofunction:: rrl.puppy.plot_all_trajectories
+.. autofunction:: HDPy.puppy.plot_all_trajectories
 
-.. autofunction:: rrl.puppy.plot_linetarget
+.. autofunction:: HDPy.puppy.plot_linetarget
 
-.. autofunction:: rrl.puppy.plot_locationtarget
+.. autofunction:: HDPy.puppy.plot_locationtarget
 
-.. autofunction:: rrl.puppy.plot_landmarks
+.. autofunction:: HDPy.puppy.plot_landmarks
 
-.. autofunction:: rrl.puppy.plot_action
+.. autofunction:: HDPy.puppy.plot_action
 
-.. autofunction:: rrl.puppy.plot_inspected_trajectory
+.. autofunction:: HDPy.puppy.plot_inspected_trajectory
 
-.. autoclass:: rrl.puppy.ActionVideo
+.. autoclass:: HDPy.puppy.ActionVideo
     :members:

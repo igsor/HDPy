@@ -1,6 +1,6 @@
 from controller import Robot
 import PuPy
-import rrl
+import HDPy
 import numpy as np
 import h5py
 
@@ -12,11 +12,11 @@ bound_gait = {
     'phase'     : (0.0, 0.0, 0.5, 0.5)
 }
 
-policy = rrl.LRA(PuPy.Gait(bound_gait))
+policy = HDPy.puppy.policy.LRA(PuPy.Gait(bound_gait))
 
 # OfflineCollector which follows a predefined sequence of actions
 # after the initial behaviour (policy with default params for 25 steps).
-class TrajectoryFollower(rrl.OfflineCollector):
+class TrajectoryFollower(HDPy.puppy.OfflineCollector):
     def __init__(self, trajectory, *args, **kwargs):
         super(TrajectoryFollower, self).__init__(*args, **kwargs)
         self.trajectory = trajectory

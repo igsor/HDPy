@@ -2,7 +2,7 @@
 For the ePuck robot, a small simulator is provided. It allows to place
 ePuck in an arena, with unpassable walls and obstacles at (almost)
 arbitrary locations. Some environment objects are predefined in
-:py:mod:`rrl.epuck.env`. The class :py:class:`Robot` provides the
+:py:mod:`HDPy.epuck.env`. The class :py:class:`Robot` provides the
 implementation of the simulated ePuck. Obstacles are directly inserted
 into this instance, hence it combines the robot with the environment.
 

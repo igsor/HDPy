@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# Reinforcement Reservoir Learning documentation build configuration file, created by
+# Heuristic Dynamic Programming documentation build configuration file, created by
 # sphinx-quickstart on Wed May 22 19:50:46 2013.
 #
 # This file is execfile()d with the current directory set to its containing dir.
@@ -17,8 +17,8 @@ import sys, os
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #sys.path.insert(0, os.path.abspath('.'))
-#sys.path.insert(0, os.path.abspath('../../rrl/puppy/'))
-#sys.path.insert(0, os.path.abspath('../../rrl/epuck/'))
+#sys.path.insert(0, os.path.abspath('../../HDPy/puppy/'))
+#sys.path.insert(0, os.path.abspath('../../HDPy/epuck/'))
 
 # -- General configuration -----------------------------------------------------
 
@@ -42,7 +42,7 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'Reinforcement Reservoir Learning'
+project = u'Heuristic Dynamic Programming with Python'
 copyright = u'2013, Matthias Baumgartner'
 
 # The version info for the project you're documenting, acts as replacement for
@@ -166,7 +166,7 @@ html_static_path = ['_static']
 #html_file_suffix = None
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'ReinforcementReservoirLearningdoc'
+htmlhelp_basename = 'HeuristicDynamicProgrammingdoc'
 
 
 # -- Options for LaTeX output --------------------------------------------------
@@ -185,7 +185,7 @@ latex_elements = {
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title, author, documentclass [howto/manual]).
 latex_documents = [
-  ('index', 'ReinforcementReservoirLearning.tex', u'Reinforcement Reservoir Learning Documentation',
+  ('index', 'HeuristicDynamicProgramming.tex', u'Heuristic Dynamic Programming Documentation',
    u'Matthias Baumgartner', 'manual'),
 ]
 
@@ -215,7 +215,7 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    ('index', 'reinforcementreservoirlearning', u'Reinforcement Reservoir Learning Documentation',
+    ('index', 'heuristicdynamicprogramming', u'Heuristic Dynamic Programming Documentation',
      [u'Matthias Baumgartner'], 1)
 ]
 
@@ -229,8 +229,8 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-  ('index', 'ReinforcementReservoirLearning', u'Reinforcement Reservoir Learning Documentation',
-   u'Matthias Baumgartner', 'ReinforcementReservoirLearning', 'One line description of project.',
+  ('index', 'HeuristicDynamicProgramming', u'Heuristic Dynamic Programming Documentation',
+   u'Matthias Baumgartner', 'HeuristicDynamicProgramming', 'One line description of project.',
    'Miscellaneous'),
 ]
 
@@ -247,7 +247,7 @@ texinfo_documents = [
 # -- Options for Epub output ---------------------------------------------------
 
 # Bibliographic Dublin Core info.
-epub_title = u'Reinforcement Reservoir Learning'
+epub_title = u'Heuristic Dynamic Programming'
 epub_author = u'Matthias Baumgartner'
 epub_publisher = u'Matthias Baumgartner'
 epub_copyright = u'2013, Matthias Baumgartner'

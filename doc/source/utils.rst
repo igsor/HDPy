@@ -4,12 +4,12 @@ Utility functions
 
 .. contents::
 
-.. module:: rrl
+.. module:: HDPy
 
 Introduction
 ------------
 
-.. automodule:: rrl.inout
+.. automodule:: HDPy.inout
 
 Reference
 ---------

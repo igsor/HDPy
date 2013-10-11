@@ -9,14 +9,14 @@ Reinforcement Learning
 Introduction
 ------------
 
-.. automodule:: rrl.rl
+.. automodule:: HDPy.rl
 
-.. automodule:: rrl.hdp
+.. automodule:: HDPy.hdp
 
 Reference
 ---------
 
-.. module:: rrl
+.. module:: HDPy
 
 .. autoclass:: Plant
     :members:

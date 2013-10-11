@@ -1,4 +1,4 @@
-import rrl
+import HDPy
 import pylab
 import numpy as np
 import h5py
@@ -21,7 +21,7 @@ robot_radius = 0.2
 
 
 # Open files
-a = rrl.Analysis(rrl.H5CombinedFile('/tmp/example_eval.hdf5', '/tmp/example_data.hdf5'))
+a = HDPy.Analysis(HDPy.H5CombinedFile('/tmp/example_eval.hdf5', '/tmp/example_data.hdf5'))
 
 # Create figure
 fig = pylab.figure()
@@ -29,7 +29,7 @@ axis = fig.add_subplot(111)
 
 # Plot target
 target_loc = (6.0, 4.0)
-rrl.puppy.plot_locationtarget(axis, target=target_loc, distance=0.5)
+HDPy.puppy.plot_locationtarget(axis, target=target_loc, distance=0.5)
 axis.invert_xaxis() # positive x-axis in webots goes to the left!
 pylab.show(block=False)
 
@@ -37,7 +37,7 @@ pylab.show(block=False)
 grp = a['0'] # this is assumed to be the main trajectory
 main_pth = grp['a_curr'][:]
 main_len = main_pth.shape[0] * step_width
-rrl.puppy.plot_trajectory(a, axis, '0', step_width, offset=step_width*25, label='Initial trajectory')
+HDPy.puppy.plot_trajectory(a, axis, '0', step_width, offset=step_width*25, label='Initial trajectory')
 pylab.show(block=False)
 
 def find_offset(a0, a1):

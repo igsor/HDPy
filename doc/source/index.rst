@@ -4,7 +4,7 @@
 Heuristic Dynamic Programming in Python
 =======================================
 
-.. automodule:: rrl
+.. automodule:: HDPy
 
 
 This documentation gives an overview over the module's functionality,
@@ -30,8 +30,15 @@ Furthermore, due to Python's magnificent online help, the interface
 documentation is also available from within the interactive interpreter
 (e.g. IPython):
 
->>> import rrl
->>> help(rrl)
+>>> import HDPy
+>>> help(HDPy)
+
+.. note::
+    The examples have been written for linux. As most of them include
+    paths, they are also specified for a unix-like filesystem. On other
+    systems, they have to be adapted. Also note that some of the paths
+    may require adaptions, even on a linux machine (e.g. normalization
+    data files).
 
 Contents
 --------

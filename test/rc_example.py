@@ -1,6 +1,6 @@
 """
 """
-import rrl
+import HDPy
 import numpy as np
 import pylab
 
@@ -14,36 +14,36 @@ reservoir_size  = 100
 ## INITIALIZATION ##
 
 # Reservoir
-reservoir_sparse = rrl.ReservoirNode(
+reservoir_sparse = HDPy.ReservoirNode(
     input_dim       = 1,
     output_dim      = reservoir_size,
     spectral_radius = 0.9,
     w_bias          = None,
-    w               = rrl.sparse_reservoir(20),
-    w_in            = rrl.sparse_w_in(1.5, 50, rnd_fu=np.random.normal),
+    w               = HDPy.sparse_reservoir(20),
+    w_in            = HDPy.sparse_w_in(1.5, 50, rnd_fu=np.random.normal),
 )
 
-reservoir_orthogonal = rrl.ReservoirNode(
+reservoir_orthogonal = HDPy.ReservoirNode(
     input_dim       = 1,
     output_dim      = reservoir_size,
     spectral_radius = 0.9,
     w_bias          = None,
-    w               = rrl.orthogonal_reservoir(20.0),
-    w_in            = rrl.sparse_w_in(1.5, 50, rnd_fu=np.random.normal),
+    w               = HDPy.orthogonal_reservoir(20.0),
+    w_in            = HDPy.sparse_w_in(1.5, 50, rnd_fu=np.random.normal),
 )
 
-reservoir_ring = rrl.ReservoirNode(
+reservoir_ring = HDPy.ReservoirNode(
     input_dim       = 1,
     output_dim      = reservoir_size,
     spectral_radius = 0.9,
     w_bias          = None,
-    w               = rrl.ring_of_neurons,
-    w_in            = rrl.sparse_w_in(1.5, 50, rnd_fu=np.random.normal),
+    w               = HDPy.ring_of_neurons,
+    w_in            = HDPy.sparse_w_in(1.5, 50, rnd_fu=np.random.normal),
 )
 
 
 # Readout
-readout = rrl.StabilizedRLS(
+readout = HDPy.StabilizedRLS(
     input_dim       = reservoir_size,
     output_dim      = 1,
     with_bias       = True,

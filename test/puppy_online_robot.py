@@ -1,62 +1,86 @@
 from controller import Robot
 import PuPy
-import rrl
+import HDPy
 import numpy as np
+import os
+import itertools
+import pickle
 
 
 ## INITIALIZATION ##
 
-# Plant and Policy
+# Create a policy
+bound_gait = {
+    'amplitude' : ( 0.8, 1.0, 0.8, 1.0),
+    'frequency' : (1.0, 1.0, 1.0, 1.0),
+    'offset'    : ( -0.23, -0.23, -0.37, -0.37),
+    'phase'     : (0.0, 0.0, 0.5, 0.5)
+}
 
-policy = rrl.puppy.policy.
+policy = HDPy.puppy.policy.LRA(PuPy.Gait(bound_gait))
 
-plant = rrl.puppy.plant.
+# Create a plant
+landmarks = [i for i in itertools.product((-10.0, -3.3, 3.3, 10.0), (-10.0, -3.3, 3.3, 10.0))]
+target_loc = (6.0, 4.0)
+plant = HDPy.puppy.plant.TargetLocationLandmarks(
+    target_loc,
+    landmarks,
+    reward_noise    = 0.0
+)
+
+# Load the normalization
+nrm = PuPy.Normalization('../data/puppy_unit.json')
 
 # Reservoir
-# FIXME: Read from file if available
-reservoir = rrl.ReservoirNode(
-    output_dim      = 100,
-    input_dim       = policy.action_space_dim() + plant.state_space_dim(),
-    reset_states    = False,
-    spectral_radius = 0.7,
-    w               = rrl.sparse_reservoir_gen(20),
-)
-
-reservoir.initialize()
+if os.path.exists('/tmp/puppy_reservoir.pic'):
+    reservoir = pickle.load(open('/tmp/puppy_reservoir.pic','r'))
+else:
+    reservoir = HDPy.ReservoirNode(
+        output_dim      = 100,
+        input_dim       = policy.action_space_dim() + plant.state_space_dim(),
+        reset_states    = False,
+        spectral_radius = 0.7,
+        w               = HDPy.sparse_reservoir(20),
+    )
+    reservoir.initialize()
+    reservoir.save('/tmp/puppy_reservoir.pic')
 
 # Readout
-# FIXME: Read from file if available
-# FIXME: Bring back the h5py readout storing structure
-readout = rrl.StabilizedRLS(
-    input_dim   = reservoir.get_output_dim() + reservoir.get_input_dim(),
-    output_dim  = 1,
-    with_bias   = True,
-    lambda_     = 1.0
-)
+if os.path.exists('/tmp/puppy_readout.pic'):
+    readout = pickle.load(open('/tmp/puppy_readout.pic','r'))
+else:
+    readout = HDPy.StabilizedRLS(
+        input_dim   = reservoir.get_output_dim() + reservoir.get_input_dim(),
+        output_dim  = 1,
+        with_bias   = True,
+        lambda_     = 1.0
+    )
 
 # Acting schema
-class OnlinePuppy(rrl.PuppyHDP):
+class OnlinePuppy(HDPy.PuppyHDP):
     def _next_action_hook(self, a_next):
+        """Choose the action in an eps-greedy
+        fashion, meaning that a random action
+        is preferred over the suggested one with
+        probability eps.
         """
-        
-        .. todo::
-            eps-greedy, documentation
-        
-        """
+        if np.random.rand() < 0.2:
+            a_next = np.random.uniform(low=0.2, high=1.0, size=a_next.shape)
+        # clip the action to a bounded range
         a_next[a_next < 0.2] = 0.2
         a_next[a_next > 1.0] = 1.0
         return a_next
 
 # actor
 actor = OnlinePuppy(
-    # 
+    # HDPy.puppy.PuppyHDP
     tumbled_reward  = 0.0,
-    # 
+    # HDPy.CollectingADHDP
     expfile         = '/tmp/puppy_online.hdf5',
-    # 
+    # HDPy.ADHDP
     reservoir       = reservoir,
     readout         = readout,
-    # 
+    # HDPy.ActorCritic
     plant           = plant,
     policy          = policy,
     gamma           = 0.5,

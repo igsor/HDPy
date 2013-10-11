@@ -1,5 +1,5 @@
 import numpy as np
-import rrl
+import HDPy
 import os
 import pylab
 
@@ -7,14 +7,14 @@ import pylab
 
 # Robot
 obstacles = [
-    rrl.epuck.env.train_lower,
-    rrl.epuck.env.train_middle,
-    rrl.epuck.env.train_left,
-    rrl.epuck.env.train_upper
+    HDPy.epuck.env.train_lower,
+    HDPy.epuck.env.train_middle,
+    HDPy.epuck.env.train_left,
+    HDPy.epuck.env.train_upper
 ]
 
-robot = rrl.epuck.AbsoluteRobot(
-    walls       = rrl.epuck.env.obstacles_box,
+robot = HDPy.epuck.AbsoluteRobot(
+    walls       = HDPy.epuck.env.obstacles_box,
     obstacles   = obstacles,
     tol         = 0.0,
     speed       = 0.5,
@@ -22,14 +22,14 @@ robot = rrl.epuck.AbsoluteRobot(
 )
 
 # Plant and Policy
-policy = rrl.epuck.policy.HeadingRandInit()
-plant = rrl.epuck.plant.CollisionAvoidanceFrontal(
+policy = HDPy.epuck.policy.HeadingRandInit()
+plant = HDPy.epuck.plant.CollisionAvoidanceFrontal(
     theta       = 1.0,
     obs_noise   = 0.05
 )
 
 # Set up reservoir
-reservoir = rrl.ReservoirNode(
+reservoir = HDPy.ReservoirNode(
     output_dim      = 50,
     input_dim       = policy.action_space_dim() + plant.state_space_dim(),
     spectral_radius = 0.95,
@@ -41,7 +41,7 @@ reservoir = rrl.ReservoirNode(
 reservoir.initialize()
 
 # Set up readout
-readout = rrl.StabilizedRLS(
+readout = HDPy.StabilizedRLS(
     with_bias   = True,
     input_dim   = reservoir.get_output_dim() + policy.action_space_dim() + plant.state_space_dim(),
     output_dim  = 1,
@@ -49,7 +49,7 @@ readout = rrl.StabilizedRLS(
 )
 
 # Custom ADHDP
-class ExperimentingHDP(rrl.CollectingADHDP):
+class ExperimentingHDP(HDPy.CollectingADHDP):
     def _next_action_hook(self, a_next):
         """Project action into the interval [0,2pi]."""
         return a_next % (2*np.pi)
@@ -76,7 +76,7 @@ acd = ExperimentingHDP(
 ## SIMULATION LOOP ##
 
 # Execute the simulation for 10 episodes, with 100 steps tops each
-rrl.epuck.simulation_loop(
+HDPy.epuck.simulation_loop(
     acd,
     robot,
     max_step        = 100,
@@ -87,12 +87,12 @@ rrl.epuck.simulation_loop(
 ## EVALUATION ##
 
 # Load the data file
-analysis = rrl.Analysis('/tmp/epuck_data.hdf5')
+analysis = HDPy.Analysis('/tmp/epuck_data.hdf5')
 
 # Plot the trajectories and obstacles
 axis = pylab.figure().add_subplot(111)
 robot._plot_obstacles(axis=axis)
-rrl.epuck.plot_all_trajectories(analysis, axis)
+HDPy.epuck.plot_all_trajectories(analysis, axis)
 
 # Show the figure
 pylab.show(block=False)

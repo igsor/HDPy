@@ -1,5 +1,5 @@
 
-import rrl
+import HDPy
 import PuPy
 import pylab
 import numpy as np
@@ -12,7 +12,7 @@ gait = PuPy.Gait(params={
     'phase'     : (0.0, 0.0, 0.5, 0.5)
 })
 
-policy = rrl.FRA(gait)
+policy = HDPy.FRA(gait)
 
 # Plot action
 it = policy.get_iterator(0, 100, 20)
@@ -25,10 +25,10 @@ pylab.show(block=False)
 
 
 # Create and initialize Plant
-plant = rrl.SpeedReward()
+plant = HDPy.SpeedReward()
 
 # Create and initialize ACD
-reservoir = rrl.SparseReservoirNode(
+reservoir = HDPy.SparseReservoirNode(
     output_dim=10,
     input_dim=policy.action_space_dim() + plant.state_space_dim(),
     reset_states=False,
@@ -37,7 +37,7 @@ reservoir = rrl.SparseReservoirNode(
     fan_in_w=20
 )
 
-readout = rrl.StabilizedRLS(
+readout = HDPy.StabilizedRLS(
     with_bias=True,
     input_dim=10,
     output_dim=1,
@@ -45,7 +45,7 @@ readout = rrl.StabilizedRLS(
 )
 
 expfile = '/tmp/acd.hdf5'
-acd = rrl.CollectingADHDP(#  rrl.ADHDP(
+acd = HDPy.CollectingADHDP(#  HDPy.ADHDP(
     expfile,
     reservoir,
     readout,
@@ -97,6 +97,6 @@ pylab.show(block=False)
 import tempfile, os
 fh, pth = tempfile.mkstemp()
 acd.save(pth)
-acd2 = rrl.ADHDP.load(pth)
+acd2 = HDPy.ADHDP.load(pth)
 os.unlink(pth)
 
