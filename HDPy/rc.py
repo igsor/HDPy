@@ -635,7 +635,7 @@ class SparseReservoirNode(ReservoirNode):
     
     """
     def __init__(self, *args, **kwargs):
-        warnings.warn("This class is deprecated. Use 'SparseReservoirNode' instead")
+        warnings.warn("This class is deprecated. Use 'ReservoirNode' instead")
         super(SparseReservoirNode, self).__init__(*args, **kwargs)
 
 ## RLS ##

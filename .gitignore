@@ -1,6 +1,7 @@
-
+*~
 *.pyc
 *.pyo
+.*project
 doc/build/
 dist/
 MANIFEST

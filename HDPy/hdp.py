@@ -254,7 +254,7 @@ class CollectingADHDP(ADHDP):
             del self.collector
         
         self.collector = PuPy.PuppyCollector(
-            actor=None,
+            child=None,
             expfile=self.expfile,
             headers=self.headers
             #headers={

@@ -319,12 +319,15 @@ def offline_playback(pth_data, critic, samples_per_action, ms_per_step, episode_
     for episode_idx, episode in enumerate(storages):
         
         data_grp = f[episode]
-        N = data_grp['trg0'].shape[0]
-        assert N % samples_per_action == 0
+        N = len(data_grp['trg0'])
+        
+        # get the stored ratio
+        db_samples_per_action = N / len(data_grp['a_next'])
+        assert N % db_samples_per_action == 0
         
         # get tumbled infos
         if 'tumbled' in data_grp:
-            time_tumbled = data_grp['tumbled'][0] * samples_per_action
+            time_tumbled = data_grp['tumbled'][0] * db_samples_per_action
         else:
             time_tumbled = -1
         
@@ -337,11 +340,11 @@ def offline_playback(pth_data, critic, samples_per_action, ms_per_step, episode_
         
         # initial action
         critic.a_curr = np.atleast_2d(data_grp['a_curr'][0]).T
-        
+
         # loop through data, incrementally feed the critic
         for num_iter in np.arange(0, N, samples_per_action):
             # next action
-            next_action = np.atleast_2d(data_grp['a_next'][num_iter/samples_per_action]).T
+            next_action = np.atleast_2d(data_grp['a_next'][num_iter/db_samples_per_action]).T
             
             # get data
             time_start_ms += time_step_ms
