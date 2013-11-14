@@ -13,21 +13,16 @@ class AccelerationReward(Plant):
     """
 
     def __init__(self):
-        super(AccelerationReward, self).__init__(state_space_dim=2)
+        super(AccelerationReward, self).__init__(state_space_dim=28)
         self.ax = []
         self.ay = []
         self.az = []
 
 
     def state_input(self, state):
-        """Return the location, sampled from the *GPS* (x,y) values.
-        The sample is an average over the last 10 GPS coordinates.
+        """Full state
         """
-        sio =  np.atleast_2d([
-            self.normalization.normalize_value('puppyGPS_x', state['puppyGPS_x'][-10:]).mean(),
-            self.normalization.normalize_value('puppyGPS_y', state['puppyGPS_y'][-10:]).mean()
-        ]).T
-        return sio
+        return np.atleast_2d(state.values())
 
 
     def reward(self, epoch):
