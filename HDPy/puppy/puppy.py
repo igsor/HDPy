@@ -192,12 +192,12 @@ class OfflineCollector(CollectingADHDP):
             # Normal walking
             a_next = self._next_action_hook(self.a_curr)
         
-        if self.num_step <= self._init_steps:
-            print "(init)", a_next.T
-        elif self.supervisor_tumbled_notice > 2:
-            print time_start_ms, self.a_curr.T, self.num_step
-        else:
-            print time_start_ms, self.a_curr.T, epoch['puppyGPS_x'][-1]
+#         if self.num_step <= self._init_steps:
+#             print "(init)", a_next.T
+#         elif self.supervisor_tumbled_notice > 2:
+#             print time_start_ms, self.a_curr.T, self.num_step
+#         else:
+#             print time_start_ms, self.a_curr.T, epoch['puppyGPS_x'][-1]
         
         self._pre_increment_hook(
             epoch,
