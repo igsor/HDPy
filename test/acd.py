@@ -25,7 +25,7 @@ pylab.show(block=False)
 
 
 # Create and initialize Plant
-plant = HDPy.SpeedReward()
+plant = HDPy.plant.SpeedReward()
 
 # Create and initialize ACD
 reservoir = HDPy.SparseReservoirNode(

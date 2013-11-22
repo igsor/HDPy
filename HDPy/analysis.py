@@ -442,7 +442,8 @@ class Analysis:
         gamma = self.f[expno]['gamma'][:]
         j_curr = self.f[expno]['j_curr'][:]
         reservoir_dim = x_curr.shape[1]
-        N = x_curr.shape[0]
+        N = reward.shape[0]
+        init = len(x_curr) - len(reward) #find initialization period
         
         trg = np.zeros((N, 1))
         for i in range(N-2, -1, -1):
@@ -455,7 +456,7 @@ class Analysis:
         
         
         lin_reg = mdp.nodes.LinearRegressionNode(input_dim=reservoir_dim, output_dim=1)
-        lin_reg.train(x_curr[:-1], trg[:-1])
+        lin_reg.train(x_curr[init:-1], trg[:-1])
         lin_reg.stop_training()
         
         olr_nb = StabilizedRLS(with_bias=False, input_dim=reservoir_dim, output_dim=1, lambda_=0.9)
