@@ -14,6 +14,8 @@ class AccelerationReward(Plant):
 
     def __init__(self):
         super(AccelerationReward, self).__init__(state_space_dim=28)
+        self.x = []
+        self.y = []
         self.ax = []
         self.ay = []
         self.az = []
@@ -32,21 +34,29 @@ class AccelerationReward(Plant):
         and sum of the acceleration minus gravity is used as negative reinforcement.
         """
         
-        if (epoch['accelerometer_z'] < 1.0).mean() > 0.8:
-            return -100.0
+#         if (epoch['accelerometer_z'] < 1.0).mean() > 0.8:
+#             return -100.0
         
-        x = epoch['puppyGPS_x']
-        y = epoch['puppyGPS_y']
-        n = x.size
+        n = epoch['puppyGPS_x'].size
         
-        # calculate displacement in a reasonable scale
-        spd = (3000.0/n) * np.linalg.norm(np.array([x[-1] - x[0], y[-1] - y[0]]));
-        
+        #keep last position
+        self.x  = np.concatenate([self.x[-1:],  epoch['puppyGPS_x']])
+        self.y  = np.concatenate([self.y[-1:],  epoch['puppyGPS_y']])
         
         #store last 2 epochs plus current one 
         self.ax = np.concatenate([self.ax[-2*n:], epoch['accelerometer_x']])
         self.ay = np.concatenate([self.ay[-2*n:], epoch['accelerometer_y']])
         self.az = np.concatenate([self.az[-2*n:], epoch['accelerometer_z']])
+        
+        spd = 0
+        if self.x.size > 1:
+            mov = np.linalg.norm(np.array([self.x[-1] - self.x[0], self.y[-1] - self.y[0]]))
+            #check consistency
+            if mov < 0.1*n:
+                # calculate displacement in a reasonable scale
+                spd = (3000.0/n) * mov;
+        
+        
         
         s = np.ceil(self.ax.size/3.0)
         fr = 0.3
