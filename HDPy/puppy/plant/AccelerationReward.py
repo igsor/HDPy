@@ -13,7 +13,7 @@ class AccelerationReward(Plant):
     """
 
     def __init__(self):
-        super(AccelerationReward, self).__init__(state_space_dim=28)
+        super(AccelerationReward, self).__init__(state_space_dim=24)
         self.x = []
         self.y = []
         self.ax = []
@@ -24,7 +24,37 @@ class AccelerationReward(Plant):
     def state_input(self, state):
         """Full state
         """
-        return np.atleast_2d(state.values())
+        sio =  np.atleast_2d([
+            self.normalization.normalize_value('puppyGPS_x', state['puppyGPS_x'][-1]),
+            self.normalization.normalize_value('puppyGPS_y', state['puppyGPS_y'][-1]),
+            self.normalization.normalize_value('puppyGPS_z', state['puppyGPS_z'][-1]),
+            self.normalization.normalize_value('accelerometer_x', state['accelerometer_x'][-1]),
+            self.normalization.normalize_value('accelerometer_y', state['accelerometer_y'][-1]),
+            self.normalization.normalize_value('accelerometer_z', state['accelerometer_z'][-1]),
+            self.normalization.normalize_value('compass_x', state['compass_x'][-1]),
+            self.normalization.normalize_value('compass_y', state['compass_y'][-1]),
+            self.normalization.normalize_value('compass_z', state['compass_z'][-1]),
+            self.normalization.normalize_value('gyro_x', state['gyro_x'][-1]),
+            self.normalization.normalize_value('gyro_y', state['gyro_y'][-1]),
+            self.normalization.normalize_value('gyro_z', state['gyro_z'][-1]),
+            self.normalization.normalize_value('hip0', state['hip0'][-1]),
+            self.normalization.normalize_value('hip1', state['hip1'][-1]),
+            self.normalization.normalize_value('hip2', state['hip2'][-1]),
+            self.normalization.normalize_value('hip3', state['hip3'][-1]),
+            self.normalization.normalize_value('knee0', state['knee0'][-1]),
+            self.normalization.normalize_value('knee1', state['knee1'][-1]),
+            self.normalization.normalize_value('knee2', state['knee2'][-1]),
+            self.normalization.normalize_value('knee3', state['knee3'][-1]),
+#             state['touch0'][-1],
+#             state['touch1'][-1],
+#             state['touch2'][-1],
+#             state['touch3'][-1],
+            self.normalization.normalize_value('touch0', state['touch0'][-1]),
+            self.normalization.normalize_value('touch1', state['touch1'][-1]),
+            self.normalization.normalize_value('touch2', state['touch2'][-1]),
+            self.normalization.normalize_value('touch3', state['touch3'][-1])
+        ]).T
+        return sio
 
 
     def reward(self, epoch):
