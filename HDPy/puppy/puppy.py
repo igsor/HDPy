@@ -243,7 +243,7 @@ class OfflineCollector(CollectingADHDP):
         
         return a_next
 
-def offline_playback(pth_data, critic, samples_per_action, ms_per_step, episode_start=None, episode_end=None, min_episode_len=0):
+def offline_playback(pth_data, critic, samples_per_action, ms_per_step, episode_start=None, episode_end=None, min_episode_len=0, err_coefficient=0.01, episode_start_test=None):
     """Simulate an experiment run for the critic by using offline data.
     The data has to be collected in webots, using the respective
     robot and supervisor. Note that the behaviour of the simulation
@@ -280,6 +280,14 @@ def offline_playback(pth_data, critic, samples_per_action, ms_per_step, episode_
     ``min_episode_len``
         Only pick episodes longer than this threshold.
     
+    ``err_coefficient``
+        coefficient for the TD-error exponential moving average (EMA)
+    
+    ``episode_start_test``
+        starting point for the test, i.e. when we start accounting the TD-error.
+        
+    :returns: accumulated TD-error average
+    
     """
     # Open data file, get valid experiments
     f = h5py.File(pth_data,'r')
@@ -296,8 +304,13 @@ def offline_playback(pth_data, critic, samples_per_action, ms_per_step, episode_
     
     assert len(storages) > 0
     
+    if episode_start_test is None:
+        episode_start_test = len(storages)/2 - 1; #use last half for testing 
+    
     # Prepare critic; redirect hooks to avoid storing epoch data twice
     # and feed the actions
+    global accError 
+    accError = 0 # accumulated error
     next_action = None
     episode = None
     critic._pre_increment_hook_orig = critic._pre_increment_hook
@@ -306,6 +319,11 @@ def offline_playback(pth_data, critic, samples_per_action, ms_per_step, episode_
     def pre_increment_hook(epoch, **kwargs):
         kwargs['offline_episode'] = np.array([episode])
         critic._pre_increment_hook_orig(dict(), **kwargs)
+        if int(episode) > episode_start_test and kwargs.has_key('err'):
+            global accError
+            accError = accError*(1-err_coefficient) + (kwargs['err'][0][0]**2)*err_coefficient # accumulated squared error
+            #accError = accError*(1-err_coefficient) + np.abs(kwargs['err'][0][0])*err_coefficient # accumulated absolute error
+    
     def next_action_hook(a_next):
         #print "(next)", a_next.T, next_action.T
         return next_action
@@ -361,12 +379,17 @@ def offline_playback(pth_data, critic, samples_per_action, ms_per_step, episode_
         # send reset after episode has finished
         if episode_idx < len(storages) - 1:
             critic.event_handler(None, dict(), ms_per_step * N, 'reset')
+            
+        if accError != 0:
+            print episode + ': accumulated error: ' + str(accError)
     
     # cleanup
     critic._pre_increment_hook = critic._pre_increment_hook_orig
     critic._next_action_hook = critic._next_action_hook_orig
     del critic._pre_increment_hook_orig
     del critic._next_action_hook_orig
+    
+    return accError
 
 
 ## DEPRECATED ##
