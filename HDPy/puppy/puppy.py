@@ -13,15 +13,16 @@ is implemented through :py:class:`OfflineCollector` and
 is documented in :ref:`puppy_offline`.
 
 """
-from ..hdp import CollectingADHDP
+from ..hdp import ADHDP
 from ..rl import Plant
 import numpy as np
 import warnings
 import h5py
+import HDPy
 
 SENSOR_NAMES = ['trg0', 'trg1', 'trg2', 'trg3', 'accelerometer_x', 'accelerometer_y', 'accelerometer_z', 'compass_x', 'compass_y', 'compass_z', 'gyro_x', 'gyro_y', 'gyro_z', 'hip0', 'hip1', 'hip2', 'hip3', 'knee0', 'knee1', 'knee2', 'knee3', 'puppyGPS_x', 'puppyGPS_y', 'puppyGPS_z', 'touch0', 'touch0', 'touch1', 'touch2', 'touch3']
 
-class PuppyHDP(CollectingADHDP):
+class PuppyHDP(ADHDP):
     """ADHDP subtype for simulations using Puppy in webots.
     
     This class adds some code considering restarts of Puppy. It adds
@@ -50,7 +51,7 @@ class PuppyHDP(CollectingADHDP):
         
         if msg == 'reset':
             #print "Reset received", self.num_step
-            self.policy.reset()
+            self.get_from_child('reset')()
             self.new_episode()
     
     def new_episode(self):
@@ -61,7 +62,7 @@ class PuppyHDP(CollectingADHDP):
         self.has_tumbled = False
         self.supervisor_tumbled_notice = 0
     
-    def _step(self, s_curr, s_next, a_curr, reward):
+    def _step(self, s_curr, epoch, a_curr, reward):
         """Ensure the tumbled reward and initiate behaviour between
         restarts. The step of the parent is then invoked.
         """
@@ -85,13 +86,14 @@ class PuppyHDP(CollectingADHDP):
             self.supervisor_tumbled_notice += 1
         
         reward += np.random.normal(scale=0.001)
-        a_next = super(PuppyHDP, self)._step(s_curr, s_next, a_curr, reward)
+        a_next = super(PuppyHDP, self)._step(s_curr, epoch, a_curr, reward)
+        epoch['a_next'] = a_next
         
         #if self.supervisor_tumbled_notice > 2:
         #    self.gamma = old_gamma
         
-        #print self.num_step, reward, a_curr.T, a_next.T, s_next['puppyGPS_x'][-1]
-        return a_next
+        #print self.num_step, reward, a_curr.T, a_next.T, epoch['puppyGPS_x'][-1]
+        return epoch
     
     def init_episode(self, epoch, time_start_ms, time_end_ms, step_size_ms):
         """Initial behaviour (after reset)
@@ -111,18 +113,15 @@ class PuppyHDP(CollectingADHDP):
             i_curr = np.vstack((in_state, a_curr_nrm)).T
             x_curr = self.reservoir(i_curr, simulate=False)
             x_curr = np.hstack((x_curr, i_curr)) # FIXME: Input/Output ESN Model
-            self._pre_increment_hook(
-                epoch,
-                x_curr=x_curr,
-                i_curr=i_curr,
-                a_next=self.a_curr.T,
-                a_curr=self.a_curr.T,
-            )
+            epoch['x_curr'] = x_curr
+            epoch['i_curr'] = i_curr
+            epoch['a_next'] = self.a_curr.T
+            epoch['a_curr'] = self.a_curr.T
         
         self.s_curr = epoch
-        return self.policy.get_iterator(time_start_ms, time_end_ms, step_size_ms)
+        return self.child(epoch, time_start_ms, time_end_ms, step_size_ms)
 
-class OfflineCollector(CollectingADHDP):
+class OfflineCollector(ADHDP):
     """Collect sensor data for Puppy in webots, such that it can be
     reused later to train a critic offline.
     
@@ -136,12 +135,22 @@ class OfflineCollector(CollectingADHDP):
     
     """
     def __init__(self, *args, **kwargs):
+        # look for policy's member 'action_space_dim' (policy is hidden in child or sub-child)
+        policy = kwargs['policy']
+        if hasattr(policy, 'action_space_dim'):
+            action_space_dim = getattr(policy, 'action_space_dim')
+        elif hasattr(policy, 'get_from_child'):
+            action_space_dim = policy.get_from_child('action_space_dim')
+        else:
+            from ..hdp import return_none
+            action_space_dim = return_none
+        
         class Phony:
             """Stub for a reservoir."""
             reset_states = False
             def get_input_dim(self):
                 """Return input dimension (action space dim.)"""
-                return kwargs['policy'].action_space_dim()
+                return action_space_dim()
             def reset(self):
                 """Reset to the initial state (no effect)"""
                 pass
@@ -199,18 +208,14 @@ class OfflineCollector(CollectingADHDP):
         else:
             print time_start_ms, self.a_curr.T, epoch['puppyGPS_x'][-1]
         
-        self._pre_increment_hook(
-            epoch,
-            a_curr=self.a_curr.T,
-            a_next=a_next.T
-        )
+        epoch['a_curr'] = self.a_curr.T
+        epoch['a_next'] = a_next.T
         
         self.a_curr = a_next
         self.num_step += 1
         
-        self.policy.update(a_next)
         #print "(call-end)", self.num_step, a_next.T
-        return self.policy.get_iterator(time_start_ms, time_end_ms, step_size_ms)
+        return self.child(epoch, time_start_ms, time_end_ms, step_size_ms)
     
     def event_handler(self, robot, epoch, current_time, msg):
         """Handle messages from the supervisor. Messages are expected
