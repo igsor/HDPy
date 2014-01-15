@@ -44,14 +44,19 @@ readout = HDPy.StabilizedRLS(
     lambda_         = 1.0
 )
 
+# Initialize the collector
+collector = PuPy.RobotCollector(
+    child   = policy,
+    expfile = '/tmp/puppy_critic.hdf5'
+)
+
 # Initialize the Critic
 critic = HDPy.PuppyHDP(
     tumbled_reward  = 0.0,
-    expfile         = '/tmp/puppy_critic.hdf5',
     reservoir       = reservoir,
     readout         = readout,
     plant           = plant,
-    policy          = policy,
+    policy          = collector,
     gamma           = 0.5,
     alpha           = 1.0,
     init_steps      = 10,

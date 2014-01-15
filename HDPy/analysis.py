@@ -1,7 +1,8 @@
 """
 Assuming that all relevant values have been written into a HDF5 file
-(e.g. using :py:class:`CollectingADHDP`), the controller intrinsics can
-be analyzed. To work with such a file, some functions are provided.
+(e.g. using :py:class:`PuPy.RobotCollector` in the policy), the
+controller intrinsics can be analyzed. To work with such a file, some
+functions are provided.
 
 It's assumed that a group represents one episode. There may be several
 groups in a single HDF5 file, which would then be interpreted as several

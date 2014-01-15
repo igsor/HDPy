@@ -3,11 +3,7 @@ On top of the :py:class:`ActorCritic` implementation, this module
 provides a couple algorithms to solve a problem stated in terms of
 Reinforcement Learning. All algorithms follow the same approach, namely
 (action dependent) Heuristic Dynamic Programming. The baseline
-algorithm is implemented in :py:class:`ADHDP`. A data collecting version
-is provided in :py:class:`CollectingADHDP`, as the class is already
-embedded in the :py:mod:`PuPy` framework through
-:py:class:`ActorCritic`. Hence the collector works in the same fashion
-as :py:class:`PuPy.RobotCollector`.
+algorithm is implemented in :py:class:`ADHDP`.
 
 If a new specialisation of an :py:class:`ActorCritic` is created,
 typically its :py:meth:`ActorCritic._step` method is adapted (this is
@@ -200,78 +196,6 @@ class ADHDP(ActorCritic):
         self.s_curr = epoch
         return self.child(epoch, time_start_ms, time_end_ms, step_size_ms)
 
-class CollectingADHDP(ADHDP):
-    """Actor-Critic design with data collector.
-    
-    A *collector* (:py:class:`PuPy.PuppyCollector` instance) is created
-    for recording sensor data and actor-critic internals together.
-    The file is stored at ``expfile``.
-    """
-    def __init__(self, expfile, *args, **kwargs):
-        self.expfile = expfile
-        self.collector = None
-        
-        self.headers = None
-        if 'additional_headers' in kwargs:
-            self.headers = kwargs.pop('additional_headers')
-        
-        super(CollectingADHDP, self).__init__(*args, **kwargs)
-    
-    def _pre_increment_hook(self, epoch, **kwargs):
-        """Add the *ADHDP* internals to the epoch and use the
-        *collector* to save all the data.
-        """
-        ep_write = epoch.copy()
-        for key in kwargs:
-            ep_write[key] = kwargs[key]
-        
-        self.collector(ep_write, 0, 1, 1)
-    
-    def save(self, pth):
-        """Save the instance without the *collector*.
-        
-        .. note::
-            When an instance is reloaded via :py:meth:`ADHDP.load`
-            a new group will be created in *expfile*.
-        
-        """
-        # Shift collector to local
-        collector = self.collector
-        self.collector = None
-        super(CollectingADHDP, self).save(pth)
-        # Shift collector to class
-        self.collector = collector
-
-    def new_episode(self):
-        """Do everything the parent does and additionally reinitialize
-        the collector. The reservoir weights are stored as header
-        information.
-        """
-        super(CollectingADHDP, self).new_episode()
-        
-        # init/reset collector
-        if self.collector is not None:
-            del self.collector
-        
-        self.collector = PuPy.PuppyCollector(
-            child=None,
-            expfile=self.expfile,
-            headers=self.headers
-            #headers={
-            #    # FIXME: Store complete reservoir or at least include the bias
-            #    # FIXME: Doesn't work with too large reservoirs (>80 nodes)? This is because of the size limit of HDF5 headers
-            #    #        Could be stored as dataset though...
-            #    'r_weights': self.reservoir.w.todense(),
-            #    'r_input'  : self.reservoir.w_in.todense()
-            #    }
-        )
-        
-        # in case of online experiments, episode number is taken from data file
-        self.num_episode = int(self.collector.grp_name) + 1
-    
-    def __del__(self):
-        del self.collector
-
 ## HDP VARIATIONS ##
 
 class ReservoirActorADHDP(ADHDP):
@@ -307,7 +231,7 @@ class ReservoirActorADHDP(ADHDP):
         deriv = deriv.T # AxL
         scale = self.normalizer.get('a_curr')[1]
         deriv *= scale # Derivative denormalization
-        return deriv
+        #return deriv
         
         
         a_next = self.gradient_descent(epoch, a_curr)

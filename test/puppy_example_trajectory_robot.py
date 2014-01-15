@@ -12,7 +12,7 @@ bound_gait = {
     'phase'     : (0.0, 0.0, 0.5, 0.5)
 }
 
-policy = HDPy.puppy.policy.LRA(PuPy.Gait(bound_gait))
+policy = HDPy.puppy.policy.LRA(PuPy.Gait(bound_gait, 'bounding'))
 
 # OfflineCollector which follows a predefined sequence of actions
 # after the initial behaviour (policy with default params for 25 steps).
@@ -61,12 +61,16 @@ else:
 
 f.close()
 
+# Initialize the collector
+collector = PuPy.RobotCollector(
+    child   = policy,
+    expfile = '/tmp/example_data.hdf5'
+)
 
 # Initialize the actor
 actor = TrajectoryFollower(
     trajectory  = trajectory,
-    expfile     = '/tmp/example_data.hdf5',
-    policy      = policy,
+    policy      = collector,
     init_steps  = 10,
 )
 

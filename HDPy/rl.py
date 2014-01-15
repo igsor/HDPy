@@ -152,8 +152,11 @@ class Policy(PuPy.RobotActor):
     
     def __call__(self, epoch, time_start_ms, time_end_ms, step_size_ms):
         if epoch.has_key('a_next'):
-            self.update(epoch['a_next'])
+            self.update(np.atleast_2d(epoch['a_next']).T)
         return self.get_iterator(time_start_ms, time_end_ms, step_size_ms)
+    
+    def _get_initial_targets(self, time_start_ms, time_end_ms, step_size_ms):
+        return self.__call__({}, time_start_ms, time_end_ms, step_size_ms)
         
 
 class _ConstParam(object):
@@ -309,8 +312,8 @@ class ActorCritic(PuPy.RobotActor):
         it is loaded from a file.
         """
         self.num_episode += 1
-        self.a_curr = self.get_from_child('initial_action')()
-        self._motor_action_dim = self.get_from_child('action_space_dim')()
+        self.a_curr = self.get_from_child('initial_action', lambda:None)()
+        self._motor_action_dim = self.get_from_child('action_space_dim', lambda:None)()
         self.s_curr = dict()
         self.num_step = 0
     
@@ -367,7 +370,7 @@ class ActorCritic(PuPy.RobotActor):
         epoch = self._step(self.s_curr, epoch, self.a_curr, reward)
         
         # increment
-        self.a_curr = epoch['a_next']
+        self.a_curr = np.atleast_2d(epoch['a_next']).T
         self.s_curr = epoch
         self.num_step += 1
         

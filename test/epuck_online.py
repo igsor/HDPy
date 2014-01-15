@@ -1,5 +1,6 @@
 import numpy as np
 import HDPy
+import PuPy
 import os
 import pylab
 
@@ -49,7 +50,7 @@ readout = HDPy.StabilizedRLS(
 )
 
 # Custom ADHDP
-class ExperimentingHDP(HDPy.CollectingADHDP):
+class ExperimentingHDP(HDPy.ADHDP):
     def _next_action_hook(self, a_next):
         """Project action into the interval [0,2pi]."""
         return a_next % (2*np.pi)
@@ -58,16 +59,18 @@ class ExperimentingHDP(HDPy.CollectingADHDP):
 if os.path.exists('/tmp/epuck_data.hdf5'):
     os.unlink('/tmp/epuck_data.hdf5')
 
+collector = PuPy.RobotCollector(
+    child   = policy,
+    expfile = '/tmp/epuck_data.hdf5')
+
 # Create ADHDP instance
 acd = ExperimentingHDP(
-    # Demanded by CollectingADHDP
-    expfile     = '/tmp/epuck_data.hdf5',
     # Demanded by ADHDP
     reservoir   = reservoir,
     readout     = readout,
     # Demanded by ActorCritic
     plant       = plant,
-    policy      = policy,
+    policy      = collector,
     gamma       = 0.5,
     alpha       = 1.0,
     init_steps  = 5,
