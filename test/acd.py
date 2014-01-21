@@ -25,7 +25,7 @@ pylab.show(block=False)
 
 
 # Create and initialize Plant
-plant = HDPy.plant.SpeedReward()
+plant = HDPy.puppy.plant.SpeedReward()
 
 # Create and initialize ACD
 reservoir = HDPy.SparseReservoirNode(
@@ -39,44 +39,42 @@ reservoir = HDPy.SparseReservoirNode(
 
 readout = HDPy.StabilizedRLS(
     with_bias=True,
-    input_dim=10,
+    input_dim=reservoir.get_output_dim() + reservoir.get_input_dim(),
     output_dim=1,
     lambda_=1.0
 )
-
 expfile = '/tmp/acd.hdf5'
-acd = HDPy.CollectingADHDP(#  HDPy.ADHDP(
-    expfile,
+collector = PuPy.RobotCollector(child=policy, expfile=expfile)
+acd = HDPy.ADHDP(
     reservoir,
     readout,
     plant,
-    policy
+    collector
 )
 
-def my_alpha(time):
-    return 0.5
+acd.set_alpha(0.5)
 
-acd.set_alpha(my_alpha)
 
+N = 100
 ep0 = {
-    'accelerometer_z'   : np.array([2.0]),
-    'puppyGPS_x'        : np.array([0.0,  1.0]),
-    'puppyGPS_y'        : np.array([0.0, 10.0])
+    'accelerometer_z'   : np.ones(N) * 2.0 + np.random.randn(N)+0.2,
+    'puppyGPS_x'        : np.ones([N,2]) * [0.0,  1.0] + np.random.randn(N,2)*0.2,
+    'puppyGPS_y'        : np.ones([N,2]) * [0.0, 10.0] + np.random.randn(N,2)*0.2
     }
 
 ep1 = {
-    'accelerometer_z'   : np.array([2.0]),
-    'puppyGPS_x'        : np.array([ 1.0,  3.0]),
-    'puppyGPS_y'        : np.array([10.0, 18.0])
+    'accelerometer_z'   : np.ones(N) * 2.0 + np.random.randn(N)+0.2,
+    'puppyGPS_x'        : np.ones([N,2]) * [1.0,  3.0] + np.random.randn(N,2)*0.5,
+    'puppyGPS_y'        : np.ones([N,2]) * [10.0, 18.0] + np.random.randn(N,2)*0.5
     }
 
 # Initialize for some epochs
-it = acd(ep0, time_start_ms=  0, time_end_ms=100, step_size_ms=20)
-it = acd(ep0, time_start_ms=100, time_end_ms=200, step_size_ms=20)
-it = acd(ep0, time_start_ms=200, time_end_ms=300, step_size_ms=20)
+it = acd(ep0, time_start_ms=  0, time_end_ms=100, step_size_ms=1)
+it = acd(ep0, time_start_ms=100, time_end_ms=200, step_size_ms=1)
+it = acd(ep0, time_start_ms=200, time_end_ms=300, step_size_ms=1)
 
 # First epoch
-it = acd(ep0, time_start_ms=300, time_end_ms=400, step_size_ms=20)
+it = acd(ep0, time_start_ms=300, time_end_ms=400, step_size_ms=1)
 data = [it.next() for i in range(100)]
 pylab.subplot(312)
 pylab.title('')
@@ -85,7 +83,7 @@ pylab.plot(data)
 pylab.show(block=False)
 
 # Second epoch
-it = acd(ep1, time_start_ms=400, time_end_ms=500, step_size_ms=20)
+it = acd(ep1, time_start_ms=400, time_end_ms=500, step_size_ms=1)
 data = [it.next() for i in range(100)]
 pylab.subplot(313)
 pylab.title('')

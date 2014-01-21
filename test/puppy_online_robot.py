@@ -27,9 +27,8 @@ plant = HDPy.puppy.plant.TargetLocationLandmarks(
     landmarks,
     reward_noise    = 0.0
 )
-
 # Load the normalization
-nrm = PuPy.Normalization('../data/puppy_unit.json')
+nrm = PuPy.Normalization(os.path.split(HDPy.__file__)[0]+'/../data/puppy_unit.json')
 
 # Reservoir
 if os.path.exists('/tmp/puppy_reservoir.pic'):
@@ -71,18 +70,22 @@ class OnlinePuppy(HDPy.PuppyHDP):
         a_next[a_next > 1.0] = 1.0
         return a_next
 
+# Initialize the collector
+collector = PuPy.RobotCollector(
+    child   = policy,
+    expfile = '/tmp/puppy_online.hdf5'
+)
+
 # actor
 actor = OnlinePuppy(
     # HDPy.puppy.PuppyHDP
     tumbled_reward  = 0.0,
-    # HDPy.CollectingADHDP
-    expfile         = '/tmp/puppy_online.hdf5',
     # HDPy.ADHDP
     reservoir       = reservoir,
     readout         = readout,
     # HDPy.ActorCritic
     plant           = plant,
-    policy          = policy,
+    policy          = collector,
     gamma           = 0.5,
     alpha           = 1.0,
     init_steps      = 10,
@@ -95,7 +98,7 @@ r = PuPy.robotBuilder(
     actor,
     sampling_period_ms  = 20,
     ctrl_period_ms      = 3000,
-    event_handlers      = actor.event_handler,
+#    event_handlers      = actor.event_handler
 )
 
 ## SIMULATION LOOP ##

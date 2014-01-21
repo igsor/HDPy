@@ -41,14 +41,19 @@ plant = HDPy.puppy.plant.TargetLocationLandmarks(
 # Load the normalization
 nrm = PuPy.Normalization('../data/puppy_unit.json')
 
+# Initialize the collector
+collector = PuPy.RobotCollector(
+    child   = policy,
+    expfile = '/tmp/example_eval.hdf5'
+)
+
 # Create HDP instance
 actor = HDPy.PuppyHDP(
     tumbled_reward  =0.0,
-    expfile         = '/tmp/example_eval.hdf5',
     reservoir       = reservoir,
     readout         = readout,
     plant           = plant,
-    policy          = policy,
+    policy          = collector,
     gamma           = 0.0,
     alpha           = 1.0,
     init_steps      = 10,

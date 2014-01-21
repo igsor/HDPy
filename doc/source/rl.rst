@@ -42,10 +42,6 @@ Reference
     :show-inheritance:
     :members: _critic_eval, _critic_deriv, init_episode, _step
 
-.. autoclass:: CollectingADHDP
-    :show-inheritance:
-    :members: _pre_increment_hook
-
 .. autoclass:: ActionGradient
     :show-inheritance:
 

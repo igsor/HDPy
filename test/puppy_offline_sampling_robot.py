@@ -3,6 +3,10 @@ import HDPy
 import PuPy
 import numpy as np
 
+# setup:
+sampling_period_ms = 20
+ctrl_period_ms = 3000
+
 # Policy setup
 bound_gait = {
     'amplitude' : ( 0.8, 1.0, 0.8, 1.0),
@@ -10,7 +14,6 @@ bound_gait = {
     'offset'    : ( -0.23, -0.23, -0.37, -0.37),
     'phase'     : (0.0, 0.0, 0.5, 0.5)
 }
-
 policy = HDPy.puppy.policy.LRA(PuPy.Gait(bound_gait))
 
 def random_initial_action():
@@ -40,10 +43,27 @@ class OfflinePuppy(HDPy.puppy.OfflineCollector):
         
         return a_next
 
+# Initialize the collector
+data_collector = PuPy.RobotCollector(
+    child   = policy,
+    expfile = '/tmp/puppy_offline_data.hdf5'
+)
+tumble_collector = PuPy.TumbleCollector(
+    child              = data_collector,
+    sampling_period_ms = sampling_period_ms,
+    ctrl_period_ms     = ctrl_period_ms
+)
+collector = PuPy.ResetCollector(
+    child              = tumble_collector,
+    sampling_period_ms = sampling_period_ms,
+    ctrl_period_ms     = ctrl_period_ms
+)
+
+
 # actor instantiation
 actor = OfflinePuppy(
-    expfile     = '/tmp/puppy_offline_data.hdf5',
-    policy      = policy,
+#    policy      = collector,
+    policy      = data_collector,
     init_steps  = 10,
 )
 
@@ -51,9 +71,9 @@ actor = OfflinePuppy(
 r = PuPy.robotBuilder(
     Robot,
     actor,
-    sampling_period_ms  = 20,
-    ctrl_period_ms      = 3000,
-    event_handlers      = actor.event_handler,
+    sampling_period_ms  = sampling_period_ms,
+    ctrl_period_ms      = ctrl_period_ms,
+#    event_handlers      = [actor.event_handler, tumble_collector.event_handler, collector.event_handler]
 )
 
 # invoke the main loop, starts the simulation

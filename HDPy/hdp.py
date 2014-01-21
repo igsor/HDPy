@@ -3,11 +3,7 @@ On top of the :py:class:`ActorCritic` implementation, this module
 provides a couple algorithms to solve a problem stated in terms of
 Reinforcement Learning. All algorithms follow the same approach, namely
 (action dependent) Heuristic Dynamic Programming. The baseline
-algorithm is implemented in :py:class:`ADHDP`. A data collecting version
-is provided in :py:class:`CollectingADHDP`, as the class is already
-embedded in the :py:mod:`PuPy` framework through
-:py:class:`ActorCritic`. Hence the collector works in the same fashion
-as :py:class:`PuPy.RobotCollector`.
+algorithm is implemented in :py:class:`ADHDP`.
 
 If a new specialisation of an :py:class:`ActorCritic` is created,
 typically its :py:meth:`ActorCritic._step` method is adapted (this is
@@ -40,11 +36,18 @@ class ADHDP(ActorCritic):
     :py:meth:`_next_action_hook` routine.
     
     ``reservoir``
-        Critic reservoir. Should have been initialized.
+        A reservoir instance compliant with the interface of
+        :py:class:`ReservoirNode`. Specifically, must provide
+        a *reset* method and *reset_states* must be :py:const:`False`.
+        The input dimension must be compliant with the specification
+        of the ``action``.
     
     ``readout``
-        Reservoir readout. Usually an online linear regression (RLS)
-        instance, like :py:class:`StabilizedRLS`.
+        The reservoir readout function. Usually an online linear
+        regression (RLS) instance, like :py:class:`StabilizedRLS`.
+        Note that the readout must include a bias. The dimensions
+        of ``reservoir`` and ``readout``  must match and the
+        output of the latter must be single dimensional.
     
     """
     def __init__(self, reservoir, readout, *args, **kwargs):
@@ -54,8 +57,8 @@ class ADHDP(ActorCritic):
         
         # Check assumptions
         assert self.reservoir.reset_states == False
-        assert self.reservoir.get_input_dim() == self.policy.action_space_dim() + self.plant.state_space_dim()
-        assert self.reservoir.get_input_dim() >= self.policy.initial_action().shape[0]
+        assert self.reservoir.get_input_dim() == self.get_from_child('action_space_dim')() + self.plant.state_space_dim()
+        assert self.reservoir.get_input_dim() >= self.get_from_child('initial_action')().shape[0]
     
     def new_episode(self):
         """Start a new episode of the same experiment. This method can
@@ -80,7 +83,7 @@ class ADHDP(ActorCritic):
     
     def _critic_deriv_io_model(self, r_state):
         """Return the critic's derivative at ``r_state``."""
-        direct_input_size = self.plant.state_space_dim()+self.policy.action_space_dim() # Input/Output ESN Model
+        direct_input_size = self.plant.state_space_dim()+self.get_from_child('action_space_dim')() # Input/Output ESN Model
         r_state = r_state[:, :-direct_input_size] # this is because _critic_eval appends the input to the state
         dtanh = (np.ones(r_state.shape) - r_state**2).T # Nx1
         dstate = dtanh * self.reservoir.w_in[:, -self._motor_action_dim:].toarray() # Nx1 .* NxA => NxA
@@ -105,7 +108,7 @@ class ADHDP(ActorCritic):
         """Return the critic's derivative at ``r_state``."""
         return self._critic_deriv_io_model(r_state)
     
-    def _step(self, s_curr, s_next, a_curr, reward):
+    def _step(self, s_curr, epoch, a_curr, reward):
         """Execute one step of the actor and return the next action.
         
         This is the baseline ADHDP algorithm. The next action is
@@ -119,18 +122,18 @@ class ADHDP(ActorCritic):
         :math:`\gamma`:
         
         .. math::
-            err = r + \gamma J(s_{t+1}, a_{t+1}) - J(s_t, a_t)
+            err = r_{t+1} + \gamma J(s_{t+1}, a_{t+1}) - J(s_t, a_t)
         
-        ``s_next``
-            Latest observed state. :py:keyword:`dict`, same as ``s_next``
+        ``epoch``
+            Latest observed state (s_next). :py:keyword:`dict`, same as ``epoch``
             of the :py:meth:`__call__`.
         
         ``s_curr``
-            Previous observed state. :py:keyword:`dict`, same as ``s_next``
+            Previous observed state. :py:keyword:`dict`, same as ``s_curr``
             of the :py:meth:`__call__`.
         
         ``reward``
-            Reward of ``s_next``
+            Reward of ``epoch``
         
         """
         # ESN-critic, first instance: in(k) => J(k)
@@ -140,13 +143,12 @@ class ADHDP(ActorCritic):
         deriv = self._critic_deriv(x_curr)
         
         # gradient training of action (acc. to eq. 10)
-        #a_next = a_curr + self.alpha(self.num_episode, self.num_step) * deriv
         a_next = a_curr + self.alpha(self.num_episode, self.num_step) * deriv
         a_next = self.momentum(a_curr, a_next, self.num_episode, self.num_step)
         a_next = self._next_action_hook(a_next)
         
         # ESN-critic, second instance: in(k+1) => J(k+1)
-        i_next, x_next, j_next = self._critic_eval(s_next, a_next, simulate=True, action_name='a_next')
+        i_next, x_next, j_next = self._critic_eval(epoch, a_next, simulate=True, action_name='a_next')
         
         # TD_error(k) = J(k) - U(k) - gamma * J(k+1)
         err = reward + self.gamma(self.num_episode, self.num_step) * j_next - j_curr
@@ -154,26 +156,23 @@ class ADHDP(ActorCritic):
         # One-step RLS training => Trained ESN
         self.readout.train(x_curr, err=err)
         
-        # increment hook
-        self._pre_increment_hook(
-            s_next,
-            reward=np.atleast_2d([reward]).T,
-            deriv=deriv.T,
-            err=err.T,
-            readout=self.readout.beta.T,
-            gamma=np.atleast_2d([self.gamma(self.num_episode, self.num_step)]).T,
-            i_curr=i_curr,
-            x_curr=x_curr,
-            j_curr=j_curr,
-            a_curr=a_curr.T,
-            i_next=i_next,
-            x_next=x_next,
-            j_next=j_next,
-            a_next=a_next.T
-            )
+        # update epoch with locals:
+        epoch['reward'] = np.atleast_2d([reward]).T
+        epoch['deriv'] = deriv.T
+        epoch['err'] = err.T
+        epoch['readout'] = self.readout.beta.T
+        epoch['gamma'] = np.atleast_2d([self.gamma(self.num_episode, self.num_step)]).T
+        epoch['i_curr'] = i_curr
+        epoch['x_curr'] = x_curr
+        epoch['j_curr'] = j_curr
+        epoch['a_curr'] = a_curr.T
+        epoch['i_next'] = i_next
+        epoch['x_next'] = x_next
+        epoch['j_next'] = j_next
+        epoch['a_next'] = a_next.T
         
         # increment
-        return a_next
+        return epoch
     
     def init_episode(self, epoch, time_start_ms, time_end_ms, step_size_ms):
         """Initial behaviour (after reset)
@@ -189,92 +188,87 @@ class ADHDP(ActorCritic):
         """
         if self.num_step > 1:
             i_curr, x_curr, j_curr = self._critic_eval(self.s_curr, self.a_curr, False, 'a_curr')
-            self._pre_increment_hook(
-                epoch,
-                x_curr=x_curr,
-                i_curr=i_curr,
-                a_next=self.a_curr.T,
-                a_curr=self.a_curr.T,
-            )
-        
+            epoch['x_curr'] = x_curr
+            epoch['i_curr'] = i_curr
+            epoch['a_next'] = self.a_curr.T
+            epoch['a_curr'] = self.a_curr.T
+                    
         self.s_curr = epoch
-        return self.policy.get_iterator(time_start_ms, time_end_ms, step_size_ms)
-
-class CollectingADHDP(ADHDP):
-    """Actor-Critic design with data collector.
-    
-    A *collector* (:py:class:`PuPy.PuppyCollector` instance) is created
-    for recording sensor data and actor-critic internals together.
-    The file is stored at ``expfile``.
-    """
-    def __init__(self, expfile, *args, **kwargs):
-        self.expfile = expfile
-        self.collector = None
-        
-        self.headers = None
-        if 'additional_headers' in kwargs:
-            self.headers = kwargs.pop('additional_headers')
-        
-        super(CollectingADHDP, self).__init__(*args, **kwargs)
-    
-    def _pre_increment_hook(self, epoch, **kwargs):
-        """Add the *ADHDP* internals to the epoch and use the
-        *collector* to save all the data.
-        """
-        ep_write = epoch.copy()
-        for key in kwargs:
-            ep_write[key] = kwargs[key]
-        
-        self.collector(ep_write, 0, 1, 1)
-    
-    def save(self, pth):
-        """Save the instance without the *collector*.
-        
-        .. note::
-            When an instance is reloaded via :py:meth:`ADHDP.load`
-            a new group will be created in *expfile*.
-        
-        """
-        # Shift collector to local
-        collector = self.collector
-        self.collector = None
-        super(CollectingADHDP, self).save(pth)
-        # Shift collector to class
-        self.collector = collector
-
-    def new_episode(self):
-        """Do everything the parent does and additionally reinitialize
-        the collector. The reservoir weights are stored as header
-        information.
-        """
-        super(CollectingADHDP, self).new_episode()
-        
-        # init/reset collector
-        if self.collector is not None:
-            del self.collector
-        
-        self.collector = PuPy.PuppyCollector(
-            child=None,
-            expfile=self.expfile,
-            headers=self.headers
-            #headers={
-            #    # FIXME: Store complete reservoir or at least include the bias
-            #    # FIXME: Doesn't work with too large reservoirs (>80 nodes)? This is because of the size limit of HDF5 headers
-            #    #        Could be stored as dataset though...
-            #    'r_weights': self.reservoir.w.todense(),
-            #    'r_input'  : self.reservoir.w_in.todense()
-            #    }
-        )
-        
-        # in case of online experiments, episode number is taken from data file
-        self.num_episode = int(self.collector.grp_name) + 1
-    
-    def __del__(self):
-        del self.collector
+        return self.child(epoch, time_start_ms, time_end_ms, step_size_ms)
 
 ## HDP VARIATIONS ##
 
-class ActionGradient(CollectingADHDP):
+class ReservoirActorADHDP(ADHDP):
+    """The next action is determined by a separate readout of the reservoir.
+    The action-readout weights are trained by gradient descending
+    
+    """
+    def __init__(self, *args, **kwargs):
+        self.gd_tol = kwargs.pop('gd_tolerance', 1e-15)
+        self.gd_max_iter = kwargs.pop('gd_max_iter', 500)
+        self.rho, self.beta = 0.001, 0.1
+        self.alpha_max = 20.0
+        self.ls_max_iter = 1000
+        super(ActionGradient, self).__init__(*args, **kwargs)
+    
+    def _step(self, s_curr, epoch, a_curr, reward):
+        """Execute one step of the actor and return the next action."""
+        # ESN-critic, first instance: in(k) => J(k)
+        in_state = self.plant.state_input(s_curr)
+        action_nrm = self.normalizer.normalize_value('a_curr', a_curr)
+        i_curr = np.vstack((in_state, action_nrm)).T
+        r_prev = self.reservoir.states
+        r_state = self.reservoir(i_curr, simulate=False)
+        x_curr = np.hstack((r_state, i_curr)) # TODO: Input/Output ESN Model
+        j_curr = self.readout(x_curr)
+        
+        # Gradient ascent of J(a|s_{t+1})
+        direct_input_size = self.plant.state_space_dim()+self.get_from_child('action_space_dim')() # Input/Output ESN Model
+        dtanh = (np.ones(r_state.shape) - r_state**2).T # Nx1
+        dstate = dtanh * self.reservoir.w_in[:, -self._motor_action_dim:].toarray() # Nx1 .* NxA => NxA
+        deriv = self.readout.beta[1:-direct_input_size].T.dot(dstate) # Input/Output ESN Model
+        deriv += self.readout.beta[-self._motor_action_dim:].T # Input/Output ESN Model
+        deriv = deriv.T # AxL
+        scale = self.normalizer.get('a_curr')[1]
+        deriv *= scale # Derivative denormalization
+        #return deriv
+        
+        
+        a_next = self.gradient_descent(epoch, a_curr)
+        deriv = (a_next - a_curr) / self.alpha(self.num_episode, self.num_step)
+        
+        # Next action
+        a_next = self.momentum(a_curr, a_next, self.num_episode, self.num_step)
+        a_next = self._next_action_hook(a_next)
+        
+        # ESN-critic, second instance: in(k+1) => J(k+1)
+        i_next, x_next, j_next = self._critic_eval(epoch, a_next, simulate=True, action_name='a_next')
+        
+        # TD_error(k) = J(k) - U(k) - gamma * J(k+1)
+        err = reward + self.gamma(self.num_episode, self.num_step) * j_next - j_curr
+        
+        # One-step RLS training => Trained ESN
+        self.readout.train(x_curr, err=err) 
+        
+        # fill epoch with locals:
+        epoch['reward'] = np.atleast_2d([reward]).T
+        epoch['deriv'] = deriv.T
+        epoch['err'] = err.T
+        epoch['readout'] = self.readout.beta.T
+        epoch['gamma'] = np.atleast_2d([self.gamma(self.num_episode, self.num_step)]).T
+        epoch['i_curr'] = i_curr
+        epoch['x_curr'] = x_curr
+        epoch['j_curr'] = j_curr
+        epoch['a_curr'] = a_curr.T
+        epoch['i_next'] = i_next
+        epoch['x_next'] = x_next
+        epoch['j_next'] = j_next
+        epoch['a_next'] = a_next.T
+        
+        # increment
+        return epoch
+
+class ActionGradient(ADHDP):
     """Determine the next action by gradient ascent search.
     The gradient ascent computes the action which maximizes the
     predicted return for a fixed state.
@@ -296,13 +290,13 @@ class ActionGradient(CollectingADHDP):
         self.ls_max_iter = 1000
         super(ActionGradient, self).__init__(*args, **kwargs)
     
-    def _step(self, s_curr, s_next, a_curr, reward):
+    def _step(self, s_curr, epoch, a_curr, reward):
         """Execute one step of the actor and return the next action."""
         # ESN-critic, first instance: in(k) => J(k)
         i_curr, x_curr, j_curr = self._critic_eval(s_curr, a_curr, simulate=False, action_name='a_curr')
         
         # Gradient ascent of J(a|s_{t+1})
-        a_next = self.gradient_descent(s_next, a_curr)
+        a_next = self.gradient_descent(epoch, a_curr)
         deriv = (a_next - a_curr) / self.alpha(self.num_episode, self.num_step)
         
         # Next action
@@ -310,34 +304,31 @@ class ActionGradient(CollectingADHDP):
         a_next = self._next_action_hook(a_next)
         
         # ESN-critic, second instance: in(k+1) => J(k+1)
-        i_next, x_next, j_next = self._critic_eval(s_next, a_next, simulate=True, action_name='a_next')
+        i_next, x_next, j_next = self._critic_eval(epoch, a_next, simulate=True, action_name='a_next')
         
         # TD_error(k) = J(k) - U(k) - gamma * J(k+1)
         err = reward + self.gamma(self.num_episode, self.num_step) * j_next - j_curr
         
         # One-step RLS training => Trained ESN
-        self.readout.train(x_curr, err=err) 
+        self.readout.train(x_curr, err=err)
         
-        # increment hook
-        self._pre_increment_hook(
-            s_next,
-            reward=np.atleast_2d([reward]).T,
-            deriv=deriv.T,
-            err=err.T,
-            readout=self.readout.beta.T,
-            gamma=np.atleast_2d([self.gamma(self.num_episode, self.num_step)]).T,
-            i_curr=i_curr,
-            x_curr=x_curr,
-            j_curr=j_curr,
-            a_curr=a_curr.T,
-            i_next=i_next,
-            x_next=x_next,
-            j_next=j_next,
-            a_next=a_next.T
-            )
+        # fill epoch with locals:
+        epoch['reward'] = np.atleast_2d([reward]).T
+        epoch['deriv'] = deriv.T
+        epoch['err'] = err.T
+        epoch['readout'] = self.readout.beta.T
+        epoch['gamma'] = np.atleast_2d([self.gamma(self.num_episode, self.num_step)]).T
+        epoch['i_curr'] = i_curr
+        epoch['x_curr'] = x_curr
+        epoch['j_curr'] = j_curr
+        epoch['a_curr'] = a_curr.T
+        epoch['i_next'] = i_next
+        epoch['x_next'] = x_next
+        epoch['j_next'] = j_next
+        epoch['a_next'] = a_next.T
         
         # increment
-        return a_next
+        return epoch
     
     def _line_search(self, state, action, gradient):
         """Line search algorithm to compute the step size parameter for
@@ -464,13 +455,13 @@ class ActionGradient(CollectingADHDP):
         
         return action
 
-class ActionRecomputation(CollectingADHDP):
+class ActionRecomputation(ADHDP):
     """Determine the next action the same way as the baseline algorithm
     for critic training, then recompute it based on the updated critic
     and with the latest state information.
     
     """
-    def _step(self, s_curr, s_next, a_curr, reward):
+    def _step(self, s_curr, epoch, a_curr, reward):
         """Execute one step of the actor and return the next action."""
         # ESN-critic, first instance: in(k) => J(k)
         i_curr, x_curr, j_curr = self._critic_eval(s_curr, a_curr, False, 'a_curr')
@@ -484,7 +475,7 @@ class ActionRecomputation(CollectingADHDP):
         a_next = self._next_action_hook(a_next)
         
         # ESN-critic, second instance: in(k+1) => J(k+1)
-        i_next, x_next, j_next = self._critic_eval(s_next, a_next, True, 'a_next')
+        i_next, x_next, j_next = self._critic_eval(epoch, a_next, True, 'a_next')
         
         # TD_error(k) = J(k) - U(k) - gamma * J(k+1)
         err = reward + self.gamma(self.num_episode, self.num_step) * j_next - j_curr
@@ -498,29 +489,26 @@ class ActionRecomputation(CollectingADHDP):
         a_next = self.momentum(a_curr, a_next, self.num_episode, self.num_step)
         a_next = self._next_action_hook(a_next)
         
-        # increment hook
-        self._pre_increment_hook(
-            s_next,
-            reward=np.atleast_2d([reward]).T,
-            deriv2=deriv.T,
-            deriv=deriv.T,
-            err=err.T,
-            readout=self.readout.beta.T,
-            gamma=np.atleast_2d([self.gamma(self.num_episode, self.num_step)]).T,
-            i_curr=i_curr,
-            x_curr=x_curr,
-            j_curr=j_curr,
-            a_curr=a_curr.T,
-            i_next=i_next,
-            x_next=x_next,
-            j_next=j_next,
-            a_next=a_next.T
-            )
+        # fill epoch with locals:
+        epoch['reward'] = np.atleast_2d([reward]).T
+        epoch['deriv2'] = deriv2.T
+        epoch['deriv'] = deriv.T
+        epoch['err'] = err.T
+        epoch['readout'] = self.readout.beta.T
+        epoch['gamma'] = np.atleast_2d([self.gamma(self.num_episode, self.num_step)]).T
+        epoch['i_curr'] = i_curr
+        epoch['x_curr'] = x_curr
+        epoch['j_curr'] = j_curr
+        epoch['a_curr'] = a_curr.T
+        epoch['i_next'] = i_next
+        epoch['x_next'] = x_next
+        epoch['j_next'] = j_next
+        epoch['a_next'] = a_next.T
         
         # increment
-        return a_next
+        return epoch
 
-class ActionBruteForce(CollectingADHDP):
+class ActionBruteForce(ADHDP):
     """Find the optimal action by computing the expected return at
     different sampled locations and picking the action which yields the
     highest one.
@@ -536,7 +524,7 @@ class ActionBruteForce(CollectingADHDP):
         super(ActionBruteForce, self).__init__(*args, **kwargs)
         self.candidates = candidates
     
-    def _step(self, s_curr, s_next, a_curr, reward):
+    def _step(self, s_curr, epoch, a_curr, reward):
         """Execute one step of the actor and return the next action."""
         # ESN-critic, first instance: in(k) => J(k)
         i_curr, x_curr, j_curr = self._critic_eval(s_curr, a_curr, False, 'a_curr')
@@ -544,7 +532,7 @@ class ActionBruteForce(CollectingADHDP):
         # Next action
         a_next = a_curr
         j_best = float('-inf')
-        in_state = self.plant.state_input(s_next)
+        in_state = self.plant.state_input(epoch)
         for candidate in self.candidates:
             candidate_nrm = self.normalizer.normalize_value('a_next', candidate)
             i_cand = np.vstack((in_state, candidate_nrm)).T
@@ -558,31 +546,28 @@ class ActionBruteForce(CollectingADHDP):
         a_next = self._next_action_hook(a_next)
         
         # ESN-critic, second instance: in(k+1) => J(k+1)
-        i_next, x_next, j_next = self._critic_eval(s_next, a_next, True, 'a_next')
+        i_next, x_next, j_next = self._critic_eval(epoch, a_next, True, 'a_next')
         
         # TD_error(k) = J(k) - U(k) - gamma * J(k+1)
         err = reward + self.gamma(self.num_episode, self.num_step) * j_next - j_curr
         
         # One-step RLS training => Trained ESN
-        self.readout.train(x_curr, err=err) 
+        self.readout.train(x_curr, err=err)
         
-        # increment hook
-        self._pre_increment_hook(
-            s_next,
-            reward=np.atleast_2d([reward]).T,
-            err=err.T,
-            deriv=a_next-a_curr,
-            readout=self.readout.beta.T,
-            gamma=np.atleast_2d([self.gamma(self.num_episode, self.num_step)]).T,
-            i_curr=i_curr,
-            x_curr=x_curr,
-            j_curr=j_curr,
-            a_curr=a_curr.T,
-            i_next=i_next,
-            x_next=x_next,
-            j_next=j_next,
-            a_next=a_next.T
-            )
+        # fill epoch with locals:
+        epoch['reward'] = np.atleast_2d([reward]).T
+        epoch['err'] = err.T
+        epoch['deriv'] = a_next-a_curr
+        epoch['readout'] = self.readout.beta.T
+        epoch['gamma'] = np.atleast_2d([self.gamma(self.num_episode, self.num_step)]).T
+        epoch['i_curr'] = i_curr
+        epoch['x_curr'] = x_curr
+        epoch['j_curr'] = j_curr
+        epoch['a_curr'] = a_curr.T
+        epoch['i_next'] = i_next
+        epoch['x_next'] = x_next
+        epoch['j_next'] = j_next
+        epoch['a_next'] = a_next.T
         
         # increment
-        return a_next
+        return epoch
