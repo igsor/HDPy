@@ -425,16 +425,16 @@ def simulation_loop(acd, robot, max_step=-1, max_episodes=-1, max_total_iter=-1)
     if max_step < 0 and max_episodes < 0 and max_total_iter < 0:
         raise Exception('The simulation cannot run forever.')
     
-    policy = acd.policy
     num_episode = 0
     num_total_iter = 0
     while True:
         
         # init episode
         acd.new_episode()
+        acd.signal('new_episode') # collectors will create new group
         robot.reset()
-        policy.reset()
-        a_curr = np.atleast_2d([policy.action])
+        acd.get_from_child('reset', lambda:None)()
+        a_curr = np.atleast_2d([acd.get_from_child('action')])
         
         num_step = 0 # k
         while True:

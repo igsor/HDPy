@@ -86,7 +86,7 @@ class Plant(object):
         """Reset plant to initial state."""
         pass
 
-class Policy(object):
+class Policy(PuPy.RobotActor):
     """A template for Actor-Critic *policies*. The *Policy* defines how
     an action is translated into a control (motor) signal. It
     continously receives action updates from the *Critic* which it has
@@ -96,6 +96,7 @@ class Policy(object):
     supplied in ``norm`` for normalizing sensor values.
     """
     def __init__(self, action_space_dim=None, norm=None):
+        super(Policy, self).__init__()
         self._action_space_dim = action_space_dim
         self.normalization = None
         self.set_normalization(norm)
@@ -147,6 +148,16 @@ class Policy(object):
         if norm is None:
             norm = PuPy.Normalization()
         self.normalization = norm
+    
+    
+    def __call__(self, epoch, time_start_ms, time_end_ms, step_size_ms):
+        if epoch.has_key('a_next'):
+            self.update(np.atleast_2d(epoch['a_next']).T)
+        return self.get_iterator(time_start_ms, time_end_ms, step_size_ms)
+    
+    def _get_initial_targets(self, time_start_ms, time_end_ms, step_size_ms):
+        return self.__call__({}, time_start_ms, time_end_ms, step_size_ms)
+        
 
 class _ConstParam(object):
     """Stub for wrapping constant values into an executable function."""
@@ -223,7 +234,7 @@ class RadialMomentum(Momentum):
         imag_r = self._value * imag_0 + (1.0 - self._value) * imag_1
         return np.angle(imag_r) % (2*np.pi)
 
-class ActorCritic(PuPy.PuppyActor):
+class ActorCritic(PuPy.RobotActor):
     """Actor-critic design.
     
     The Actor-Critic estimates the return function
@@ -236,25 +247,13 @@ class ActorCritic(PuPy.PuppyActor):
     the next action by optimizing the return in a single step. See
     [ESN-ACD]_ for details.
     
-    ``reservoir``
-        A reservoir instance compliant with the interface of
-        :py:class:`ReservoirNode`. Specifically, must provide
-        a *reset* method and *reset_states* must be :py:const:`False`.
-        The input dimension must be compliant with the specification
-        of the ``action``.
-    
-    ``readout``
-        The reservoir readout function. An instance of ``PlainRLS`` is
-        expected. Note that the readout must include a bias. The
-        dimensions of ``reservoir`` and ``readout``  must match and the
-        output of the latter must be single dimensional.
-    
     ``plant``
         An instance of :py:class:`Plant`. The plant defines the
         interaction with the environment.
     
-    ``policy``
-        An instance of :py:class:`Policy`. The policy defines the
+    ``child``
+        An instance of :py:class:`RobotActor` which should be a
+        :py:class:`Policy` or have one as child. The policy defines the
         interaction with the robot's actuators.
     
     ``gamma``
@@ -279,11 +278,10 @@ class ActorCritic(PuPy.PuppyActor):
     
     """
     def __init__(self, plant, policy, gamma=1.0, alpha=1.0, init_steps=1, norm=None, momentum=0.0):
-        super(ActorCritic, self).__init__()
+        super(ActorCritic, self).__init__(child=policy)
         
         # Initial members
         self.plant = plant
-        self.policy = policy
         self.normalizer = None
         self.num_episode = 0
         self._init_steps = init_steps
@@ -302,8 +300,8 @@ class ActorCritic(PuPy.PuppyActor):
         self.set_momentum(momentum)
         
         # Check assumptions
-        assert self.policy.initial_action().shape[0] >= 1
-        assert self.policy.initial_action().shape[1] == 1
+        assert self.get_from_child('initial_action')().shape[0] >= 1
+        assert self.get_from_child('initial_action')().shape[1] == 1
         
         # Start a new episode
         self.new_episode()
@@ -314,8 +312,8 @@ class ActorCritic(PuPy.PuppyActor):
         it is loaded from a file.
         """
         self.num_episode += 1
-        self.a_curr = self.policy.initial_action()
-        self._motor_action_dim = self.policy.action_space_dim()
+        self.a_curr = self.get_from_child('initial_action', lambda:None)()
+        self._motor_action_dim = self.get_from_child('action_space_dim', lambda:None)()
         self.s_curr = dict()
         self.num_step = 0
     
@@ -336,7 +334,7 @@ class ActorCritic(PuPy.PuppyActor):
         """
         self.s_curr = epoch
         self._pre_increment_hook(epoch)
-        return self.policy.get_iterator(time_start_ms, time_end_ms, step_size_ms)
+        return self.child(epoch, time_start_ms, time_end_ms, step_size_ms)
     
     def __call__(self, epoch, time_start_ms, time_end_ms, step_size_ms):
         """One round in the actor-critic cycle. The current observations
@@ -358,25 +356,26 @@ class ActorCritic(PuPy.PuppyActor):
         # observe sensors values produced by the action (a_curr = previous a_next)
         
         # Generate reinforcement signal U(k), given in(k)
-        #reward = self.plant.reward(epoch)
-        reward = self.plant.reward(self.s_curr)
+        reward = self.plant.reward(epoch)
+        #reward = self.plant.reward(self.s_curr)
         # It's not clear, which reward should be the input to the critic:
         # While the ACD papers imply the reward of time step n, the book
         # by Sutton/Barto indicate the reward as being from the next
         # state, n+1. Experiments indicate that it doesn't really matter.
         # To be consistent with other work, I go with time n.
+        # Nico: I changed it to be epoch. This is just a notation thing with
+        # the n and n+1, but it should be the reward of the newest state.
         
         # do the actual work
-        a_next = self._step(self.s_curr, epoch, self.a_curr, reward)
+        epoch = self._step(self.s_curr, epoch, self.a_curr, reward)
         
         # increment
-        self.a_curr = a_next
+        self.a_curr = np.atleast_2d(epoch['a_next']).T
         self.s_curr = epoch
         self.num_step += 1
         
         # return next action
-        self.policy.update(a_next)
-        return self.policy.get_iterator(time_start_ms, time_end_ms, step_size_ms)
+        return self.child(epoch, time_start_ms, time_end_ms, step_size_ms)
     
     def _step(self, s_curr, s_next, a_curr, reward):
         """Execute one step of the actor and return the next action.
@@ -430,9 +429,14 @@ class ActorCritic(PuPy.PuppyActor):
             functions (:keyword:`lambda`) can't be pickled.
         
         """
+        child = self.child
+        self.child = None
+        
         f = open(pth, 'w')
         pickle.dump(self, f)
         f.close()
+        
+        self.child = child
     
     @staticmethod
     def load(pth):
@@ -477,5 +481,5 @@ class ActorCritic(PuPy.PuppyActor):
             norm = PuPy.Normalization()
         self.normalizer = norm
         self.plant.set_normalization(norm)
-        self.policy.set_normalization(norm)
+        self.get_from_child('set_normalization')(norm) # for the policy.
 
