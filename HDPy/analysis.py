@@ -86,10 +86,10 @@ class Analysis:
         """Return a list of all data belonging to ``key``."""
         return [self.f[exp][key][:] for exp in self.experiments]
     
-    def stack_data(self, key):
+    def stack_data(self, key, offset=0):
         """Return data related to ``key`` of all experiments in a single
         array."""
-        data = [self.f[exp][key][:] for exp in self.experiments if key in self.f[exp]]
+        data = [self.f[exp][key][offset:] for exp in self.experiments if key in self.f[exp]]
         return np.concatenate(data)
     
     def __getitem__(self, key):
@@ -266,6 +266,20 @@ class Analysis:
         axis.set_ylabel('Reward')
         if self.always_plot_grid:
             self.plot_grid(axis)
+        return axis
+    
+    def plot_reward_against_action2d(self, axis=None, reward_offset=0):
+        """make a scatter plot of actions and color them according to the resulting reward."""
+        if axis is None:
+            axis = pylab.figure().add_subplot(111)
+        reward = self.stack_data('reward')
+        action = self.stack_data('a_curr', reward_offset)
+        print reward.shape, action.shape
+        sc = axis.scatter(action[:,0], action[:,1], c=reward, edgecolors='none')
+        axis.set_xlabel('action 1')
+        axis.set_ylabel('action 2')
+        cb = pylab.colorbar(sc)
+        cb.set_label('reward')
         return axis
     
     def plot_derivative(self, axis=None, **kwargs):

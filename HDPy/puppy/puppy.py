@@ -46,7 +46,7 @@ class PuppyHDP(ADHDP):
         # msg is 'reset', 'out_of_arena', 'tumbled_grace_start' or 'tumbled'
         # for msg==reset, the robot is reset immediately
         # msg==tumbled_grace_start marks the start of the grace period of the tumbled robot
-        if msg == 'tumbled_grace_start':
+        if msg == 'tumbled':
             #print "Tumbling received", self.num_step
             self.supervisor_tumbled_notice = 1
         
@@ -105,7 +105,7 @@ class PuppyHDP(ADHDP):
                 #self.set_gamma(0.0)
             self.supervisor_tumbled_notice += 1
         
-        reward += np.random.normal(scale=0.001)
+        #reward += np.random.normal(scale=0.001)
         epoch = super(PuppyHDP, self)._step(s_curr, epoch, a_curr, reward)
         
         #if self.supervisor_tumbled_notice > 2:
@@ -127,11 +127,12 @@ class PuppyHDP(ADHDP):
             trajectory.
         """
         if self.num_step > 2:
-            in_state = self.plant.state_input(self.s_curr)
-            a_curr_nrm = self.normalizer.normalize_value('a_curr', self.a_curr)
-            i_curr = np.vstack((in_state, a_curr_nrm)).T
-            x_curr = self.reservoir(i_curr, simulate=False)
-            x_curr = np.hstack((x_curr, i_curr)) # FIXME: Input/Output ESN Model
+#            in_state = self.plant.state_input(self.s_curr)
+#            a_curr_nrm = self.normalizer.normalize_value('a_curr', self.a_curr)
+#            i_curr = np.vstack((in_state, a_curr_nrm)).T
+#            x_curr = self.reservoir(i_curr, simulate=False)
+#            x_curr = np.hstack((x_curr, i_curr)) # FIXME: Input/Output ESN Model
+            i_curr, x_curr, _ = self._critic_eval(self.s_curr, self.a_curr, False, 'a_curr')
             epoch['x_curr'] = x_curr
             epoch['i_curr'] = i_curr
             epoch['a_next'] = self.a_curr.T

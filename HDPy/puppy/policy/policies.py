@@ -725,5 +725,37 @@ class IIAPFO(_II4):
     """Individual; Amplitude, Phase, Frequency, Offset"""
     pass
 
+# Policy with raw motor targets
+class RawTrgPolicy(Policy):
+    """not yet working well..."""
+    def __init__(self, init_trg=np.atleast_2d([0.0, 0.0, 0.0, 0.0]).T, init_gait=None):
+        super(RawTrgPolicy, self).__init__(4)
+        self.init_gait = init_gait
+#        if self.init_gait is not None:
+#            self.init=
+        self.init_trg = init_trg
+        self.trg = init_trg
+    
+    def get_iterator(self, time_start_ms, time_end_ms, step_size_ms):
+        """Return an iterator for the *motor_target* sequence.
+        """
+        def _iter():
+            while True:
+                yield list(self.trg[:,0])
+#        _print("call get_iterator "+str(time_start_ms))
+        return _iter()
+    
+    def reset(self):
+        self.trg = self.init_trg.copy()
+#        _print("call reset")
+    
+    def update(self, action):
+        self.trg = action
+#        _print("call update")
+#        print "POLICY: new action=", action.T
+    
+    def initial_action(self):
+#        _print("call initial_action")
+        return self.trg
 
 
