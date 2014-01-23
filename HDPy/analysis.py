@@ -313,6 +313,20 @@ class Analysis:
             self.plot_grid(axis)
         return axis
     
+    def plot_action_space_2d(self, axis=None, bins=30, offset=0, **kwargs):
+        """make a scatter plot of actions"""
+        if axis is None:
+            axis = pylab.figure().add_subplot(111)
+        action = self.stack_data('a_curr', offset=offset)
+        print action.shape
+#        sc = axis.scatter(action[:,0], action[:,1], edgecolors='none')
+        n, bins = np.histogramdd(action[:], bins)
+        pc = axis.pcolor(bins[0], bins[1], n, **kwargs)
+        axis.set_xlabel('action 1')
+        axis.set_ylabel('action 2')
+        pylab.colorbar(pc)
+        return axis
+    
     def plot_absolute_error(self, axis=None, **kwargs):
         """Plot the absolute error over time in ``axis``."""
         if axis is None:
@@ -648,6 +662,43 @@ class Analysis:
         axis.set_xlabel('time')
         axis.set_ylabel('node output')
         return axis
+    
+    def plot_histogram(self, key, axis=None, norm=[0,1], bins=30):
+        """Plot the current (blue) and next action (red) over time in
+        ``axis``."""
+        if axis is None:
+            axis = pylab.figure().add_subplot(111)
+        x = self.stack_data(key)
+        x = (x-norm[0])/norm[1]
+#        axis.set_xlabel('step')
+#        axis.set_ylabel('Action')
+#        print 'mean(%s)=%.3f, std(%s)=%.3f' % (key, np.mean(x), key, np.std(x))
+        print '[%.3f, %.3f], ' % (np.mean(x), np.std(x)),
+        axis.hist(x, bins)
+        axis.set_title(key)
+        if self.always_plot_grid:
+            self.plot_grid(axis)
+        return axis
+    
+    def plot_all_histograms(self, keys=None, norm=None, bins=30):
+        if keys is None:
+            keys = self.f[self.experiments[0]].keys()
+        N = len(keys)
+        if norm is None:
+            norm = [[0.0,1.0] for _ in range(N)]
+        rows = 1
+        if N>1: rows = 2
+        if N>4: rows = 3
+        if N>9: rows = 4
+        if N>16: rows = 5
+        if N>25: rows = 6
+        if N>36: rows = 7
+        if N>49: return -1
+        pl = pylab
+        fig, ax = pl.subplots(rows, rows, False, False, False)
+        ax = ax.flatten()
+        for key, axis, normalize in zip(keys, ax, norm):
+            self.plot_histogram(key, axis, normalize, bins)
 
 def overview(analysis, figure):
     """Plot some characteristics of ``analysis`` in ``figure``.

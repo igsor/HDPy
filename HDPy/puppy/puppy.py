@@ -52,7 +52,7 @@ class PuppyHDP(ADHDP):
         
         if msg == 'reset':
             #print "Reset received", self.num_step
-            self.get_from_child('reset', lambda:None)()
+            self.child.reset()
             self.new_episode()
     
     # DEPRICATED: use of event_handler replaced by RobotActor's signal chain.
@@ -69,7 +69,7 @@ class PuppyHDP(ADHDP):
     #    
     #    if msg == 'reset':
     #        #print "Reset received", self.num_step
-    #        self.get_from_child('reset', lambda:None)()
+    #        self.child.reset()
     #        self.new_episode()
     #        self.signal('new_episode')
     
@@ -158,9 +158,7 @@ class OfflineCollector(ADHDP):
         # look for policy's member 'action_space_dim' (policy is hidden in child or sub-child)
         policy = kwargs['policy']
         if hasattr(policy, 'action_space_dim'):
-            action_space_dim = getattr(policy, 'action_space_dim')
-        elif hasattr(policy, 'get_from_child'):
-            action_space_dim = policy.get_from_child('action_space_dim')
+            action_space_dim = policy.action_space_dim
         else:
             from ..hdp import return_none
             action_space_dim = return_none
@@ -204,7 +202,7 @@ class OfflineCollector(ADHDP):
             self.num_step += 1
             #self._pre_increment_hook(dict(), empty_initial_step=np.array([1]))
             self._pre_increment_hook(dict(), init_step=np.array([self.num_step]))
-            return self.get_from_child('get_iterator', lambda a,b,c:None)(time_start_ms, time_end_ms, step_size_ms)
+            return self.child.get_iterator(time_start_ms, time_end_ms, step_size_ms)
         
         # Determine next action
         if self.num_step <= self._init_steps:
@@ -253,7 +251,7 @@ class OfflineCollector(ADHDP):
         
         if msg == 'reset':
             #print "Reset received", self.num_step
-            self.get_from_child('reset', lambda:None)() #self.policy.reset()
+            self.child.reset()
             self.new_episode()
     
     # DEPRICATED: use of event_handler replaced by RobotActor's signal chain.
@@ -271,7 +269,7 @@ class OfflineCollector(ADHDP):
     #    
     #    if msg == 'reset':
     #        #print "Reset received", self.num_step
-    #        self.get_from_child('reset', lambda:None)() #self.policy.reset()
+    #        self.child.reset()
     #        self.new_episode()
     #        self.signal('new_episode')
     
