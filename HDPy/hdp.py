@@ -171,6 +171,8 @@ class ADHDP(ActorCritic):
         epoch['j_next'] = j_next
         epoch['a_next'] = a_next.T
         
+        self._pre_increment_hook(epoch)
+        
         # increment
         return epoch
     

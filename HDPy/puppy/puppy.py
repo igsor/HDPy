@@ -362,13 +362,13 @@ def offline_playback(pth_data, critic, samples_per_action, ms_per_step, episode_
     critic._pre_increment_hook_orig = critic._pre_increment_hook
     critic._next_action_hook_orig = critic._next_action_hook
     
-    def pre_increment_hook(epoch, **kwargs):
-        kwargs['offline_episode'] = np.array([episode])
-        critic._pre_increment_hook_orig(dict(), **kwargs)
-        if int(episode) > episode_start_test and kwargs.has_key('err'):
+    def pre_increment_hook(epoch):
+        epoch['offline_episode'] = np.array([episode])
+        critic._pre_increment_hook_orig(epoch)
+        if int(episode) > episode_start_test and epoch.has_key('err'):
             global accError
-            accError = accError*(1-err_coefficient) + (kwargs['err'][0][0]**2)*err_coefficient # accumulated squared error
-            #accError = accError*(1-err_coefficient) + np.abs(kwargs['err'][0][0])*err_coefficient # accumulated absolute error
+            accError = accError*(1-err_coefficient) + (epoch['err'][0][0]**2)*err_coefficient # accumulated squared error
+            #accError = accError*(1-err_coefficient) + np.abs(epoch['err'][0][0])*err_coefficient # accumulated absolute error
     
     def next_action_hook(a_next):
         #print "(next)", a_next.T, next_action.T
@@ -386,17 +386,17 @@ def offline_playback(pth_data, critic, samples_per_action, ms_per_step, episode_
         data_grp = f[episode]
         N = len(data_grp['trg0'])
         
-        # get the stored ratio
-        #db_samples_per_action = N / len(data_grp['a_next'])
+        # get the stored ratio, this can be different if the current policy dowsn't exactly match the stored one
+        db_samples_per_action = N / len(data_grp['a_next'])
         #assert N % db_samples_per_action == 0
         assert N % samples_per_action == 0
         
-        # get tumbled infos
+        # get tumbled info
         if 'tumble' in data_grp:
             from pylab import find 
-            time_tumbled = find(data_grp['tumble'])[0] / samples_per_action * samples_per_action
-            #time_tumbled = data_grp['tumbled'][0] * db_samples_per_action
-            #time_tumbled = data_grp['tumble'][0] * samples_per_action
+            time_tumbled = find(data_grp['tumble'])[0] / db_samples_per_action * db_samples_per_action
+        elif 'tumbled' in data_grp: # depreciated: support legacy format
+            time_tumbled = data_grp['tumbled'][0] * db_samples_per_action
         else:
             time_tumbled = -1
         
@@ -433,6 +433,9 @@ def offline_playback(pth_data, critic, samples_per_action, ms_per_step, episode_
             #critic.event_handler(None, dict(), ms_per_step * N, 'reset')
             critic.signal('reset')
             critic.signal('new_episode') # collectors will create new group
+        
+        if accError != 0:
+            print episode + ': accumulated error: ' + str(accError)
     
     # cleanup
     critic._pre_increment_hook = critic._pre_increment_hook_orig
