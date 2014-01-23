@@ -57,8 +57,8 @@ class ADHDP(ActorCritic):
         
         # Check assumptions
         assert self.reservoir.reset_states == False
-        assert self.reservoir.get_input_dim() == self.get_from_child('action_space_dim')() + self.plant.state_space_dim()
-        assert self.reservoir.get_input_dim() >= self.get_from_child('initial_action')().shape[0]
+        assert self.reservoir.get_input_dim() == self.child.action_space_dim() + self.plant.state_space_dim()
+        assert self.reservoir.get_input_dim() >= self.child.initial_action().shape[0]
     
     def new_episode(self):
         """Start a new episode of the same experiment. This method can
@@ -83,7 +83,7 @@ class ADHDP(ActorCritic):
     
     def _critic_deriv_io_model(self, r_state):
         """Return the critic's derivative at ``r_state``."""
-        direct_input_size = self.plant.state_space_dim()+self.get_from_child('action_space_dim')() # Input/Output ESN Model
+        direct_input_size = self.plant.state_space_dim()+self.child.action_space_dim() # Input/Output ESN Model
         r_state = r_state[:, :-direct_input_size] # this is because _critic_eval appends the input to the state
         dtanh = (np.ones(r_state.shape) - r_state**2).T # Nx1
         dstate = dtanh * self.reservoir.w_in[:, -self._motor_action_dim:].toarray() # Nx1 .* NxA => NxA
@@ -223,7 +223,7 @@ class ReservoirActorADHDP(ADHDP):
         j_curr = self.readout(x_curr)
         
         # Gradient ascent of J(a|s_{t+1})
-        direct_input_size = self.plant.state_space_dim()+self.get_from_child('action_space_dim')() # Input/Output ESN Model
+        direct_input_size = self.plant.state_space_dim()+self.child.action_space_dim() # Input/Output ESN Model
         dtanh = (np.ones(r_state.shape) - r_state**2).T # Nx1
         dstate = dtanh * self.reservoir.w_in[:, -self._motor_action_dim:].toarray() # Nx1 .* NxA => NxA
         deriv = self.readout.beta[1:-direct_input_size].T.dot(dstate) # Input/Output ESN Model

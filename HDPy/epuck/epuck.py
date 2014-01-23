@@ -433,8 +433,8 @@ def simulation_loop(acd, robot, max_step=-1, max_episodes=-1, max_total_iter=-1)
         acd.new_episode()
         acd.signal('new_episode') # collectors will create new group
         robot.reset()
-        acd.get_from_child('reset', lambda:None)()
-        a_curr = np.atleast_2d([acd.get_from_child('action')])
+        acd.child.reset()
+        a_curr = np.atleast_2d([acd.child.action])
         
         num_step = 0 # k
         while True:

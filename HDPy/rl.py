@@ -300,8 +300,8 @@ class ActorCritic(PuPy.RobotActor):
         self.set_momentum(momentum)
         
         # Check assumptions
-        assert self.get_from_child('initial_action')().shape[0] >= 1
-        assert self.get_from_child('initial_action')().shape[1] == 1
+        assert self.child.initial_action().shape[0] >= 1
+        assert self.child.initial_action().shape[1] == 1
         
         # Start a new episode
         self.new_episode()
@@ -312,8 +312,8 @@ class ActorCritic(PuPy.RobotActor):
         it is loaded from a file.
         """
         self.num_episode += 1
-        self.a_curr = self.get_from_child('initial_action', lambda:None)()
-        self._motor_action_dim = self.get_from_child('action_space_dim', lambda:None)()
+        self.a_curr = self.child.initial_action()
+        self._motor_action_dim = self.child.action_space_dim()
         self.s_curr = dict()
         self.num_step = 0
     
@@ -481,5 +481,5 @@ class ActorCritic(PuPy.RobotActor):
             norm = PuPy.Normalization()
         self.normalizer = norm
         self.plant.set_normalization(norm)
-        self.get_from_child('set_normalization')(norm) # for the policy.
+        self.child.set_normalization(norm) # for the policy.
 
