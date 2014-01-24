@@ -43,9 +43,9 @@ class PuppyHDP(ADHDP):
         when the robot has tumbled and thus the robot has to be reset.
         """
         super(PuppyHDP, self)._signal(msg, **kwargs)
-        # msg is 'reset', 'out_of_arena', 'tumbled_grace_start' or 'tumbled'
+        # msg is 'reset', 'out_of_arena', 'tumbled'
         # for msg==reset, the robot is reset immediately
-        # msg==tumbled_grace_start marks the start of the grace period of the tumbled robot
+        # msg==tumbled marks the start of the grace period of the tumbled robot
         if msg == 'tumbled':
             #print "Tumbling received", self.num_step
             self.supervisor_tumbled_notice = 1
@@ -54,24 +54,6 @@ class PuppyHDP(ADHDP):
             #print "Reset received", self.num_step
             self.child.reset()
             self.new_episode()
-    
-    # DEPRICATED: use of event_handler replaced by RobotActor's signal chain.
-    #def event_handler(self, robot, epoch, current_time, msg):
-    #    """Handle messages from the supervisor. Messages are expected
-    #    when the robot has tumbled and thus the robot has to be reset.
-    #    """
-    #    # msg is 'reset', 'out_of_arena', 'tumbled_grace_start' or 'tumbled'
-    #    # for msg==reset, the robot is reset immediately
-    #    # msg==tumbled_grace_start marks the start of the grace period of the tumbled robot
-    #    if msg == 'tumbled_grace_start':
-    #        #print "Tumbling received", self.num_step
-    #        self.supervisor_tumbled_notice = 1
-    #    
-    #    if msg == 'reset':
-    #        #print "Reset received", self.num_step
-    #        self.child.reset()
-    #        self.new_episode()
-    #        self.signal('new_episode')
     
     def new_episode(self):
         """After restarting, reset the tumbled values and start the
@@ -225,7 +207,7 @@ class OfflineCollector(ADHDP):
         elif self.supervisor_tumbled_notice > 2:
             print time_start_ms, self.a_curr.T, self.num_step
         else:
-            print time_start_ms, self.a_curr.T, epoch['puppyGPS_x'][-1]
+            print 't:', time_start_ms, ' a:', self.a_curr.T, ' x:', epoch['puppyGPS_x'][-1], 'y:', epoch['puppyGPS_y'][-1]
         
         epoch['a_curr'] = self.a_curr.T
         epoch['a_next'] = a_next.T
@@ -241,10 +223,10 @@ class OfflineCollector(ADHDP):
         when the robot has tumbled and thus the robot has to be reset.
         """
         super(OfflineCollector, self)._signal(msg, **kwargs)
-        # msg is 'reset', 'out_of_arena', 'tumbled_grace_start' or 'tumbled'
+        # msg is 'reset', 'out_of_arena', tumbled'
         # for msg==reset, the robot is reset immediately
-        # msg==tumbled_grace_start marks the start of the grace period of the tumbled robot
-        if msg == 'tumbled_grace_start':
+        # msg==tumbled marks the start of the grace period of the tumbled robot
+        if msg == 'tumbled':
             #print "Tumbling received", self.num_step
             self.supervisor_tumbled_notice = 1
             self._pre_increment_hook(dict(), tumbled=np.array([self.num_step]))
@@ -253,25 +235,6 @@ class OfflineCollector(ADHDP):
             #print "Reset received", self.num_step
             self.child.reset()
             self.new_episode()
-    
-    # DEPRICATED: use of event_handler replaced by RobotActor's signal chain.
-    #def event_handler(self, robot, epoch, current_time, msg):
-    #    """Handle messages from the supervisor. Messages are expected
-    #    when the robot has tumbled and thus the robot has to be reset.
-    #    """
-    #    # msg is 'reset', 'out_of_arena', 'tumbled_grace_start' or 'tumbled'
-    #    # for msg==reset, the robot is reset immediately
-    #    # msg==tumbled_grace_start marks the start of the grace period of the tumbled robot
-    #    if msg == 'tumbled_grace_start':
-    #        #print "Tumbling received", self.num_step
-    #        self.supervisor_tumbled_notice = 1
-    #        self._pre_increment_hook(dict(), tumbled=np.array([self.num_step]))
-    #    
-    #    if msg == 'reset':
-    #        #print "Reset received", self.num_step
-    #        self.child.reset()
-    #        self.new_episode()
-    #        self.signal('new_episode')
     
     def _next_action_hook(self, a_next):
         """Defines the action sampling policy of the offline data
@@ -361,10 +324,11 @@ def offline_playback(pth_data, critic, samples_per_action, ms_per_step, episode_
     time_step_ms = ms_per_step * samples_per_action
     time_start_ms = 0
     for episode_idx, episode in enumerate(storages):
-        print episode_idx
+        print episode_idx,'/',len(storages)
         
         data_grp = f[episode]
         N = data_grp['trg0'].shape[0]
+        #N = data_grp['hip0'].shape[0]
         assert N % samples_per_action == 0
         
         # get tumbled infos
@@ -393,12 +357,11 @@ def offline_playback(pth_data, critic, samples_per_action, ms_per_step, episode_
             # get data
             time_start_ms += time_step_ms
             time_end_ms = time_start_ms + time_step_ms
-            chunk = dict([(k, data_grp[k][num_iter:(num_iter+samples_per_action)]) for k in SENSOR_NAMES])
+            chunk = dict([(k, data_grp[k][num_iter:(num_iter+samples_per_action)]) for k in SENSOR_NAMES if k in data_grp])
             
             # send tumbled message
             if num_iter == time_tumbled:
-                #critic.event_handler(None, dict(), time_tumbled, 'tumbled_grace_start')
-                critic.signal('tumbled_grace_start')
+                critic.signal('tumbled')
             
             # update critic
             critic(chunk, time_start_ms, time_end_ms, time_step_ms)
@@ -414,6 +377,7 @@ def offline_playback(pth_data, critic, samples_per_action, ms_per_step, episode_
     critic._next_action_hook = critic._next_action_hook_orig
     del critic._pre_increment_hook_orig
     del critic._next_action_hook_orig
+    f.close()
 
 
 ## DEPRECATED ##

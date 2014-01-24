@@ -72,13 +72,16 @@ class Analysis:
     
     ## Basis functions
     
-    def stack_all_data(self):
+    def stack_all_data(self, keys=None, **kwargs):
         """Return a :py:keyword:`dict` with all concatenated data,
         sorted by the data key."""
-        all_keys = self.f[self.experiments[0]].keys()
+        if keys is None:
+            all_keys = self.f[self.experiments[0]].keys()
+        else:
+            all_keys = keys
         data = {}
         for key in all_keys:
-            data[key] = self.stack_data(key)
+            data[key] = self.stack_data(key, **kwargs)
         
         return data
     
@@ -86,11 +89,13 @@ class Analysis:
         """Return a list of all data belonging to ``key``."""
         return [self.f[exp][key][:] for exp in self.experiments]
     
-    def stack_data(self, key, offset=0):
+    def stack_data(self, key, offset=0, start_episode=0, end_episode=-1):
         """Return data related to ``key`` of all experiments in a single
         array."""
-        data = [self.f[exp][key][offset:] for exp in self.experiments if key in self.f[exp]]
-        return np.concatenate(data)
+        data = [self.f[exp][key][offset:] for exp in self.experiments[start_episode:end_episode] if key in self.f[exp] and self.f[exp][key].shape[0]>offset]
+        if len(data)>0:
+            data = np.concatenate(data)
+        return data
     
     def __getitem__(self, key):
         if isinstance(key, int):
@@ -131,7 +136,7 @@ class Analysis:
         axis.set_xlabel('episode')
         axis.set_ylabel('number of steps')
         if self.always_plot_grid:
-            self.plot_grid(axis)
+            self.plot_grid(axis, 'a_curr')
         return axis
     
     def plot_grid(self, axis, key=None):
@@ -158,7 +163,7 @@ class Analysis:
         axis.set_xlabel('step')
         axis.set_ylabel('Absolute Neuron Activation')
         if self.always_plot_grid:
-            self.plot_grid(axis)
+            self.plot_grid(axis, 'x_curr')
         return axis
     
     def plot_readout(self, axis=None, func=lambda i:i, **kwargs):
@@ -183,7 +188,7 @@ class Analysis:
         axis.set_xlabel('step')
         axis.set_ylabel('readout weight')
         if self.always_plot_grid:
-            self.plot_grid(axis)
+            self.plot_grid(axis, 'readout')
         return axis
     
     def plot_readout_sum(self, axis=None, **kwargs):
@@ -196,7 +201,7 @@ class Analysis:
         axis.set_xlabel('step')
         axis.set_ylabel('Sum of absolute readout weights')
         if self.always_plot_grid:
-            self.plot_grid(axis)
+            self.plot_grid(axis, 'readout')
         return axis
     
     def plot_readout_diff(self, axis=None, **kwargs):
@@ -213,7 +218,7 @@ class Analysis:
         axis.set_xlabel('step')
         axis.set_ylabel('Readout difference')
         if self.always_plot_grid:
-            self.plot_grid(axis)
+            self.plot_grid(axis, 'readout')
         return axis
     
     def plot_cumulative_readout_diff(self, axis=None, **kwargs):
@@ -231,7 +236,7 @@ class Analysis:
         axis.set_ylabel('Cumulative readout weight distance')
         axis.set_xlabel('step')
         if self.always_plot_grid:
-            self.plot_grid(axis)
+            self.plot_grid(axis, 'readout')
         return axis
     
     def plot_node_weight_over_episode(self, episode, axis=None, **kwargs):
@@ -265,17 +270,22 @@ class Analysis:
         axis.set_xlabel('step')
         axis.set_ylabel('Reward')
         if self.always_plot_grid:
-            self.plot_grid(axis)
+            self.plot_grid(axis, 'reward')
         return axis
     
-    def plot_reward_against_action2d(self, axis=None, reward_offset=0):
+    def plot_reward_against_action2d(self, axis=None, offset=0, reward_offset=0, reward_min=None, reward_max=None):
         """make a scatter plot of actions and color them according to the resulting reward."""
         if axis is None:
             axis = pylab.figure().add_subplot(111)
-        reward = self.stack_data('reward')
-        action = self.stack_data('a_curr', reward_offset)
+        reward = self.stack_data('reward', offset=offset)
+        action = self.stack_data('a_curr', offset=offset+reward_offset)
         print reward.shape, action.shape
-        sc = axis.scatter(action[:,0], action[:,1], c=reward, edgecolors='none')
+        if reward_min is None:
+            reward_min = reward.min()
+        if reward_max is None:
+            reward_max = reward.max()
+        idx = np.logical_and(reward>=reward_min, reward<=reward_max)[:,0]
+        sc = axis.scatter(action[idx,0], action[idx,1], c=reward[idx], edgecolors='none')
         axis.set_xlabel('action 1')
         axis.set_ylabel('action 2')
         cb = pylab.colorbar(sc)
@@ -293,7 +303,7 @@ class Analysis:
         axis.set_xlabel('step')
         axis.set_ylabel('Derivative')
         if self.always_plot_grid:
-            self.plot_grid(axis)
+            self.plot_grid(axis, 'deriv')
         return axis
     
     def plot_actions(self, axis=None, **kwargs):
@@ -310,18 +320,17 @@ class Analysis:
         axis.set_xlabel('step')
         axis.set_ylabel('Action')
         if self.always_plot_grid:
-            self.plot_grid(axis)
+            self.plot_grid(axis, 'a_curr')
         return axis
     
-    def plot_action_space_2d(self, axis=None, bins=30, offset=0, **kwargs):
+    def plot_action_space_2d(self, axis=None, bins=30, offset=0, start_episode=0, end_episode=-1, **kwargs):
         """make a scatter plot of actions"""
         if axis is None:
             axis = pylab.figure().add_subplot(111)
-        action = self.stack_data('a_curr', offset=offset)
-        print action.shape
+        action = self.stack_data('a_curr', offset=offset, start_episode=start_episode, end_episode=end_episode)
 #        sc = axis.scatter(action[:,0], action[:,1], edgecolors='none')
-        n, bins = np.histogramdd(action[:], bins)
-        pc = axis.pcolor(bins[0], bins[1], n, **kwargs)
+        n, edges = np.histogramdd(action[:], bins)
+        pc = axis.pcolor(edges[0], edges[1], n.T, **kwargs)
         axis.set_xlabel('action 1')
         axis.set_ylabel('action 2')
         pylab.colorbar(pc)
@@ -338,7 +347,7 @@ class Analysis:
         axis.set_xlabel('step')
         axis.set_ylabel('TD-error')
         if self.always_plot_grid:
-            self.plot_grid(axis)
+            self.plot_grid(axis, 'err')
         return axis
     
     def plot_error(self, axis=None, **kwargs):
@@ -352,7 +361,7 @@ class Analysis:
         axis.set_xlabel('step')
         axis.set_ylabel('TD-error')
         if self.always_plot_grid:
-            self.plot_grid(axis)
+            self.plot_grid(axis, 'err')
         return axis
     
     def plot_accumulated_reward(self, axis=None, **kwargs):
@@ -430,7 +439,7 @@ class Analysis:
             axis.legend(loc=0)
         
         if self.always_plot_grid:
-            self.plot_grid(axis)
+            self.plot_grid(axis, 'j_curr')
         return axis
     
     def plot_path_return_prediction(self, expno, axis=None, **kwargs):
@@ -676,7 +685,7 @@ class Analysis:
         axis.hist(x, bins)
         axis.set_title(key)
         if self.always_plot_grid:
-            self.plot_grid(axis)
+            self.plot_grid(axis, key)
         return axis
     
     def plot_all_histograms(self, keys=None, norm=None, bins=30):
