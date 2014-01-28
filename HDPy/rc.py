@@ -680,6 +680,7 @@ class PlainRLS(object):
     
     """
     def __init__(self, input_dim, output_dim, with_bias=True, lambda_=1.0):
+        warnings.warn('Deprecated, please use StabilizedRLS instead')
         self.input_dim = input_dim
         self.output_dim = output_dim
         self.lambda_ = lambda_
@@ -800,6 +801,12 @@ class StabilizedRLS(PlainRLS):
     implementation instead of :py:class:`PlainRLS`.
     
     """
+    def __init__(self, *args, **kwargs):
+        self.tau = kwargs.pop('tau', 500)
+        super(StabilizedRLS, self).__init__(*args, **kwargs)
+        self.diag_default = self._psi_inv[0,0]
+        self.cnt_train = 0
+    
     def train(self, sample, trg=None, err=None, d=None, e=None):
         """Train the regression on one or more samples.
         
@@ -847,6 +854,11 @@ class StabilizedRLS(PlainRLS):
             #self._psi_inv = tri + tri.T - np.diag(tri.diagonal())
             # FIXME: (numpy bug) tri.diagonal() introduces a memory leak
             self._psi_inv = np.tril(tri, -1).T + tri
+            
+            # Diagonal stabilization
+            self.cnt_train += 1
+            if self.cnt_train % self.tau == 0:
+                np.fill_diagonal(self._psi_inv, self.diag_default)
     
     def __repr__(self):
         return 'StabilizedRLS(with_bias=%r, input_dim=%i, output_dim=%i, lambda_=%f)' % (self.with_bias, self.input_dim, self.output_dim, self.lambda_)
