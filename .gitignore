@@ -5,6 +5,7 @@
 doc/build/
 dist/
 MANIFEST
+HDPy.pth
 
 # compiled downloads
 doc/source/_downloads/*
