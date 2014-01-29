@@ -680,7 +680,6 @@ class PlainRLS(object):
     
     """
     def __init__(self, input_dim, output_dim, with_bias=True, lambda_=1.0):
-        warnings.warn('Deprecated, please use StabilizedRLS instead')
         self.input_dim = input_dim
         self.output_dim = output_dim
         self.lambda_ = lambda_
@@ -704,6 +703,7 @@ class PlainRLS(object):
             Sample error terms. Array of size (K, output_dim)
         
         """
+        warnings.warn('Deprecated, please use StabilizedRLS instead')
         if self._stop_training:
             return
         
