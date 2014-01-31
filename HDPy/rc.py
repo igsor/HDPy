@@ -985,3 +985,315 @@ class ESN:
         pass
     def _postprocessing(self):
         pass
+
+class ActionReadoutNode(object):
+    """A readout node from the reservoir"""
+    def __init__(self, input_dim, output_dim, w=None, w_scaling=1.0, with_bias=True, alpha=1.0):
+        self.input_dim = input_dim
+        self.output_dim = output_dim
+        self.w_scaling = w_scaling
+#        if not callable(alpha):
+#            alpha = self.const(alpha)
+        self.alpha = alpha # learning rate
+        self.with_bias = with_bias
+        if self.with_bias:
+            input_dim += 1
+        if w is None:
+            w = np.random.uniform(size=(self.input_dim+int(with_bias), self.output_dim))*2.0-1.0 * self.w_scaling
+        if callable(w):
+            # If it is a function, call it
+            self.w = w(self.input_dim+int(with_bias), self.output_dim)
+        else:
+            # else just copy it
+            self.w = w.copy()
+        self._stop_training = False
+    
+#    @staticmethod
+#    def const(a):
+#        def func(t): return a
+#        return func
+    
+    def train(self, sample, deriv, t):
+        """Train the regression on one or more samples.
+        
+        ``sample``
+            Input samples. A concatenation of reservoir-states, sensor-states and actions
+        ``deriv``
+            Derivative of action according to HDPy.ADHDP
+        
+        """
+        if self._stop_training:
+            return
+                
+        if self.with_bias:
+            sample = self._add_constant(sample)
+        
+        # update:
+        self.w += self.alpha * np.outer(sample, deriv)
+    
+    def __call__(self, x):
+        """Evaluate the linear approximation on some point ``x``.
+        """
+        if self.with_bias:
+            x = self._add_constant(x)
+        return self.w.T.dot(x.T).T
+    
+    def _add_constant(self, x):
+        """Add a constant term to the vector 'x'.
+        x -> [1 x]
+        """
+        return np.concatenate((np.ones((x.shape[0], 1)), x), axis=1)
+    
+    def save(self, pth):
+        """Save the node in a file.
+        """
+        f = open(pth, 'w')
+        _cPickle.dump(self, f)
+        f.close()
+    
+    def __repr__(self):
+        return 'ActionReadoutNode(with_bias=%r, input_dim=%i, output_dim=%i, w_scaling=%f, alpha=%f)' % (self.with_bias, self.input_dim, self.output_dim, self.w_scaling, self.alpha)
+    
+    def stop_training(self):
+        """Disable filter adaption for future calls to ``train``."""
+        self._stop_training = True
+    
+    def copy(self):
+        """Return a deep copy of the node."""
+        return _copy.deepcopy(self)
+
+
+class RewardModulatedHebbianLearningNode(object):
+    """Hebbian learning node with reward modulation.
+    ``input_dim``
+        Number of inputs.
+    ``output_dim``
+        Number of outputs.
+    ``learning_rate``
+        Step size of the weight updates.
+    ``w``
+        Input weights initialization routine. The callback
+        is executed on two arguments, the output and input size.
+        The default is a sparse matrix :py:func:`sparse_w_in`, with
+        input scaling of 1.0 and density 100. If ``fan_in_w`` is provided,
+        a sparse matrix is created, instead.
+    ``density``
+        Density of the weights, in percent.
+    ``input_scaling``
+        Scaling of the input weights.
+    """
+    def __init__(self, input_dim=None, output_dim=None, learning_rate=0.1, w=None, with_bias=True, **kwargs):
+        
+        # initialize basic attributes
+        self._input_dim = None
+        self._output_dim = None
+        self.with_bias = with_bias
+        
+        # call set functions for properties
+        self.set_input_dim(input_dim)
+        self.set_output_dim(output_dim)
+        
+        # Set all object attributes
+        # Learning rate
+        self.learning_rate = learning_rate
+        
+        # Fields for allocating weight matrix w
+        self.w = np.array([])
+        # Reservoir initialization
+        if w is None:
+            if 'density' in kwargs:
+                warnings.warn('Reservoir init function (w) should be provided')
+            density = kwargs.pop('density', 100)
+            input_scaling = kwargs.pop('w_scaling', 1.0)
+            w = sparse_w_in(input_scaling, density)
+        self.w_initial = w
+        
+        # Initialization
+        self._is_initialized = False
+        if input_dim is not None and output_dim is not None:
+            # Call the initialize function to create the weight matrices
+            self.initialize()
+
+        self._stop_training = False
+    
+    def initialize(self):
+        """ Initialize the weight matrices of the reservoir node."""
+        if self.input_dim is None:
+            raise Exception('Cannot initialize weight matrices: input_dim is not set.')
+        
+        if self.output_dim is None:
+            raise Exception('Cannot initialize weight matrices: output_dim is not set.')
+        
+        # Initialize weight matrix
+        if callable(self.w_initial):
+            # If it is a function, call it
+            self.w = self.w_initial(self.output_dim, self.input_dim+int(self.with_bias))
+        else:
+            # else just copy it
+            self.w = self.w_initial.copy()
+        
+        # Check if dimensions of the weight matrix match the dimensions of the node inputs and outputs
+        if self.w.shape != (self.output_dim, self.input_dim+int(self.with_bias)):
+            exception_str = 'Shape of given w does not match input/output dimensions of node. '
+            exception_str += 'Input dim: ' + str(self.input_dim+int(self.with_bias)) + ', output dim: ' + str(self.output_dim) + '. '
+            exception_str += 'Shape of w: ' + str(self.w.shape)
+            raise Exception(exception_str)
+        
+        self._is_initialized = True
+    
+    def execute(self, x):
+        """Executes simulation with input vector ``x``.
+        ``x``
+            Input samples. Variables in columns, observations in rows,
+            i.e. if N,M = x.shape then M == ``input_dim``.
+        """
+        # Check if the weight matrices are initialized, otherwise create them
+        if not self._is_initialized:
+            self.initialize()
+        
+        # Check input
+        self._check_input(x)
+        
+        # Add bias
+        if self.with_bias:
+            x = self._add_constant(x)
+
+        # Apply weights to input
+        output = self.w * x.T
+
+        # Return the output
+        return output.T
+    
+    def __call__(self, x, *args, **kwargs):
+        """Calling an instance of `Node` is equivalent to calling
+        its `execute` method."""
+        return self.execute(x, *args, **kwargs)
+
+    def train(self, x, y, reward):
+        """Train the network on one or more samples.
+        ``x``
+            Input samples. Array of size (K, input_dim)
+        ``y``
+            Output samples. Array of size (K, output_dim)
+        ``reward``
+            Reward of the samples. Array of size (K,)
+        """
+        if self._stop_training:
+            return
+        
+        # Check input
+        self._check_input(x)
+        
+        # Add bias
+        if self.with_bias:
+            x = self._add_constant(x)
+        
+        # Update the matrix
+        for i in range(x.shape[0]):
+            self.w = scipy.sparse.csc_matrix((1.0-self.learning_rate) * self.w + self.learning_rate * reward[i] * np.outer(y[i,:], x[i,:]))
+            self.w = (self.w / self.w.sum()) * self.w_initial._scaling
+    
+    ## GETTERS, SETTERS, LEFTOVERS FROM MDP/OGER ##
+    
+    def get_input_dim(self):
+        """Return input dimensions."""
+        return self._input_dim
+    
+    def set_input_dim(self, dim):
+        """Set input dimensions.
+        Perform sanity checks and then calls ``self._set_input_dim(dim)``, which
+        is responsible for setting the internal attribute ``self._input_dim``.
+        Note that subclasses should overwrite `self._set_input_dim`
+        when needed.
+        """
+        if dim is None:
+            pass
+        elif (self._input_dim is not None) and (self._input_dim != dim):
+            msg = ("Input dim are set already (%d) "
+                   "(%d given)!" % (self.input_dim, dim))
+            raise Exception(msg)
+        else:
+            self._input_dim = dim
+    
+    input_dim = property(get_input_dim,
+                         set_input_dim,
+                         doc="Input dimensions")
+    
+    def get_output_dim(self):
+        """Return output dimensions."""
+        return self._output_dim
+    
+    def set_output_dim(self, dim):
+        """Set output dimensions.
+        Perform sanity checks and then calls ``self._set_output_dim(dim)``, which
+        is responsible for setting the internal attribute ``self._output_dim``.
+        Note that subclasses should overwrite `self._set_output_dim`
+        when needed.
+        """
+        self._output_dim = dim
+    
+    output_dim = property(get_output_dim,
+                          set_output_dim,
+                          doc="Output dimensions")
+    
+    ### check functions
+    def _check_input(self, x):
+        """Check if input data ``x`` matches the requirements."""
+        # check input rank
+        if not x.ndim == 2:
+            error_str = "x has rank %d, should be 2" % (x.ndim)
+            raise Exception(error_str)
+        
+        # set the input dimension if necessary
+        if self.input_dim is None:
+            self.input_dim = x.shape[1]
+        
+        # check the input dimension
+        if not x.shape[1] == self.input_dim:
+            error_str = "x has dimension %d, should be %d" % (x.shape[1],
+                                                              self.input_dim)
+            raise Exception(error_str)
+        
+        if x.shape[0] == 0:
+            error_str = "x must have at least one observation (zero given)"
+            raise Exception(error_str)  
+
+    def _add_constant(self, x):
+        """Add a constant term to the vector 'x'.
+        x -> [1 x]
+        """
+        return np.concatenate((np.ones((x.shape[0], 1)), x), axis=1)
+    
+    def __str__(self):
+        return str(type(self).__name__)
+    
+    def __repr__(self):
+        # print input_dim, output_dim
+        name = type(self).__name__
+        inp = "input_dim=%s" % str(self.input_dim)
+        out = "output_dim=%s" % str(self.output_dim)
+        args = ', '.join((inp, out))
+        return name + '(' + args + ')'
+
+    def stop_training(self):
+        """Disable filter adaption for future calls to ``train``."""
+        self._stop_training = True
+    
+    def copy(self):
+        """Return a deep copy of the node."""
+        return _copy.deepcopy(self)
+    
+    def save(self, filename, protocol=-1):
+        """Save a pickled serialization of the node to `filename`.
+        If `filename` is None, return a string.
+        Note: the pickled `Node` is not guaranteed to be forwards or
+        backwards compatible."""
+        if filename is None:
+            return _cPickle.dumps(self, protocol)
+        else:
+            # if protocol != 0 open the file in binary mode
+            mode = 'wb' if protocol != 0 else 'w'
+            with open(filename, mode) as flh:
+                _cPickle.dump(self, flh, protocol)
+
+

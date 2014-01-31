@@ -250,7 +250,7 @@ class OfflineCollector(ADHDP):
         
         return a_next
 
-def offline_playback(pth_data, critic, samples_per_action, ms_per_step, episode_start=None, episode_end=None, min_episode_len=0):
+def offline_playback(pth_data, critic, samples_per_action, ms_per_step, episode_start=None, episode_end=None, min_episode_len=0, sensor_names=SENSOR_NAMES):
     """Simulate an experiment run for the critic by using offline data.
     The data has to be collected in webots, using the respective
     robot and supervisor. Note that the behaviour of the simulation
@@ -333,9 +333,12 @@ def offline_playback(pth_data, critic, samples_per_action, ms_per_step, episode_
         
         # get tumbled infos
         if 'tumble' in data_grp:
-            from pylab import find 
-            time_tumbled = find(data_grp['tumble'])[0] / samples_per_action * samples_per_action
-#            time_tumbled = data_grp['tumble'][0] * samples_per_action
+            from pylab import find
+            time_tumbled = find(data_grp['tumble'])
+            if len(time_tumbled)<1:
+                time_tumbled = -1
+            else:  
+                time_tumbled = time_tumbled[0] / samples_per_action * samples_per_action
         else:
             time_tumbled = -1
         
@@ -357,7 +360,7 @@ def offline_playback(pth_data, critic, samples_per_action, ms_per_step, episode_
             # get data
             time_start_ms += time_step_ms
             time_end_ms = time_start_ms + time_step_ms
-            chunk = dict([(k, data_grp[k][num_iter:(num_iter+samples_per_action)]) for k in SENSOR_NAMES if k in data_grp])
+            chunk = dict([(k, data_grp[k][num_iter:(num_iter+samples_per_action)]) for k in sensor_names if k in data_grp])
             
             # send tumbled message
             if num_iter == time_tumbled:

@@ -358,13 +358,14 @@ class ActorCritic(PuPy.RobotActor):
         # Generate reinforcement signal U(k), given in(k)
         reward = self.plant.reward(epoch)
         #reward = self.plant.reward(self.s_curr)
-        # It's not clear, which reward should be the input to the critic:
+        # Matthias: It's not clear, which reward should be the input to the critic:
         # While the ACD papers imply the reward of time step n, the book
         # by Sutton/Barto indicate the reward as being from the next
         # state, n+1. Experiments indicate that it doesn't really matter.
         # To be consistent with other work, I go with time n.
-        # Nico: I changed it to be epoch. This is just a notation thing with
-        # the n and n+1, but it should be the reward of the newest state.
+        # Nico: I changed it to be epoch (n+1). It should be the reward of performing
+        # action a_n when being in state s_n. The reward is calculated on the 
+        # outcome of that, so on the new state s_n+1.
         
         # do the actual work
         epoch = self._step(self.s_curr, epoch, self.a_curr, reward)

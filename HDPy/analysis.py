@@ -52,7 +52,7 @@ class Analysis:
         the initialization phase.
     
     """
-    def __init__(self, pth, grid=False, min_key_length=0):
+    def __init__(self, pth, grid=False, min_key_length=0, episode_start=0):
         if isinstance(pth, inout.H5CombinedFile):
             self.pth = pth.pth0
             self.f = pth
@@ -62,7 +62,7 @@ class Analysis:
         exp = map(int, self.f.keys())
         exp = sorted(exp)
         exp = map(str, exp)
-        exp = filter(lambda k: len(self.f[k]) > min_key_length, exp) # normalization fails, if not >0
+        exp = filter(lambda k: (len(self.f[k]) > min_key_length) and (int(k)>=episode_start), exp) # normalization fails, if not >0
         self.experiments = exp
         self.always_plot_grid = grid
     
@@ -87,12 +87,12 @@ class Analysis:
     
     def get_data(self, key):
         """Return a list of all data belonging to ``key``."""
-        return [self.f[exp][key][:] for exp in self.experiments]
+        return [self.f[exp][key][:] for exp in self.experiments if key in self.f[exp]]
     
-    def stack_data(self, key, offset=0, start_episode=0, end_episode=-1):
+    def stack_data(self, key, offset=0, start_episode=0, end_episode=None):
         """Return data related to ``key`` of all experiments in a single
         array."""
-        data = [self.f[exp][key][offset:] for exp in self.experiments[start_episode:end_episode] if key in self.f[exp] and self.f[exp][key].shape[0]>offset]
+        data = [self.f[exp][key][offset:] for exp in self.experiments[start_episode:(end_episode is None and len(self.experiments) or end_episode)] if key in self.f[exp] and self.f[exp][key].shape[0]>offset]
         if len(data)>0:
             data = np.concatenate(data)
         return data
@@ -121,7 +121,7 @@ class Analysis:
         if key is None:
             key = self.f[self.experiments[0]].keys()[0]
         
-        steps = [self.f[exp][key].shape[0] for exp in self.experiments]
+        steps = [(key in self.f[exp] and self.f[exp][key].shape[0] or 0) for exp in self.experiments]
         return steps
     
     ## Plotters
@@ -187,8 +187,6 @@ class Analysis:
         #axis.legend(loc=0)
         axis.set_xlabel('step')
         axis.set_ylabel('readout weight')
-        if self.always_plot_grid:
-            self.plot_grid(axis, 'readout')
         return axis
     
     def plot_readout_sum(self, axis=None, **kwargs):
@@ -204,21 +202,23 @@ class Analysis:
             self.plot_grid(axis, 'readout')
         return axis
     
-    def plot_readout_diff(self, axis=None, **kwargs):
+    def plot_readout_diff(self, axis=None, key='readout', log_scale=False, **kwargs):
         """Plot the difference of absolute readout weights in
         ``axis``."""
         if axis is None:
             axis = pylab.figure().add_subplot(111)
-        data = self.stack_data('readout')
+        data = self.stack_data(key)
         diff = data[1:] - data[:-1]
         diff = diff.sum(axis=1)**2
         color = kwargs.pop('color','k')
         lbl = kwargs.pop('label', 'Readout difference')
         axis.plot(diff, color=color, label=lbl, **kwargs)
+        if log_scale:
+            axis.set_yscale('log')
         axis.set_xlabel('step')
         axis.set_ylabel('Readout difference')
         if self.always_plot_grid:
-            self.plot_grid(axis, 'readout')
+            self.plot_grid(axis, key)
         return axis
     
     def plot_cumulative_readout_diff(self, axis=None, **kwargs):
@@ -292,6 +292,27 @@ class Analysis:
         cb.set_label('reward')
         return axis
     
+    def plot_reward_against_state2d(self, key1, key2, key_reward='reward', axis=None, offset=0, reward_offset=0, reward_min=None, reward_max=None, state_step=1):
+        """make a scatter plot of state ``key`` and color them according to the resulting reward."""
+        if axis is None:
+            axis = pylab.figure().add_subplot(111)
+        reward = self.stack_data(key_reward, offset=offset)
+        state = np.vstack([self.stack_data(key1, offset=(offset+reward_offset)*state_step)[::state_step],
+                           self.stack_data(key2, offset=(offset+reward_offset)*state_step)[::state_step]]).T
+        print reward.shape, state.shape
+        assert reward.shape[0] == state.shape[0], 'wrong shapes'
+        if reward_min is None:
+            reward_min = reward.min()
+        if reward_max is None:
+            reward_max = reward.max()
+        idx = np.logical_and(reward>=reward_min, reward<=reward_max)[:,0]
+        sc = axis.scatter(state[idx,0], state[idx,1], c=reward[idx], edgecolors='none')
+        axis.set_xlabel(key1)
+        axis.set_ylabel(key2)
+        cb = pylab.colorbar(sc)
+        cb.set_label(key_reward)
+        return axis
+    
     def plot_derivative(self, axis=None, **kwargs):
         """Plot the derivative dJ/da over time in ``axis``."""
         if axis is None:
@@ -336,6 +357,12 @@ class Analysis:
         pylab.colorbar(pc)
         return axis
     
+    def plot_action_vs_compass(self, axis=None):
+        if axis is None:
+            axis = pylab.figure().add_subplot(111)
+        
+        
+    
     def plot_absolute_error(self, axis=None, **kwargs):
         """Plot the absolute error over time in ``axis``."""
         if axis is None:
@@ -344,6 +371,22 @@ class Analysis:
         lbl = kwargs.pop('label', 'error')
         col = kwargs.pop('color', 'k')
         axis.plot(data, col, label=lbl, **kwargs)
+        axis.set_xlabel('step')
+        axis.set_ylabel('TD-error')
+        if self.always_plot_grid:
+            self.plot_grid(axis, 'err')
+        return axis
+    
+    def plot_absolute_avg_error_per_episode(self, axis=None, **kwargs):
+        """Plot the absolute error over time in ``axis``."""
+        if axis is None:
+            axis = pylab.figure().add_subplot(111)
+        error = self.get_data('err')
+        idx = np.hstack([[0], np.cumsum([e.shape[0] for e in error]).repeat(2)[:-1]])
+        data = np.repeat([np.abs(e[:,0]).mean() for e in error], 2)
+        lbl = kwargs.pop('label', 'error')
+        col = kwargs.pop('color', 'k')
+        axis.plot(idx, data, col, label=lbl, **kwargs)
         axis.set_xlabel('step')
         axis.set_ylabel('TD-error')
         if self.always_plot_grid:
@@ -386,6 +429,8 @@ class Analysis:
         axis.plot(data, label=lbl, **kwargs)
         axis.set_xlabel('step')
         axis.set_ylabel('Input')
+        if self.always_plot_grid:
+            self.plot_grid(axis, 'i_curr')
         return axis
     
     def plot_reservoir_input(self, axis=None, **kwargs):
@@ -608,16 +653,21 @@ class Analysis:
         axis.legend(loc=0)
         return axis
     
-    def plot_node_over_episode(self, axis, episode, node):
+    def plot_node_over_episode(self, axis, episode=None, node=0, hist=False):
         """Plot the reservoir input and output of ``node`` on a tanh
         shape over one ``episode`` in ``axis``. If ``node`` is None,
         all nodes are plotted. If ``axis`` is a list, each node is
         plotted in its own axis."""
         
-        assert episode in self.experiments
-        
-        o_output = self.f[episode]['x_curr'][:, node]
-        o_input  = np.arctanh(o_output)
+        if episode is None:
+            o_output = self.stack_data('x_curr')[:, node]
+        else:
+            assert episode in self.experiments
+            o_output = self.f[episode]['x_curr'][:, node]
+        if hist:
+            n, o_output = np.histogram(o_output, 20)
+            o_output = o_output[1:] - np.diff(o_output)
+        o_input = np.arctanh(o_output)
         
         if node is None:
             raise NotImplementedError()
@@ -630,17 +680,22 @@ class Analysis:
         axis.plot(range_x, np.tanh(range_x), label='tanh', color='0.75')
         
         # plot points
-        axis.plot(o_input, o_output, 'b*', label='samples')
+        if hist:
+            axis.scatter(o_input, o_output, c=n, edgecolors='none', marker='o', label='samples')
+        else:
+            axis.plot(o_input, o_output, 'b*', label='samples')
         axis.set_xlabel('node input')
         axis.set_ylabel('node output')
         return axis
     
-    def plot_node_over_episode_time_input(self, axis, episode, node):
+    def plot_node_over_episode_time_input(self, axis, episode=None, node=0):
         """Plot the time over input of ``node`` in ``axis``. Only
         ``episode`` is considered."""
-        assert episode in self.experiments
-        
-        o_output = self.f[episode]['x_curr'][:, node]
+        if episode is None:
+            o_output = self.stack_data('x_curr')[:, node]
+        else:
+            assert episode in self.experiments
+            o_output = self.f[episode]['x_curr'][:, node]
         o_input  = np.arctanh(o_output)
         
         if node is None:
@@ -655,12 +710,14 @@ class Analysis:
         axis.set_ylabel('time')
         return axis
     
-    def plot_node_over_episode_time_output(self, axis, episode, node):
+    def plot_node_over_episode_time_output(self, axis, episode=None, node=0):
         """Plot the output of ``node`` over time in ``axis``. Only
         ``episode`` is considered."""
-        assert episode in self.experiments
-        
-        o_output = self.f[episode]['x_curr'][:, node]
+        if episode is None:
+            o_output = self.stack_data('x_curr')[:, node]
+        else:
+            assert episode in self.experiments
+            o_output = self.f[episode]['x_curr'][:, node]
         
         if node is None:
             raise NotImplementedError()
@@ -684,8 +741,6 @@ class Analysis:
         print '[%.3f, %.3f], ' % (np.mean(x), np.std(x)),
         axis.hist(x, bins)
         axis.set_title(key)
-        if self.always_plot_grid:
-            self.plot_grid(axis, key)
         return axis
     
     def plot_all_histograms(self, keys=None, norm=None, bins=30):
@@ -777,3 +832,38 @@ def critic(plant, reservoir, readout, norm=None):
         return j_curr
     
     return critic_fu
+
+def find_corrupt_data(filename):
+    def add(corrupt, exp, key, i):
+        if not exp in corrupt: corrupt[exp] = {}
+        if not key in corrupt[exp]: corrupt[exp][key] = []
+        corrupt[exp][key].append(i)
+    
+    corrupt = {}
+    with h5py.File(filename, 'r') as f:
+        experiments = f.keys()
+        for exp in experiments:
+            print exp, '/', len(experiments)
+            c = []
+            for key in f[exp].keys():
+                try:
+                    x = f[exp][key][:]
+                except IOError:
+                    print 'error'
+                    c.append(key)
+            for key in c:
+                for i in range(f[exp][key].shape[0]):
+                    try:
+                        x = f[exp][key][i]
+                    except IOError:
+                        add(corrupt, exp, key, i)
+    for exp in corrupt:
+        print 'exp', exp, ':',
+        for key in corrupt[exp]:
+            n = sum(corrupt[exp][key])
+            if n>0:
+                print key, n,'; ',
+        print
+    return corrupt
+                        
+        
