@@ -19,6 +19,8 @@ import numpy as np
 import warnings
 import h5py
 import HDPy
+import sys
+from mdp.nodes.lle_nodes import sqrt
 
 SENSOR_NAMES = ['trg0', 'trg1', 'trg2', 'trg3', 'accelerometer_x', 'accelerometer_y', 'accelerometer_z', 'compass_x', 'compass_y', 'compass_z', 'gyro_x', 'gyro_y', 'gyro_z', 'hip0', 'hip1', 'hip2', 'hip3', 'knee0', 'knee1', 'knee2', 'knee3', 'puppyGPS_x', 'puppyGPS_y', 'puppyGPS_z', 'touch0', 'touch0', 'touch1', 'touch2', 'touch3']
 
@@ -352,11 +354,13 @@ def offline_playback(pth_data, critic, samples_per_action, ms_per_step, episode_
     
     if episode_start_test is None:
         episode_start_test = len(storages)/2 - 1; #use last half for testing 
+        
+    global accError, Jmax, Jmin
+    accError = 0 # accumulated error
+    Jmax, Jmin = -sys.maxint, sys.maxint
     
     # Prepare critic; redirect hooks to avoid storing epoch data twice
     # and feed the actions
-    global accError 
-    accError = 0 # accumulated error
     next_action = None
     episode = None
     critic._pre_increment_hook_orig = critic._pre_increment_hook
@@ -366,9 +370,13 @@ def offline_playback(pth_data, critic, samples_per_action, ms_per_step, episode_
         epoch['offline_episode'] = np.array([episode])
         critic._pre_increment_hook_orig(epoch)
         if int(episode) > episode_start_test and epoch.has_key('err'):
-            global accError
-            accError = accError*(1-err_coefficient) + (epoch['err'][0][0]**2)*err_coefficient # accumulated squared error
-            #accError = accError*(1-err_coefficient) + np.abs(epoch['err'][0][0])*err_coefficient # accumulated absolute error
+            global accError, Jmax, Jmin
+            J = epoch['j_curr'][0][0]
+            err = epoch['err'][0][0]
+            if J > Jmax: Jmax = J
+            elif J < Jmin: Jmin = J
+            accError = accError*(1-err_coefficient) + (err**2) * err_coefficient # accumulated squared error
+            #accError = accError*(1-err_coefficient) + np.abs(err)*err_coefficient # accumulated absolute error
     
     def next_action_hook(a_next):
         #print "(next)", a_next.T, next_action.T
@@ -386,9 +394,9 @@ def offline_playback(pth_data, critic, samples_per_action, ms_per_step, episode_
         data_grp = f[episode]
         N = len(data_grp['trg0'])
         
-        # get the stored ratio, this can be different if the current policy dowsn't exactly match the stored one
+        # get the stored ratio, this can be different if the current policy doesn't exactly match the stored one
         db_samples_per_action = N / len(data_grp['a_next'])
-        #assert N % db_samples_per_action == 0
+        assert N % db_samples_per_action == 0
         assert N % samples_per_action == 0
         
         # get tumbled info
@@ -435,7 +443,8 @@ def offline_playback(pth_data, critic, samples_per_action, ms_per_step, episode_
             critic.signal('new_episode') # collectors will create new group
         
         if accError != 0:
-            print episode + ': accumulated error: ' + str(accError)
+            devError = sqrt(accError)/(Jmax-Jmin)  # normalized root-mean-square deviation
+            print episode + ': accumulated error: %f  NRMSD: %f' % (accError, devError)
     
     # cleanup
     critic._pre_increment_hook = critic._pre_increment_hook_orig
@@ -443,7 +452,7 @@ def offline_playback(pth_data, critic, samples_per_action, ms_per_step, episode_
     del critic._pre_increment_hook_orig
     del critic._next_action_hook_orig
     
-    return accError
+    return devError
 
 
 ## DEPRECATED ##
