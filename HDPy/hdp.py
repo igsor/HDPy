@@ -20,7 +20,6 @@ details are given in details of the respective class.
 
 """
 import numpy as np
-import PuPy
 from rl import ActorCritic
 import warnings
 

@@ -18,8 +18,6 @@ from ..rl import Plant
 import numpy as np
 import warnings
 import h5py
-import HDPy
-import sys
 from mdp.nodes.lle_nodes import sqrt
 
 SENSOR_NAMES = ['trg0', 'trg1', 'trg2', 'trg3', 'accelerometer_x', 'accelerometer_y', 'accelerometer_z', 'compass_x', 'compass_y', 'compass_z', 'gyro_x', 'gyro_y', 'gyro_z', 'hip0', 'hip1', 'hip2', 'hip3', 'knee0', 'knee1', 'knee2', 'knee3', 'puppyGPS_x', 'puppyGPS_y', 'puppyGPS_z', 'touch0', 'touch0', 'touch1', 'touch2', 'touch3']
@@ -291,7 +289,9 @@ class OfflineCollector(ADHDP):
         
         return a_next
 
-def offline_playback(pth_data, critic, samples_per_action, ms_per_step, episode_start=None, episode_end=None, min_episode_len=0, err_coefficient=0.01, episode_start_test=None):
+def offline_playback(pth_data, critic, samples_per_action, ms_per_step,
+                     episode_start=None, episode_end=None, min_episode_len=0, err_coefficient=0.01, episode_start_test=None,
+                     preprocess_initial_action_hook=None, preprocess_next_action_hook=None):
     """Simulate an experiment run for the critic by using offline data.
     The data has to be collected in webots, using the respective
     robot and supervisor. Note that the behaviour of the simulation
@@ -333,7 +333,13 @@ def offline_playback(pth_data, critic, samples_per_action, ms_per_step, episode_
     
     ``episode_start_test``
         starting point for the test, i.e. when we start accounting the TD-error.
-        
+    
+    ``preprocess_initial_action_hook``
+        allows overwriting initial action.
+    
+    ``preprocess_next_action_hook``
+        allows overwriting next action.
+    
     :returns: accumulated TD-error average
     
     """
@@ -355,9 +361,10 @@ def offline_playback(pth_data, critic, samples_per_action, ms_per_step, episode_
     if episode_start_test is None:
         episode_start_test = len(storages)/2 - 1; #use last half for testing 
         
-    global accError, Jmax, Jmin
+    global accError, Jmax, Jmin, Rmax, Rmin
     accError = 0 # accumulated error
-    Jmax, Jmin = -sys.maxint, sys.maxint
+    Jmax, Jmin = float('-inf'), float('inf')
+    Rmax, Rmin = float('-inf'), float('inf')
     
     # Prepare critic; redirect hooks to avoid storing epoch data twice
     # and feed the actions
@@ -370,11 +377,14 @@ def offline_playback(pth_data, critic, samples_per_action, ms_per_step, episode_
         epoch['offline_episode'] = np.array([episode])
         critic._pre_increment_hook_orig(epoch)
         if int(episode) > episode_start_test and epoch.has_key('err'):
-            global accError, Jmax, Jmin
+            global accError, Jmax, Jmin, Rmax, Rmin
             J = epoch['j_curr'][0][0]
+            R = epoch['reward'][0][0]
             err = epoch['err'][0][0]
             if J > Jmax: Jmax = J
             elif J < Jmin: Jmin = J
+            if R > Rmax: Rmax = R
+            elif R < Rmin: Rmin = R
             accError = accError*(1-err_coefficient) + (err**2) * err_coefficient # accumulated squared error
             #accError = accError*(1-err_coefficient) + np.abs(err)*err_coefficient # accumulated absolute error
     
@@ -416,12 +426,18 @@ def offline_playback(pth_data, critic, samples_per_action, ms_per_step, episode_
             time_tumbled -= samples_per_action
         
         # initial action
-        critic.a_curr = np.atleast_2d(data_grp['a_curr'][0]).T
+        if preprocess_initial_action_hook is None:
+            critic.a_curr = np.atleast_2d(data_grp['a_curr'][0]).T
+        else:
+            critic.a_curr = preprocess_initial_action_hook(data_grp)
 
         # loop through data, incrementally feed the critic
         for num_iter in np.arange(0, N, samples_per_action):
             # next action
-            next_action = np.atleast_2d(data_grp['a_next'][num_iter/db_samples_per_action]).T
+            if preprocess_next_action_hook is None:
+                next_action = np.atleast_2d(data_grp['a_next'][num_iter/db_samples_per_action]).T
+            else:
+                next_action = preprocess_next_action_hook(data_grp, num_iter, db_samples_per_action)
             
             # get data
             time_start_ms += time_step_ms
@@ -443,7 +459,8 @@ def offline_playback(pth_data, critic, samples_per_action, ms_per_step, episode_
             critic.signal('new_episode') # collectors will create new group
         
         if accError != 0:
-            devError = sqrt(accError)/(Jmax-Jmin)  # normalized root-mean-square deviation
+            devErrorJ = sqrt(accError)/(Jmax-Jmin)  # normalized root-mean-square deviation
+            devError = sqrt(accError)/(Rmax-Rmin)  # normalized root-mean-square deviation
             print episode + ': accumulated error: %f  NRMSD: %f' % (accError, devError)
     
     # cleanup
