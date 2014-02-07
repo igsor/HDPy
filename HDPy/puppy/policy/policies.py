@@ -412,7 +412,12 @@ class _LR1(_GaitPolicy):
         return np.atleast_2d([left, right]).T
     
     def update(self, action):
-        self.gait.params[self.param] = (action[0, 0], action[1, 0], action[0, 0], action[1, 0])
+        try:
+            if action.shape[0] == 1:
+                action = action.T
+            self.gait.params[self.param] = (action[0, 0], action[1, 0], action[0, 0], action[1, 0])
+        except:
+            pass
 
 class _LR2(_GaitPolicy):
     """Left/Right; Two parameters"""
