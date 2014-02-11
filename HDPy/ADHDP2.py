@@ -33,15 +33,18 @@ class ADHDP2(ADHDP):
         self.countIterations = 0
          
         plant = kwargs['plant']
-        action_space_dim = self.reservoir.get_input_dim() - plant.state_space_dim()
+        self.action_space_dim = self.reservoir.get_input_dim() - plant.state_space_dim()
          
         # Initialize the states
         self.state_prec = np.zeros([1, self.reservoir.states.shape[0]])
         self.state_curr = np.zeros([1, self.reservoir.states.shape[0]])
-        self.sensor_prec = np.zeros([1, self.reservoir.get_input_dim() - action_space_dim])
-        self.sensor_curr = np.zeros([1, self.reservoir.get_input_dim() - action_space_dim])
-        self.action_prec = np.zeros([1, action_space_dim])
+        self.sensor_prec = np.zeros([1, self.reservoir.get_input_dim() - self.action_space_dim])
+        self.sensor_curr = np.zeros([1, self.reservoir.get_input_dim() - self.action_space_dim])
+        
+        # Initialize the action
+        self.action_prec = np.zeros([1, self.action_space_dim])
         self.action_curr = initial_action
+        self.a_brute_prop = None
          
         # Initialize the learning rates
         if etha is not None:
@@ -49,23 +52,23 @@ class ADHDP2(ADHDP):
             self.etha_w_inout_aa = etha
             self.etha_w_inout_sa = etha
         else:
-            e = 0.1 # TODO: What is a good standard value?
-            self.etha_w_out_a = e
-            self.etha_w_inout_aa = e
-            self.etha_w_inout_sa = e
+            e = 0.1
+            self.etha_w_out_a = np.random.normal(0.0 + e, 0.01)
+            self.etha_w_inout_aa = np.random.normal(0.0 + e, 0.01)
+            self.etha_w_inout_sa = np.random.normal(0.0 + e, 0.01)
          
         # Initialize the weight matrices for the action outputs
-        self.w_out_a = self.init_random_action_weights(action_space_dim, self.reservoir.output_dim)
-        self.w_inout_aa = self.init_random_action_weights(action_space_dim, action_space_dim)
-        self.w_inout_sa = self.init_random_action_weights(action_space_dim, self.reservoir.get_input_dim() - action_space_dim)
-        self.w_bias_a = self.init_random_action_weights(action_space_dim, 1)
+        self.w_out_a = self.init_random_action_weights(self.action_space_dim, self.reservoir.output_dim)
+        self.w_inout_aa = self.init_random_action_weights(self.action_space_dim, self.action_space_dim)
+        self.w_inout_sa = self.init_random_action_weights(self.action_space_dim, self.reservoir.get_input_dim() - self.action_space_dim)
+        self.w_bias_a = self.init_random_action_weights(self.action_space_dim, 1)
          
          
         # TODO: REMOVE THIS; FOR TESTING ONLY
         #self.withRecursion = True
          
         if self.withRecursion:
-         
+            action_space_dim = self.action_space_dim 
             # Initialize the action derivatives for the recursive case
             self.da_dWout_a_prec = np.zeros([action_space_dim, self.reservoir.output_dim])
             self.da_dWinout_aa_prec = np.zeros([action_space_dim, action_space_dim])
@@ -81,8 +84,6 @@ class ADHDP2(ADHDP):
             self.dX_dWout_a_curr = np.zeros([action_space_dim, self.reservoir.output_dim])
             self.dX_dWinout_aa_curr = np.zeros([action_space_dim, action_space_dim])
             self.dX_dWinout_sa_curr = np.zeros([action_space_dim, self.reservoir.get_input_dim() - action_space_dim])
-         
-        self.action_space_dim = action_space_dim
          
         # Check assumptions
         assert self.reservoir.reset_states == False
@@ -124,6 +125,10 @@ class ADHDP2(ADHDP):
             Reward of ``s_next``
         
         """
+        
+        if self.reservoir is None:
+            return epoch
+        
         epoch = super(ADHDP2, self)._step(s_curr, epoch, a_curr, reward)     
         i_curr = epoch['i_curr']   
         i_next = epoch['i_next']
@@ -144,30 +149,22 @@ class ADHDP2(ADHDP):
         A = action_space_dim
         N = self.reservoir.w.shape[0]
          
-        # Capture the different weights needed from the ESN output
+        # Capture the different weights needed for the ESN output
         w_in_s = self.reservoir.w_in[:,:-action_space_dim]
         w_in_a = self.reservoir.w_in[:,-action_space_dim:]
         w_out_J = self.readout.beta[1:1+self.readout.input_dim-i_curr.shape[1]][:]
         w_inout_a = np.concatenate((self.w_inout_sa, self.w_inout_aa), axis=1)
         w_inout_aJ = self.readout.beta[-action_space_dim:][:].T
         weight_out_a = np.hstack((self.w_bias_a, self.w_out_a, self.w_inout_sa, self.w_inout_aa)).T
-        #w_inout_aJ = self.w
                  
-        # Get the different activations
-        self.state_curr = self.reservoir.states                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             
-        a = self.s_curr.values()
-        
+        # Get the activations
+        self.state_curr = self.reservoir.states      
         self.sensor_curr = self.plant.state_input(epoch)
-        
-#         it = 0
-#         for i in self.s_curr.keys():
-#             if ("trg", "curr", "next", "deriv", "readout", "offline", "reward", "gamma"): continue
-#             if (it >= self.sensor_curr.shape[1]): continue
-#             self.sensor_curr[0][it] = self.normalizer.normalize_value(i, self.s_curr.get(i)[0])
-#             it+=1
         self.action_curr = self.a_curr
+        
+        # Normalize the actions
         for i in range(self.a_curr.shape[0]):
-            self.action_curr = self.normalizer.normalize_value('a_curr', self.a_curr[i])
+            self.action_curr[i] = self.normalizer.normalize_value('a_curr', self.a_curr[i])
         
         if not self.withRecursion:
             part_A = np.dot(w_out_J.T, np.atleast_2d(w_in_a.multiply(np.reshape(np.repeat(1-self.state_curr**2, A, axis=0), [N,A])))) + w_inout_aJ
@@ -221,10 +218,11 @@ class ADHDP2(ADHDP):
         deltaW_inout_aa = self.etha_w_inout_aa * dJ_dW_inout_aa
         deltaW_inout_sa = self.etha_w_inout_sa * dJ_dW_inout_sa
         
-        x_next1= np.concatenate((np.ones((x_next.shape[0], 1)), x_next), axis=1)
+        x_next1 = np.concatenate((np.ones((x_next.shape[0], 1)), x_next), axis=1)
+        x_next1 = np.tanh(x_next1)
         
         # pre test
-        a_pre_prop = np.tanh(x_next1.dot(weight_out_a)).T
+        a_pre_prop = x_next1.dot(weight_out_a).T
         
         # Apply the deltas
         self.w_bias_a += deltaW_bias_a.T    
@@ -240,17 +238,23 @@ class ADHDP2(ADHDP):
          
         # Let the activations flow through the network, and get the new action activation from that
         weight_out_a = np.hstack((self.w_bias_a, self.w_out_a, self.w_inout_sa, self.w_inout_aa)).T
-        a_prop = np.tanh(x_next1.dot(weight_out_a)).T
-#         scale = self.normalizer.get('a_curr')[1]
-#         a_prop *= scale # Derivative denormalization
+        
+        # NORMALIZE???
+        max = np.max(weight_out_a)
+        min = np.min(weight_out_a)
+        weight_out_a /= (max-min)
+        
+        a_prop = x_next1.dot(weight_out_a).T
+        scale = self.normalizer.get('a_curr')[1]
+        a_prop *= scale # Derivative denormalization
         
         proposer = BruteForceActor(self.reservoir, self.readout, self.plant)
-        a_brute_prop = proposer.explore(epoch)
+        self.a_brute_prop = proposer.explore(epoch)
         self.countIterations += 1
         if self.countIterations % 100 == 0:
             print "Matthias': ", a_next
             print "Arthur's: ", a_prop
-            print "Brute Force's: ", a_brute_prop
+            print "Brute Force's: ", self.a_brute_prop
             print "   "
             
         
