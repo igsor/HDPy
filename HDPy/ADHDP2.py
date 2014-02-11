@@ -31,6 +31,8 @@ class ADHDP2(ADHDP):
         self.initial_action = initial_action
          
         self.countIterations = 0
+        
+        self.proposer = BruteForceActor(self.reservoir, self.readout, self.plant)
          
         plant = kwargs['plant']
         self.action_space_dim = self.reservoir.get_input_dim() - plant.state_space_dim()
@@ -162,18 +164,18 @@ class ADHDP2(ADHDP):
         # Get the activations
         self.state_curr = self.reservoir.states      
         self.sensor_curr = self.plant.state_input(epoch)
-        self.action_curr = self.a_curr
+        self.action_curr = np.copy(self.a_curr)
         
         # Normalize the actions
         for i in range(self.a_curr.shape[0]):
-            self.action_curr[i] = self.normalizer.normalize_value('a_curr', self.a_curr[i])
+            self.action_curr[i] = self.normalizer.normalize_value('a_curr', np.copy(self.a_curr[i]))
         
         if not self.withRecursion:
             part_A = np.dot(w_out_J.T, np.atleast_2d(w_in_a.multiply(np.reshape(np.repeat(1-self.state_curr**2, A, axis=0), [N,A])))) + w_inout_aJ
 
             # Compute the derivatives:
             # Assuming no recursive dependency
-            dJ_dW_bias_a = part_A
+            dJ_dW_bias_a = np.copy(part_A)
             dJ_dW_out_a = np.outer(part_A, self.state_curr)
             dJ_dW_inout_sa = np.outer(part_A, self.sensor_curr)
             dJ_dW_inout_aa = np.outer(part_A, self.action_curr)
@@ -188,13 +190,13 @@ class ADHDP2(ADHDP):
         if self.withRecursion:
             
             # Transmit the old derivatives
-            self.da_dWout_a_prec = self.da_dWout_a_curr
-            self.da_dWinout_sa_prec = self.da_dWinout_sa_curr
-            self.da_dWinout_aa_prec = self.da_dWinout_aa_curr
+            self.da_dWout_a_prec = np.copy(self.da_dWout_a_curr)
+            self.da_dWinout_sa_prec = np.copy(self.da_dWinout_sa_curr)
+            self.da_dWinout_aa_prec = np.copy(self.da_dWinout_aa_curr)
             
-            self.dX_dWout_a_prec = self.dX_dWout_a_curr
-            self.dX_dWinout_sa_prec = self.dX_dWinout_sa_curr
-            self.dX_dWinout_aa_prec = self.dX_dWinout_sa_curr
+            self.dX_dWout_a_prec = np.copy(self.dX_dWout_a_curr)
+            self.dX_dWinout_sa_prec = np.copy(self.dX_dWinout_sa_curr)
+            self.dX_dWinout_aa_prec = np.copy(self.dX_dWinout_sa_curr)
             
             # Update the derivatives current values
             # TODO: CHECK DIMENSIONS AND MULTIPLIERS (outer, elementwise, dot, ...)
@@ -233,9 +235,9 @@ class ADHDP2(ADHDP):
         self.w_inout_sa = self.w_inout_sa + deltaW_inout_sa
              
         # End of the current calculations, the states, sensor inputs and actions get old
-        self.state_prec = self.state_curr
-        self.sensor_prec = self.sensor_curr
-        self.action_prec = self.action_curr
+        self.state_prec = np.copy(self.state_curr)
+        self.sensor_prec = np.copy(self.sensor_curr)
+        self.action_prec = np.copy(self.action_curr)
         
          
         # Let the activations flow through the network, and get the new action activation from that
@@ -250,14 +252,13 @@ class ADHDP2(ADHDP):
         scale = self.normalizer.get('a_curr')[1]
         a_prop *= scale # Derivative denormalization
         
-        proposer = BruteForceActor(self.reservoir, self.readout, self.plant)
-        self.a_brute_prop = proposer.explore(epoch1)
-        self.countIterations += 1
-        if self.countIterations % 100 == 0:
-            print "Matthias': ", a_next
-            print "Arthur's: ", a_prop
-            print "Brute Force's: ", self.a_brute_prop
-            print "   "
+        self.a_brute_prop = self.proposer.explore(epoch1)
+#         self.countIterations += 1
+#         if self.countIterations % 100 == 0:
+#             print "Matthias': ", a_next
+#             print "Arthur's: ", a_prop
+#             print "Brute Force's: ", self.a_brute_prop
+#             print "   "
             
         
         #END ARTHUR
@@ -290,6 +291,7 @@ class BruteForceActor:
         self.reservoir = reservoir
         self.readout = readout
         self.plant = plant
+        self.a_old = None
     
     def _add_constant(self, x):
         """Add a constant term to the vector 'x'.
@@ -301,28 +303,31 @@ class BruteForceActor:
         """Execute one step of the actor and return the next action."""
           
         # Next action
-        a_next = epoch['a_next']
-        a_curr = epoch['a_curr']
-        j_best = epoch['j_next']
+        a_next = np.copy(epoch['a_next'])
+        a_curr = np.copy(epoch['a_curr'])
+        j_best = np.copy(epoch['j_next'])
         in_state = self.plant.state_input(epoch)
         
-        #delta action
-        a_delta = a_next - a_curr
-          
-        import itertools as it
-        for exploration_factor in  it.product(self.exploration_factor, repeat=a_delta.shape[1]):
-#                 candidate_nrm = self.normalizer.normalize_value('a_next', candidate)
-            candidate = a_curr + (exploration_factor + a_delta)
-            i_cand = np.vstack((in_state, candidate)).T
-            x_cand = self.reservoir(i_cand, simulate=True)
-            #x_cand = np.concatenate((x_cand, epoch['i_next']), axis=1)
-            j_cand = self.readout(np.concatenate((x_cand, i_cand), axis=1))
-            if j_cand > j_best:
-                j_best = j_cand
-                a_next = np.atleast_2d(candidate)
-          
-                #a_next = a_curr + self.alpha(self.num_episode, self.num_step) * (a_next - a_curr)
+        if self.a_old is not None:
+            #delta action
+            a_delta =  self.a_old - a_curr
+            n = a_delta.shape[1]
+              
+            import itertools as it
+            for exploration_factor in  it.product(self.exploration_factor, repeat=n):
+    #                 candidate_nrm = self.normalizer.normalize_value('a_next', candidate)
+                candidate = a_curr + (exploration_factor + a_delta) + np.random.normal(scale=0.01, size=n)
+                i_cand = np.vstack((in_state, candidate)).T
+                x_cand = self.reservoir(i_cand, simulate=True)
+                #x_cand = np.concatenate((x_cand, epoch['i_next']), axis=1)
+                j_cand = self.readout(np.concatenate((x_cand, i_cand), axis=1))
+                if j_cand > j_best:
+                    j_best = j_cand
+                    a_next = np.atleast_2d(candidate)
+              
+                    #a_next = a_curr + self.alpha(self.num_episode, self.num_step) * (a_next - a_curr)
         
-        self.a_old = a_next
+        self.a_old = a_curr
+        print "actions: ", np.round(a_curr.T, 2), np.round(a_next.T, 2), j_best
         
         return a_next
