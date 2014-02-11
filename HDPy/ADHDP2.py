@@ -126,6 +126,8 @@ class ADHDP2(ADHDP):
         
         """
         
+        epoch1 = epoch
+        
         if self.reservoir is None:
             return epoch
         
@@ -249,7 +251,7 @@ class ADHDP2(ADHDP):
         a_prop *= scale # Derivative denormalization
         
         proposer = BruteForceActor(self.reservoir, self.readout, self.plant)
-        self.a_brute_prop = proposer.explore(epoch)
+        self.a_brute_prop = proposer.explore(epoch1)
         self.countIterations += 1
         if self.countIterations % 100 == 0:
             print "Matthias': ", a_next
@@ -297,21 +299,20 @@ class BruteForceActor:
     
     def explore(self, epoch):
         """Execute one step of the actor and return the next action."""
-        
-        a_next = None
-      
-        #delta action
-        a_delta = epoch['a_next'] - epoch['a_curr']
           
         # Next action
         a_next = epoch['a_next']
+        a_curr = epoch['a_curr']
         j_best = epoch['j_next']
         in_state = self.plant.state_input(epoch)
+        
+        #delta action
+        a_delta = a_next - a_curr
           
         import itertools as it
         for exploration_factor in  it.product(self.exploration_factor, repeat=a_delta.shape[1]):
 #                 candidate_nrm = self.normalizer.normalize_value('a_next', candidate)
-            candidate = epoch['a_curr'] + (exploration_factor + a_delta)
+            candidate = a_curr + (exploration_factor + a_delta)
             i_cand = np.vstack((in_state, candidate)).T
             x_cand = self.reservoir(i_cand, simulate=True)
             #x_cand = np.concatenate((x_cand, epoch['i_next']), axis=1)
@@ -321,5 +322,7 @@ class BruteForceActor:
                 a_next = np.atleast_2d(candidate)
           
                 #a_next = a_curr + self.alpha(self.num_episode, self.num_step) * (a_next - a_curr)
+        
+        self.a_old = a_next
         
         return a_next
