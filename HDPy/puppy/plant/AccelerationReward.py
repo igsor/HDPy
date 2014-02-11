@@ -84,7 +84,7 @@ class AccelerationReward(Plant):
             #check consistency
             if mov < 0.1*n:
                 # calculate displacement in a reasonable scale
-                spd = (3000.0/n) * mov;
+                spd = (3000.0/n) * mov
         
         
         
@@ -102,10 +102,10 @@ class AccelerationReward(Plant):
         if fax.size > 0:
             acc = abs(fax  + fay  + faz - scipy.constants.g).mean()
         else:
-            acc = scipy.constants.g;
+            acc = scipy.constants.g
 
         #acc = abs(epoch['accelerometer_x'] + epoch['accelerometer_y']  + epoch['accelerometer_z'] - scipy.constants.g).mean()
-        return spd - acc; 
+        return spd# - acc
 
 
 def firfilt(interval, freq, sampling_rate):
