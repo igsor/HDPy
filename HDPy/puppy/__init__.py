@@ -6,7 +6,6 @@
 
 """
 from puppy import *
-from puppyBruteForce import BruteForcePuppyHDP
 from analysis_puppy import *
 import policy
 import plant
