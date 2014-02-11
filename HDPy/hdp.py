@@ -164,11 +164,11 @@ class ADHDP(ActorCritic):
         epoch['i_curr'] = i_curr
         epoch['x_curr'] = x_curr
         epoch['j_curr'] = j_curr
-        epoch['a_curr'] = a_curr.T
+        epoch['a_curr'] = a_curr
         epoch['i_next'] = i_next
         epoch['x_next'] = x_next
         epoch['j_next'] = j_next
-        epoch['a_next'] = a_next.T
+        epoch['a_next'] = a_next
         
         self._pre_increment_hook(epoch)
         

@@ -14,15 +14,17 @@ is documented in :ref:`puppy_offline`.
 
 """
 from ..hdp import ADHDP
+from ..ADHDP2 import ADHDP2
 from ..rl import Plant
 import numpy as np
 import warnings
 import h5py
 from mdp.nodes.lle_nodes import sqrt
 
+
 SENSOR_NAMES = ['trg0', 'trg1', 'trg2', 'trg3', 'accelerometer_x', 'accelerometer_y', 'accelerometer_z', 'compass_x', 'compass_y', 'compass_z', 'gyro_x', 'gyro_y', 'gyro_z', 'hip0', 'hip1', 'hip2', 'hip3', 'knee0', 'knee1', 'knee2', 'knee3', 'puppyGPS_x', 'puppyGPS_y', 'puppyGPS_z', 'touch0', 'touch0', 'touch1', 'touch2', 'touch3']
 
-class PuppyHDP(ADHDP):
+class PuppyHDP(ADHDP2):
     """ADHDP subtype for simulations using Puppy in webots.
     
     This class adds some code considering restarts of Puppy. It adds
@@ -141,7 +143,7 @@ class PuppyHDP(ADHDP):
         self.s_curr = epoch
         return self.child(epoch, time_start_ms, time_end_ms, step_size_ms)
 
-class OfflineCollector(ADHDP):
+class OfflineCollector(ADHDP2):
     """Collect sensor data for Puppy in webots, such that it can be
     reused later to train a critic offline.
     

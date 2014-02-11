@@ -418,6 +418,8 @@ class ActorCritic(PuPy.RobotActor):
         """Postprocessing hook, after the next action ``a_next`` was
         proposed by the algorithm. Must return the possibly altered
         next action in the same format."""
+        if a_next.shape[0] > 1:
+            a_next = a_next.T
         return a_next
     
     def save(self, pth):
