@@ -44,7 +44,7 @@ class ADHDP2(ADHDP):
         # Initialize the action
         self.action_prec = np.zeros([1, self.action_space_dim])
         self.action_curr = initial_action
-        self.a_brute_prop = None
+        self.a_brute_prop = np.array([])
          
         # Initialize the learning rates
         if etha is not None:
