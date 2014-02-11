@@ -363,9 +363,8 @@ def offline_playback(pth_data, critic, samples_per_action, ms_per_step,
     if episode_start_test is None:
         episode_start_test = len(storages)/2 - 1; #use last half for testing 
         
-    global accError, Jmax, Jmin, Rmax, Rmin
+    global accError, Rmax, Rmin
     accError = 0 # accumulated error
-    Jmax, Jmin = float('-inf'), float('inf')
     Rmax, Rmin = float('-inf'), float('inf')
     
     # Prepare critic; redirect hooks to avoid storing epoch data twice
@@ -379,12 +378,9 @@ def offline_playback(pth_data, critic, samples_per_action, ms_per_step,
         epoch['offline_episode'] = np.array([episode])
         critic._pre_increment_hook_orig(epoch)
         if int(episode) > episode_start_test and epoch.has_key('err'):
-            global accError, Jmax, Jmin, Rmax, Rmin
-            J = epoch['j_curr'][0][0]
+            global accError, Rmax, Rmin
             R = epoch['reward'][0][0]
             err = epoch['err'][0][0]
-            if J > Jmax: Jmax = J
-            elif J < Jmin: Jmin = J
             if R > Rmax: Rmax = R
             elif R < Rmin: Rmin = R
             accError = accError*(1-err_coefficient) + (err**2) * err_coefficient # accumulated squared error
@@ -461,7 +457,6 @@ def offline_playback(pth_data, critic, samples_per_action, ms_per_step,
             critic.signal('new_episode') # collectors will create new group
         
         if accError != 0:
-            devErrorJ = sqrt(accError)/(Jmax-Jmin)  # normalized root-mean-square deviation
             devError = sqrt(accError)/(Rmax-Rmin)  # normalized root-mean-square deviation
             print episode + ': accumulated error: %f  NRMSD: %f' % (accError, devError)
     
