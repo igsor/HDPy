@@ -73,11 +73,6 @@ class AccelerationReward(Plant):
         self.x  = np.concatenate([self.x[-1:],  epoch['puppyGPS_x']])
         self.y  = np.concatenate([self.y[-1:],  epoch['puppyGPS_y']])
         
-        #store last 2 epochs plus current one 
-        self.ax = np.concatenate([self.ax[-2*n:], epoch['accelerometer_x']])
-        self.ay = np.concatenate([self.ay[-2*n:], epoch['accelerometer_y']])
-        self.az = np.concatenate([self.az[-2*n:], epoch['accelerometer_z']])
-        
         spd = 0
         if self.x.size > 1:
             mov = np.linalg.norm(np.array([self.x[-1] - self.x[0], self.y[-1] - self.y[0]]))
@@ -87,24 +82,28 @@ class AccelerationReward(Plant):
                 spd = (3000.0/n) * mov
         
         
-        
-        s = np.ceil(self.ax.size/3.0)
-        fr = 0.3
-        sr = 2*fr + (s/10.0) #should be smaller than s
-        
-        #filtered to remove noise; borders of the result always tend to zero and have to be trimmed
-        end = -np.ceil(sr)
-        beg = -s+end
-        fax = firfilt(self.ax, fr, sr)[beg:end]
-        fay = firfilt(self.ay, fr, sr)[beg:end]
-        faz = firfilt(self.az, fr, sr)[beg:end]
-        
-        if fax.size > 0:
-            acc = abs(fax  + fay  + faz - scipy.constants.g).mean()
-        else:
-            acc = scipy.constants.g
-
-        #acc = abs(epoch['accelerometer_x'] + epoch['accelerometer_y']  + epoch['accelerometer_z'] - scipy.constants.g).mean()
+#         #store last 2 epochs plus current one 
+#         self.ax = np.concatenate([self.ax[-2*n:], epoch['accelerometer_x']])
+#         self.ay = np.concatenate([self.ay[-2*n:], epoch['accelerometer_y']])
+#         self.az = np.concatenate([self.az[-2*n:], epoch['accelerometer_z']])
+#         
+#         s = np.ceil(self.ax.size/3.0)
+#         fr = 0.3
+#         sr = 2*fr + (s/10.0) #should be smaller than s
+#         
+#         #filtered to remove noise; borders of the result always tend to zero and have to be trimmed
+#         end = -np.ceil(sr)
+#         beg = -s+end
+#         fax = firfilt(self.ax, fr, sr)[beg:end]
+#         fay = firfilt(self.ay, fr, sr)[beg:end]
+#         faz = firfilt(self.az, fr, sr)[beg:end]
+#         
+#         if fax.size > 0:
+#             acc = abs(fax  + fay  + faz - scipy.constants.g).mean()
+#         else:
+#             acc = scipy.constants.g
+# 
+#         acc = abs(epoch['accelerometer_x'] + epoch['accelerometer_y']  + epoch['accelerometer_z'] - scipy.constants.g).mean()
         return spd# - acc
 
 

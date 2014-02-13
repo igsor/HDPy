@@ -458,7 +458,7 @@ def offline_playback(pth_data, critic, samples_per_action, ms_per_step,
         
         if accError != 0:
             devError = sqrt(accError)/(Rmax-Rmin)  # normalized root-mean-square deviation
-            print episode + ': accumulated error: %f  NRMSD: %f' % (accError, devError)
+            print episode + ': accumulated error: %g  NRMSD: %g' % (accError, devError)
     
     # cleanup
     critic._pre_increment_hook = critic._pre_increment_hook_orig
