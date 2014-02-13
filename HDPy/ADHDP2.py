@@ -252,7 +252,7 @@ class ADHDP2(ADHDP):
         scale = self.normalizer.get('a_curr')[1]
         a_prop *= scale # Derivative denormalization
         
-        self.a_brute_prop = self.proposer.explore(epoch1)
+        #self.a_brute_prop = self.proposer.explore(epoch1)
 #         self.countIterations += 1
 #         if self.countIterations % 100 == 0:
 #             print "Matthias': ", a_next
