@@ -222,11 +222,11 @@ class ADHDP2(ADHDP):
         deltaW_inout_aa = self.etha_w_inout_aa * dJ_dW_inout_aa
         deltaW_inout_sa = self.etha_w_inout_sa * dJ_dW_inout_sa
         
-        x_next1 = np.concatenate((np.ones((x_next.shape[0], 1)), x_next), axis=1)
-        x_next1 = np.tanh(x_next1)
+        x_curr1 = np.concatenate((np.ones((x_curr.shape[0], 1)), x_curr), axis=1)
+        x_curr1 = np.tanh(x_curr1)
         
         # pre test
-        a_pre_prop = x_next1.dot(weight_out_a).T
+        a_pre_prop = x_curr1.dot(weight_out_a).T
         
         # Apply the deltas
         self.w_bias_a += deltaW_bias_a.T    
@@ -248,17 +248,17 @@ class ADHDP2(ADHDP):
         min = np.min(weight_out_a)
         weight_out_a /= (max-min)
         
-        a_prop = x_next1.dot(weight_out_a).T
+        a_prop = x_curr1.dot(weight_out_a).T
         scale = self.normalizer.get('a_curr')[1]
         a_prop *= scale # Derivative denormalization
         
-        #self.a_brute_prop = self.proposer.explore(epoch1)
-#         self.countIterations += 1
-#         if self.countIterations % 100 == 0:
-#             print "Matthias': ", a_next
-#             print "Arthur's: ", a_prop
-#             print "Brute Force's: ", self.a_brute_prop
-#             print "   "
+        self.a_brute_prop = self.proposer.explore(epoch1)
+        self.countIterations += 1
+        if self.countIterations % 100 == 0:
+            print "Matthias': ", a_next
+            print "Arthur's: ", a_prop
+            print "Brute Force's: ", self.a_brute_prop
+            print "   "
             
         
         #END ARTHUR
@@ -272,11 +272,11 @@ class ADHDP2(ADHDP):
         epoch['i_curr'] = i_curr
         epoch['x_curr'] = x_curr
         epoch['j_curr'] = j_curr
-        epoch['a_curr'] = a_curr.T
+        epoch['a_curr'] = a_curr
         epoch['i_next'] = i_next
         epoch['x_next'] = x_next
         epoch['j_next'] = j_next
-        epoch['a_next'] = a_next.T
+        epoch['a_next'] = a_next
         
         self._pre_increment_hook(epoch)
         

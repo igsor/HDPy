@@ -72,7 +72,10 @@ class ADHDP(ActorCritic):
         """Evaluate the critic at ``state`` and ``action``."""
         in_state = self.plant.state_input(state)
         action_nrm = self.normalizer.normalize_value(action_name, action)
+        if in_state.shape[1] != action_nrm.shape[1]:
+            action_nrm = action_nrm.T
         r_input = np.vstack((in_state, action_nrm)).T
+        action_nrm = action_nrm.T
         #r_input += np.random.normal(scale=0.001, size=r_input.shape)
         r_state = self.reservoir(r_input, simulate=simulate)
         #o_state = r_state # TODO: Direct ESN Model
@@ -150,7 +153,11 @@ class ADHDP(ActorCritic):
         i_next, x_next, j_next = self._critic_eval(epoch, a_next, simulate=True, action_name='a_next')
         
         # TD_error(k) = J(k) - U(k) - gamma * J(k+1)
-        err = reward + self.gamma(self.num_episode, self.num_step) * j_next - j_curr
+        if reward is not None:
+            err = reward + self.gamma(self.num_episode, self.num_step) * j_next - j_curr
+        else:
+            err = self.gamma(self.num_episode, self.num_step) * j_next - j_curr
+            #raise Exception('no reward (hdp.py)')
         
         # One-step RLS training => Trained ESN
         self.readout.train(x_curr, err=err)
