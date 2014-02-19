@@ -49,10 +49,16 @@ class ADHDP(ActorCritic):
         of ``reservoir`` and ``readout``  must match and the
         output of the latter must be single dimensional.
     
+    ``iomodel``
+        :py:type:bool: whether or not to use the I/O-model, where the
+        readout's input is the reservoir states plus the reservoir inputs.
+    
     """
-    def __init__(self, reservoir, readout, *args, **kwargs):
+    def __init__(self, reservoir, readout, iomodel=True, train=True, *args, **kwargs):
         self.reservoir = reservoir
         self.readout = readout
+        self.iomodel = iomodel
+        self.train = train
         super(ADHDP, self).__init__(*args, **kwargs)
         
         # Check assumptions
@@ -73,13 +79,22 @@ class ADHDP(ActorCritic):
         """Evaluate the critic at ``state`` and ``action``."""
         in_state = self.plant.state_input(state)
         action_nrm = self.normalizer.normalize_value(action_name, action)
-        r_input = np.vstack((in_state, action_nrm)).T
+        # to concatenate state and action, the action needs to be expanded to epoch length (in case they don't match):
+        r_input = np.vstack((in_state, np.repeat(action_nrm, in_state.shape[1], axis=1))).T
         #r_input += np.random.normal(scale=0.001, size=r_input.shape)
         r_state = self.reservoir(r_input, simulate=simulate)
-        #o_state = r_state # TODO: Direct ESN Model
-        o_state = np.hstack((r_state, r_input)) # TODO: Input/Output ESN Model
-        j_curr = self.readout(o_state)
-        return r_input, o_state, j_curr
+        if self.iomodel:
+            r_state = np.hstack((r_state, r_input)) # I/O model
+        # for the readout we only take the last step:
+        j_curr = self.readout(r_state[np.newaxis, -1])
+        return r_input, r_state, j_curr
+        
+    def _critic_deriv(self, r_state):
+        """Return the critic's derivative at ``r_state``."""
+        if self.iomodel:
+            return self._critic_deriv_io_model(r_state)
+        else:
+            return self._critic_deriv_direct_model(r_state)
     
     def _critic_deriv_io_model(self, r_state):
         """Return the critic's derivative at ``r_state``."""
@@ -103,10 +118,6 @@ class ADHDP(ActorCritic):
         scale = self.normalizer.get('a_curr')[1]
         deriv *= scale # Derivative denormalization
         return deriv
-    
-    def _critic_deriv(self, r_state):
-        """Return the critic's derivative at ``r_state``."""
-        return self._critic_deriv_io_model(r_state)
     
     def _step(self, s_curr, epoch, a_curr, reward):
         """Execute one step of the actor and return the next action.
@@ -140,7 +151,7 @@ class ADHDP(ActorCritic):
         i_curr, x_curr, j_curr = self._critic_eval(s_curr, a_curr, simulate=False, action_name='a_curr')
         
         # Next action
-        deriv = self._critic_deriv(x_curr)
+        deriv = self._critic_deriv(x_curr[np.newaxis, -1])
         
         # gradient training of action (acc. to eq. 10)
         a_next = a_curr + self.alpha(self.num_episode, self.num_step) * deriv
@@ -154,8 +165,10 @@ class ADHDP(ActorCritic):
         err = reward + self.gamma(self.num_episode, self.num_step) * j_next - j_curr
         
         # One-step RLS training => Trained ESN
-        self.readout.train(x_curr, err=err)
+        if self.train:
+            self.readout.train(x_curr[np.newaxis, -1], err=err)
         
+        # TODO: make optional list with locals to store in epoch
         # update epoch with locals:
         epoch['reward'] = np.atleast_2d([reward]).T
         epoch['deriv'] = deriv.T

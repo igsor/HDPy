@@ -144,18 +144,21 @@ class OfflineCollector(ADHDP):
         else:
             from ..hdp import return_none
             action_space_dim = return_none
+        if 'plant' not in kwargs:
+            kwargs['plant'] = Plant(state_space_dim=0)
+        plant = kwargs['plant']
+        state_space_dim = plant.state_space_dim
         
         class Phony:
             """Stub for a reservoir."""
             reset_states = False
             def get_input_dim(self):
                 """Return input dimension (action space dim.)"""
-                return action_space_dim()
+                return action_space_dim()+state_space_dim()
             def reset(self):
                 """Reset to the initial state (no effect)"""
                 pass
         
-        kwargs['plant'] = Plant(state_space_dim=0)
         kwargs['reservoir'] = Phony()
         kwargs['readout'] = None
         self.supervisor_tumbled_notice = 0
@@ -209,6 +212,10 @@ class OfflineCollector(ADHDP):
         else:
             print 't:', time_start_ms, ' a:', self.a_curr.T, ' x:', epoch['puppyGPS_x'][-1], 'y:', epoch['puppyGPS_y'][-1]
         
+        try:
+            epoch['reward'] = np.atleast_2d(self.plant.reward(epoch))
+        except NotImplementedError:
+            pass
         epoch['a_curr'] = self.a_curr.T
         epoch['a_next'] = a_next.T
         

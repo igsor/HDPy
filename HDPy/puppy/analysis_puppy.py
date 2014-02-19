@@ -44,16 +44,21 @@ def plot_trajectory(analysis, axis, episode, step_width=1, offset=0, legend=True
     
     return axis
 
-def plot_all_trajectories(analysis, axis, step_width=1, **kwargs):
+def plot_all_trajectories(analysis, axis=None, step_width=1, **kwargs):
     """Plot all trajectories in ``analysis`` into ``axis``.
     """
+    if axis is None:
+        axis = pylab.figure().add_subplot(111)
     gps_x = analysis.get_data('puppyGPS_x')
     gps_y = analysis.get_data('puppyGPS_y')
     
     N = len(gps_x)-1
-    kwargs.pop('color', None) # remove color argument
+    color = kwargs.pop('color', None) # remove color argument
     for idx, (x, y) in enumerate(zip(gps_x, gps_y)):
-        col = 0.75 - (0.75 * (idx - 1))/N
+        if color is None:
+            col = 0.75 - (0.75 * (idx - 1))/N
+        else:
+            col = color
         
         x_plot = np.concatenate(([x[0]], x[step_width-1::step_width]))
         y_plot = np.concatenate(([y[0]], y[step_width-1::step_width]))
@@ -62,6 +67,29 @@ def plot_all_trajectories(analysis, axis, step_width=1, **kwargs):
     
     return axis
 
+def plot_trajectory_with_reward(analysis, axis=None, episode=None, reward_key='reward', reward_step=1, reward_offset=0, reward_min=None, reward_max=None, **kwargs):
+    if axis is None:
+        axis = pylab.figure().add_subplot(111)
+    if episode is None:
+        start_episode = 0
+        end_episode = None
+    else:
+        start_episode = episode
+        end_episode = episode+1
+    
+    reward = analysis.stack_data(reward_key, start_episode=start_episode, end_episode=end_episode)
+    if reward_min is not None:
+        reward[reward<reward_min] = reward_min
+    if reward_max is not None:
+        reward[reward>reward_max] = reward_max
+    gps_x = analysis.stack_data('puppyGPS_x', offset=reward_offset*reward_step, start_episode=start_episode, end_episode=end_episode)
+    gps_y = analysis.stack_data('puppyGPS_y', offset=reward_offset*reward_step, start_episode=start_episode, end_episode=end_episode)
+    
+    sc = axis.scatter(gps_x[::reward_step], gps_y[::reward_step], c=reward, edgecolors='none', **kwargs)
+    cb = pylab.colorbar(sc, ax=axis)
+    
+    return axis, cb
+    
 def plot_linetarget(axis, origin=(2.0, 0.0), direction=(1.0, 1.0), range_=(-5.0, 5.0)):
     """Plot a line given by ``origin`` and ``direction``. The ``range_``
     may be supplid, which corresponds to the length of the line (from

@@ -85,17 +85,17 @@ class Analysis:
         
         return data
     
-    def get_data(self, key):
+    def get_data(self, key, offset=0, start_episode=0, end_episode=None):
         """Return a list of all data belonging to ``key``."""
-        return [self.f[exp][key][:] for exp in self.experiments if key in self.f[exp]]
+        return [self.f[exp][key][offset:] for exp in self.experiments[start_episode:(end_episode is None and len(self.experiments) or end_episode)] if key in self.f[exp] and self.f[exp][key].shape[0]>offset]
     
     def stack_data(self, key, offset=0, start_episode=0, end_episode=None):
         """Return data related to ``key`` of all experiments in a single
         array."""
-        data = [self.f[exp][key][offset:] for exp in self.experiments[start_episode:(end_episode is None and len(self.experiments) or end_episode)] if key in self.f[exp] and self.f[exp][key].shape[0]>offset]
+        data = self.get_data(key, offset=offset, start_episode=start_episode, end_episode=end_episode)
         if len(data)>0:
             data = np.concatenate(data)
-        return data
+        return np.array(data)
     
     def __getitem__(self, key):
         if isinstance(key, int):
@@ -146,6 +146,12 @@ class Analysis:
         for i in np.array(steps).cumsum():
             axis.axvline(i, linestyle='-', color='0.7')
         
+        return axis
+    
+    def plot_mark(self, episode, axis, key=None, **kwargs):
+        steps = np.cumsum(self.num_steps(key))
+        col = kwargs.pop('color', '0.7')
+        axis.axvline(steps[episode], linestyle='-', color=col, **kwargs)
         return axis
     
     def plot_neuron_activation(self, axis=None, **kwargs):
@@ -221,6 +227,25 @@ class Analysis:
             self.plot_grid(axis, key)
         return axis
     
+    def plot_readout_diff_avg_per_episode(self, axis=None, key='readout', log_scale=False, **kwargs):
+        """Plot the difference of absolute readout weights in
+        ``axis``."""
+        if axis is None:
+            axis = pylab.figure().add_subplot(111)
+        data = self.get_data(key)
+        diff = map(lambda x:np.repeat(np.mean(np.abs(np.diff(x, axis=0))), len(x)), data)
+        diff = np.concatenate(diff)
+        color = kwargs.pop('color','k')
+        lbl = kwargs.pop('label', 'Readout difference')
+        axis.plot(diff, color=color, label=lbl, **kwargs)
+        if log_scale:
+            axis.set_yscale('log')
+        axis.set_xlabel('step')
+        axis.set_ylabel('Readout difference')
+        if self.always_plot_grid:
+            self.plot_grid(axis, key)
+        return axis
+    
     def plot_cumulative_readout_diff(self, axis=None, **kwargs):
         """Plot the cumulative difference of absolute readout weights in
         ``axis``."""
@@ -273,6 +298,22 @@ class Analysis:
             self.plot_grid(axis, 'reward')
         return axis
     
+    def plot_mean_reward(self, axis=None, **kwargs):
+        """Plot the reward over time in ``axis``."""
+        if axis is None:
+            axis = pylab.figure().add_subplot(111)
+        data = self.get_data('reward')
+        n = map(len, data)
+        data = map(np.mean, data)
+        data = np.vstack([np.ones((n[i],1))*data[i] for i in range(len(n))])
+        color = kwargs.pop('color', 'k')
+        axis.plot(data, color=color, **kwargs)
+        axis.set_xlabel('step')
+        axis.set_ylabel('Mean Reward')
+        if self.always_plot_grid:
+            self.plot_grid(axis, 'reward')
+        return axis
+    
     def plot_reward_against_action2d(self, axis=None, offset=0, reward_offset=0, reward_min=None, reward_max=None):
         """make a scatter plot of actions and color them according to the resulting reward."""
         if axis is None:
@@ -309,9 +350,10 @@ class Analysis:
         sc = axis.scatter(state[idx,0], state[idx,1], c=reward[idx], edgecolors='none')
         axis.set_xlabel(key1)
         axis.set_ylabel(key2)
-        cb = pylab.colorbar(sc)
+        cb = pylab.colorbar(sc, ax=axis)
         cb.set_label(key_reward)
-        return axis
+        pylab.axis('equal', ax=axis)
+        return axis, cb
     
     def plot_derivative(self, axis=None, **kwargs):
         """Plot the derivative dJ/da over time in ``axis``."""
@@ -344,7 +386,7 @@ class Analysis:
             self.plot_grid(axis, 'a_curr')
         return axis
     
-    def plot_action_space_2d(self, axis=None, bins=30, offset=0, start_episode=0, end_episode=-1, **kwargs):
+    def plot_action_space_2d(self, axis=None, bins=30, offset=0, start_episode=0, end_episode=None, **kwargs):
         """make a scatter plot of actions"""
         if axis is None:
             axis = pylab.figure().add_subplot(111)
@@ -356,6 +398,21 @@ class Analysis:
         axis.set_ylabel('action 2')
         pylab.colorbar(pc)
         return axis
+    
+    def plot_state_space_2d(self, key1, key2, axis=None, bins=30, offset=0, start_episode=0, end_episode=None, xlabel=None, ylabel=None, **kwargs):
+        """make a scatter plot of actions"""
+        if axis is None:
+            axis = pylab.figure().add_subplot(111)
+        state1 = self.stack_data(key1, offset=offset, start_episode=start_episode, end_episode=end_episode)
+        state2 = self.stack_data(key2, offset=offset, start_episode=start_episode, end_episode=end_episode)
+        n, edges = np.histogramdd([state1,state2], bins)
+#        n /= n.sum()
+        pc = axis.pcolor(edges[0], edges[1], n.T, **kwargs)
+#        pc = axis.imshow(n.T, interpolation='none', **kwargs)
+        axis.set_xlabel(xlabel is None and key1 or xlabel)
+        axis.set_ylabel(ylabel is None and key2 or ylabel)
+        cb = pylab.colorbar(pc,ax=axis)
+        return axis, cb
     
     def plot_action_vs_compass(self, axis=None):
         if axis is None:
@@ -449,18 +506,18 @@ class Analysis:
         axis.legend(loc=0)
         return axis
     
-    def plot_mean_reward(self, axis=None, **kwargs):
-        """Plot the accumulated reward per episode in ``axis``."""
-        if axis is None:
-            axis = pylab.figure().add_subplot(111)
-        reward = self.get_data('reward')
-        data = [r.mean() for r in reward]
-        lbl = kwargs.pop('label', 'Accumulated reward')
-        col = kwargs.pop('color', 'k')
-        axis.plot(data, col, label=lbl, **kwargs)
-        axis.set_xlabel('episode')
-        axis.set_ylabel('Accumulated reward')
-        return axis
+#    def plot_mean_reward(self, axis=None, **kwargs):
+#        """Plot the accumulated reward per episode in ``axis``."""
+#        if axis is None:
+#            axis = pylab.figure().add_subplot(111)
+#        reward = self.get_data('reward')
+#        data = [r.mean() for r in reward]
+#        lbl = kwargs.pop('label', 'Accumulated reward')
+#        col = kwargs.pop('color', 'k')
+#        axis.plot(data, col, label=lbl, **kwargs)
+#        axis.set_xlabel('episode')
+#        axis.set_ylabel('Accumulated reward')
+#        return axis
     
     def plot_return_prediction(self, axis=None, plot=('j_curr', 'j_next'), **kwargs):
         """Plot the predicted return of the current (red) and next
@@ -468,15 +525,17 @@ class Analysis:
         of the two predicted return are plotted."""
         if axis is None:
             axis = pylab.figure().add_subplot(111)
-        kwargs.pop('color', 0)
+        #kwargs.pop('color', 0)
         kwargs.pop('label', 0)
         if 'j_curr' in plot:
             j_curr = self.stack_data('j_curr')
-            axis.plot(j_curr, 'r', label='j_curr', **kwargs)
+            #axis.plot(j_curr, 'r', label='j_curr', **kwargs)
+            axis.plot(j_curr, label='j_curr', **kwargs)
         
         if 'j_next' in plot:
             j_next = self.stack_data('j_next')
-            axis.plot(j_next, 'b', label='j_next', **kwargs)
+            #axis.plot(j_next, 'b', label='j_next', **kwargs)
+            axis.plot(j_next, label='j_next', **kwargs)
         
         axis.set_xlabel('step')
         axis.set_ylabel('predicted return')
