@@ -99,7 +99,11 @@ class ADHDP2(ADHDP):
     def init_random_action_weights(self, rows, cols):
         weight_matrice = np.zeros((rows, cols))
         for i in range(rows):
-            weight_matrice[i][:] = np.random.normal(0.0, 0.1, cols)
+            for j in range(cols):
+                weight = np.random.normal(0.0, 1.0, 1)
+                while weight < -1.0 or weight > 1.0:
+                    weight = np.random.normal(0.0, 1.0, 1)
+                weight_matrice[i][j] = weight
         return weight_matrice 
     
     def _step(self, s_curr, epoch, a_curr, reward):
