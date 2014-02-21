@@ -19,10 +19,12 @@ class ADHDP2(ADHDP):
         instance, like :py:class:`StabilizedRLS`.
     
     """    
-    def __init__(self, reservoir, readout, initial_action=None, _withBias=True, etha=0.1, _withRecursion=False, lambda_=1.0, *args, **kwargs):
+    def __init__(self, reservoir, readout, initial_action=None, _withBias=True, etha=0.1, _withRecursion=False, withActionDerivation=True, withBruteForce=False, lambda_=1.0, *args, **kwargs):
         
         super(ADHDP2, self).__init__(reservoir, readout, *args, **kwargs)            
         
+        self.withActionDerivation = withActionDerivation
+        self.withBruteForce = withBruteForce
         self.reservoir = reservoir
         self.readout = readout
         self.withRecursion = _withRecursion
@@ -32,7 +34,8 @@ class ADHDP2(ADHDP):
          
         self.countIterations = 0
         
-        self.proposer = BruteForceActor(self.reservoir, self.readout, self.plant)
+        if withBruteForce:
+            self.proposer = BruteForceActor(self.reservoir, self.readout, self.plant)
          
         plant = kwargs['plant']
         self.action_space_dim = self.reservoir.get_input_dim() - plant.state_space_dim()
@@ -147,117 +150,123 @@ class ADHDP2(ADHDP):
         
         # BEGIN ARTHUR
         
+        if self.withActionDerivation:
+        
         #epoch = self.normalizer.normalize_epoch(epoch)
         
-        action_space_dim = self.action_space_dim
-        A = action_space_dim
-        N = self.reservoir.w.shape[0]
-         
-        # Capture the different weights needed for the ESN output
-        w_in_s = self.reservoir.w_in[:,:-action_space_dim]
-        w_in_a = self.reservoir.w_in[:,-action_space_dim:]
-        w_out_J = self.readout.beta[1:1+self.readout.input_dim-i_curr.shape[1]][:]
-        w_inout_a = np.concatenate((self.w_inout_sa, self.w_inout_aa), axis=1)
-        w_inout_aJ = self.readout.beta[-action_space_dim:][:].T
-        weight_out_a = np.hstack((self.w_bias_a, self.w_out_a, self.w_inout_sa, self.w_inout_aa)).T
-                 
-        # Get the activations
-        self.state_curr = self.reservoir.states      
-        self.sensor_curr = self.plant.state_input(epoch)
-        self.action_curr = np.copy(self.a_curr)
-        
-        # Normalize the actions
-        for i in range(self.a_curr.shape[0]):
-            self.action_curr[i] = self.normalizer.normalize_value('a_curr', np.copy(self.a_curr[i]))
-        
-        if not self.withRecursion:
-            part_A = np.dot(w_out_J.T, np.atleast_2d(w_in_a.multiply(np.reshape(np.repeat(1-self.state_curr**2, A, axis=0), [N,A])))) + w_inout_aJ
-
-            # Compute the derivatives:
-            # Assuming no recursive dependency
-            dJ_dW_bias_a = np.copy(part_A)
-            dJ_dW_out_a = np.outer(part_A, self.state_curr)
-            dJ_dW_inout_sa = np.outer(part_A, self.sensor_curr)
-            dJ_dW_inout_aa = np.outer(part_A, self.action_curr)
-            
-#             dJ_dW_out_a = np.outer(part_A, self.state_curr) + w_inout_a * self.state_curr
-#             dJ_dW_inout_sa = np.outer(part_A, self.sensor_curr) + w_inout_a * self.sensor_prec
-#             dJ_dW_inout_aa = np.outer(part_A, self.action_curr) + w_inout_a * self.action_prec
-        
-        
-        #BEGIN WITH RECURSION
-        
-        if self.withRecursion:
-            
-            # Transmit the old derivatives
-            self.da_dWout_a_prec = np.copy(self.da_dWout_a_curr)
-            self.da_dWinout_sa_prec = np.copy(self.da_dWinout_sa_curr)
-            self.da_dWinout_aa_prec = np.copy(self.da_dWinout_aa_curr)
-            
-            self.dX_dWout_a_prec = np.copy(self.dX_dWout_a_curr)
-            self.dX_dWinout_sa_prec = np.copy(self.dX_dWinout_sa_curr)
-            self.dX_dWinout_aa_prec = np.copy(self.dX_dWinout_sa_curr)
-            
-            # Update the derivatives current values
-            # TODO: CHECK DIMENSIONS AND MULTIPLIERS (outer, elementwise, dot, ...)
-            # NOTE: (1-X**2) is the derivative of the tanh function, which is the activation function for this application
-            self.dX_dWout_a_curr = (1 - self.state_curr**2) * (w_in_a * self.da_dWout_a_curr + self.reservoir.w * self.dX_dWout_a_prec)
-            self.dX_dinWout_sa_curr = (1 - self.state_curr**2) * (w_in_a * self.da_dWinout_sa_curr + self.reservoir.w * self.dX_dWinout_sa_prec)
-            self.dX_dinWout_aa_curr = (1 - self.state_curr**2) * (w_in_a * self.da_dWinout_aa_curr + self.reservoir.w * self.dX_dWinout_aa_prec)
-            
-            self.da_dWout_a_curr = self.state_curr + weight_out_a * self.dX_dWout_a_prec + w_inout_a * self.da_dWout_a_prec
-            self.da_dWinout_sa_curr = self.sensor_curr + weight_out_a * self.dX_dWinout_sa_prec + w_inout_a * self.da_dWinout_sa_prec
-            self.da_dWinout_aa_curr = self.action_curr + weight_out_a * self.dX_dWinout_aa_prec + w_inout_a * self.da_dWinout_aa_prec
-            
-            # Compute the Expected Return derivatives
-            dJ_dW_out_a = w_out_J * self.dX_dWout_a_curr + w_inout_a * self.da_dWout_a_curr
-            dJ_dW_inout_sa = w_out_J * self.dX_dWinout_sa_curr + w_inout_a * self.da_dWinout_sa_curr
-            dJ_dW_inout_aa = w_out_J * self.dX_dWinout_aa_curr + w_inout_a * self.da_dWinout_aa_curr
-        
-        #END WITH RECURSION
-        
-        # Compute the deltas
-        deltaW_bias_a = self.etha_w_out_a * dJ_dW_bias_a
-        deltaW_out_a = self.etha_w_out_a * dJ_dW_out_a
-        deltaW_inout_aa = self.etha_w_inout_aa * dJ_dW_inout_aa
-        deltaW_inout_sa = self.etha_w_inout_sa * dJ_dW_inout_sa
-        
-        x_curr1 = np.concatenate((np.ones((x_curr.shape[0], 1)), x_curr), axis=1)
-        x_curr1 = np.tanh(x_curr1)
-        
-        # pre test
-        a_pre_prop = x_curr1.dot(weight_out_a).T
-        
-        # Apply the deltas
-        self.w_bias_a += deltaW_bias_a.T    
-        self.w_out_a += deltaW_out_a
-        self.w_inout_aa = self.w_inout_aa + deltaW_inout_aa
-        self.w_inout_sa = self.w_inout_sa + deltaW_inout_sa
+            action_space_dim = self.action_space_dim
+            A = action_space_dim
+            N = self.reservoir.w.shape[0]
              
-        # End of the current calculations, the states, sensor inputs and actions get old
-        self.state_prec = np.copy(self.state_curr)
-        self.sensor_prec = np.copy(self.sensor_curr)
-        self.action_prec = np.copy(self.action_curr)
-        
-         
-        # Let the activations flow through the network, and get the new action activation from that
-        weight_out_a = np.hstack((self.w_bias_a, self.w_out_a, self.w_inout_sa, self.w_inout_aa)).T
-        
-        # NORMALIZE???
-        max = np.max(weight_out_a)
-        min = np.min(weight_out_a)
-        weight_out_a /= (max-min)
-        
-        a_prop = x_curr1.dot(weight_out_a).T
-        scale = self.normalizer.get('a_curr')[1]
-        a_prop *= scale # Derivative denormalization
-        
-        self.a_brute_prop = self.proposer.explore(epoch1)
+            # Capture the different weights needed for the ESN output
+            w_in_s = self.reservoir.w_in[:,:-action_space_dim]
+            w_in_a = self.reservoir.w_in[:,-action_space_dim:]
+            w_out_J = self.readout.beta[1:1+self.readout.input_dim-i_curr.shape[1]][:]
+            w_inout_a = np.concatenate((self.w_inout_sa, self.w_inout_aa), axis=1)
+            w_inout_aJ = self.readout.beta[-action_space_dim:][:].T
+            weight_out_a = np.hstack((self.w_bias_a, self.w_out_a, self.w_inout_sa, self.w_inout_aa)).T
+                     
+            # Get the activations
+            self.state_curr = self.reservoir.states
+            res_state = ((s_curr['x_curr'])[0][:self.readout.input_dim-i_curr.shape[1]])
+            self.sensor_curr = self.plant.state_input(s_curr) #WAR self.plant.state_input(epoch)
+            self.action_curr = np.copy(self.a_curr)
+            
+            # Normalize the actions
+            for i in range(self.a_curr.shape[0]):
+                self.action_curr[i] = self.normalizer.normalize_value('a_curr', np.copy(self.a_curr[i]))
+            
+            if not self.withRecursion:
+                part_A = np.dot(w_out_J.T, np.atleast_2d(w_in_a.multiply(np.reshape(np.repeat(1-(res_state*2), A, axis=0), [N,A])))) + w_inout_aJ
+    
+                # Compute the derivatives:
+                # Assuming no recursive dependency
+                dJ_dW_bias_a = np.copy(part_A)
+                dJ_dW_out_a = np.outer(part_A, self.state_curr)
+                dJ_dW_inout_sa = np.outer(part_A, self.sensor_curr)
+                dJ_dW_inout_aa = np.outer(part_A, self.action_curr)
+                
+    #             dJ_dW_out_a = np.outer(part_A, self.state_curr) + w_inout_a * self.state_curr
+    #             dJ_dW_inout_sa = np.outer(part_A, self.sensor_curr) + w_inout_a * self.sensor_prec
+    #             dJ_dW_inout_aa = np.outer(part_A, self.action_curr) + w_inout_a * self.action_prec
+            
+            
+            #BEGIN WITH RECURSION
+            
+            if self.withRecursion:
+                
+                # Transmit the old derivatives
+                self.da_dWout_a_prec = np.copy(self.da_dWout_a_curr)
+                self.da_dWinout_sa_prec = np.copy(self.da_dWinout_sa_curr)
+                self.da_dWinout_aa_prec = np.copy(self.da_dWinout_aa_curr)
+                
+                self.dX_dWout_a_prec = np.copy(self.dX_dWout_a_curr)
+                self.dX_dWinout_sa_prec = np.copy(self.dX_dWinout_sa_curr)
+                self.dX_dWinout_aa_prec = np.copy(self.dX_dWinout_sa_curr)
+                
+                # Update the derivatives current values
+                # TODO: CHECK DIMENSIONS AND MULTIPLIERS (outer, elementwise, dot, ...)
+                # NOTE: (1-X**2) is the derivative of the tanh function, which is the activation function for this application
+                self.dX_dWout_a_curr = (1 - self.state_curr**2) * (w_in_a * self.da_dWout_a_curr + self.reservoir.w * self.dX_dWout_a_prec)
+                self.dX_dinWout_sa_curr = (1 - self.state_curr**2) * (w_in_a * self.da_dWinout_sa_curr + self.reservoir.w * self.dX_dWinout_sa_prec)
+                self.dX_dinWout_aa_curr = (1 - self.state_curr**2) * (w_in_a * self.da_dWinout_aa_curr + self.reservoir.w * self.dX_dWinout_aa_prec)
+                
+                self.da_dWout_a_curr = self.state_curr + weight_out_a * self.dX_dWout_a_prec + w_inout_a * self.da_dWout_a_prec
+                self.da_dWinout_sa_curr = self.sensor_curr + weight_out_a * self.dX_dWinout_sa_prec + w_inout_a * self.da_dWinout_sa_prec
+                self.da_dWinout_aa_curr = self.action_curr + weight_out_a * self.dX_dWinout_aa_prec + w_inout_a * self.da_dWinout_aa_prec
+                
+                # Compute the Expected Return derivatives
+                dJ_dW_out_a = w_out_J * self.dX_dWout_a_curr + w_inout_a * self.da_dWout_a_curr
+                dJ_dW_inout_sa = w_out_J * self.dX_dWinout_sa_curr + w_inout_a * self.da_dWinout_sa_curr
+                dJ_dW_inout_aa = w_out_J * self.dX_dWinout_aa_curr + w_inout_a * self.da_dWinout_aa_curr
+            
+            #END WITH RECURSION
+            
+            # Compute the deltas
+            deltaW_bias_a = self.etha_w_out_a * dJ_dW_bias_a
+            deltaW_out_a = self.etha_w_out_a * dJ_dW_out_a
+            deltaW_inout_aa = self.etha_w_inout_aa * dJ_dW_inout_aa
+            deltaW_inout_sa = self.etha_w_inout_sa * dJ_dW_inout_sa
+            
+            x_curr1 = np.concatenate((np.ones(((s_curr['x_curr']).shape[0], 1)), s_curr['x_curr']), axis=1)
+            #x_curr1 = np.tanh(x_curr1)
+            
+            # pre test
+            a_pre_prop = x_curr1.dot(weight_out_a).T
+            
+            # Apply the deltas
+            self.w_bias_a += deltaW_bias_a.T    
+            self.w_out_a += deltaW_out_a
+            self.w_inout_aa = self.w_inout_aa + deltaW_inout_aa
+            self.w_inout_sa = self.w_inout_sa + deltaW_inout_sa
+                 
+            # End of the current calculations, the states, sensor inputs and actions get old
+            self.state_prec = np.copy(self.state_curr)
+            self.sensor_prec = np.copy(self.sensor_curr)
+            self.action_prec = np.copy(self.action_curr)
+            
+             
+            # Let the activations flow through the network, and get the new action activation from that
+            weight_out_a = np.hstack((self.w_bias_a, self.w_out_a, self.w_inout_sa, self.w_inout_aa)).T
+            
+            # NORMALIZE???
+            max = np.max(weight_out_a)
+            min = np.min(weight_out_a)
+            weight_out_a /= (max-min)
+            
+            a_prop = x_curr1.dot(weight_out_a).T
+#             scale = self.normalizer.get('a_curr')[1]
+#             a_prop *= scale # Derivative denormalization
+            
+        if self.withBruteForce:
+            self.a_brute_prop = self.proposer.explore(epoch1)
         self.countIterations += 1
-        if self.countIterations % 100 == 0:
+        if False:# self.countIterations % 100 == 0:
             print "Matthias': ", a_next
-            print "Arthur's: ", a_prop
-            print "Brute Force's: ", self.a_brute_prop
+            if self.withActionDerivation:
+                print "Arthur's: ", a_prop
+            if self.withBruteForce:
+                print "Brute Force's: ", self.a_brute_prop
             print "   "
             
         
@@ -276,7 +285,7 @@ class ADHDP2(ADHDP):
         epoch['i_next'] = i_next
         epoch['x_next'] = x_next
         epoch['j_next'] = j_next
-        epoch['a_next'] = a_next
+        epoch['a_next'] = a_prop
         
         self._pre_increment_hook(epoch)
         
