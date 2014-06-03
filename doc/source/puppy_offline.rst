@@ -44,7 +44,7 @@ predefined arena.
 The robot script is a bit more complex. The controller has to select
 actions according to a predefined schema and store all data in a HDF5
 file for later processing. To have the file in the correct format, the
-class :py:class:`OfflineCollector` has to be used. It records all data
+class :py:class:`OfflinePuppy` has to be used. It records all data
 such that the simulation behaviour can be reproduced.
 
 For the action selection mechanism, first a :py:class:`Policy` is
@@ -53,8 +53,8 @@ to a motor target sequence, as explained in :ref:`plants-and-policies`.
 In this case, the action is based on a gait and controlls the
 amplitudes of the left and right legs. The procedure to create an
 initial action is overwritten such that the initial action is randomly
-chosen. The same is achieved by subtyping :py:class:`OfflineCollector`
-and overwriting the :py:meth:`OfflineCollector._next_action_hook` for
+chosen. The same is achieved by subtyping :py:class:`OfflinePuppy`
+and overwriting the :py:meth:`OfflinePuppy._next_action_hook` for
 action selection during the experiment. Hence, actions are chosen
 randomly at all times, according to the respective schema. Note that
 the action selection schema may have a huge influence on Critic training
@@ -156,7 +156,7 @@ from the robot.
 .. literalinclude:: ../../test/puppy_example_trajectory_supervisor.py
 
 Hence, the main logic is implemented in the robot controller. A special
-case of an :py:class:`OfflineCollector` is defined, enforcing the action
+case of an :py:class:`OfflinePuppy` is defined, enforcing the action
 to follow a specified sequence. If the sequence has ended, a signal is
 sent to the supervisor. The action sequence is loaded from the HDF5
 file, which was written before and the file updated such that all the

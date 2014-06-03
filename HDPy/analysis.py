@@ -50,19 +50,34 @@ class Analysis:
         Threshold for the number of datasets in an episode. This is
         usually used to filter out episodes which terminated during
         the initialization phase.
+        
+    ``episode_start``
+        First episode to include in data set. All earlier ones are filtered out.
+    
+    ``min_sample_length``
+        Threshold for the number of samples in an episode. Default key to measure
+        the number of samples is the first key that is found in the first experiment.
+        To provide a key, ``min_sample_length`` can be a tuple or list: [key_string, threshold_int].
     
     """
-    def __init__(self, pth, grid=False, min_key_length=0, episode_start=0):
+    def __init__(self, pth, grid=False, min_key_length=0, episode_start=0, min_sample_length=0):
         if isinstance(pth, inout.H5CombinedFile):
             self.pth = pth.pth0
             self.f = pth
         else:
             self.pth = pth
             self.f = h5py.File(pth, 'r')
+        if isinstance(min_sample_length, (list, tuple)):
+            key_sl, min_sample_length = min_sample_length
         exp = map(int, self.f.keys())
         exp = sorted(exp)
         exp = map(str, exp)
         exp = filter(lambda k: (len(self.f[k]) > min_key_length) and (int(k)>=episode_start), exp) # normalization fails, if not >0
+        if isinstance(min_sample_length, (list, tuple)):
+            key_sl, min_sample_length = min_sample_length
+        else:
+            key_sl = self.f[exp[0]].keys()[0]
+        exp = filter(lambda k: len(self.f[k][key_sl]) > min_sample_length, exp)
         self.experiments = exp
         self.always_plot_grid = grid
     
@@ -88,6 +103,22 @@ class Analysis:
     def get_data(self, key, offset=0, start_episode=0, end_episode=None):
         """Return a list of all data belonging to ``key``."""
         return [self.f[exp][key][offset:] for exp in self.experiments[start_episode:(end_episode is None and len(self.experiments) or end_episode)] if key in self.f[exp] and self.f[exp][key].shape[0]>offset]
+    
+    def get_all_data(self, keys, **kwargs):
+        """Return a list of arrays containing all data specified by ``keys``.
+        Each array in the list is the concatenated matrix of size [len_experiment, len_keys] of one experiment.
+        """
+        if keys is None:
+            all_keys = self.f[self.experiments[0]].keys()
+        else:
+            all_keys = keys
+        data = []
+        for key in all_keys:
+            data.append(self.get_data(key, **kwargs)) # get list containing data ``key`` of all experiments
+        data = map(np.vstack, zip(*data)) # converting to list of experiments containing the data ``keys`` as rows of a matrix 
+        data = map(np.transpose, data) # transpose data matrices to have samples in rows and ``keys`` in columns
+        return data
+        
     
     def stack_data(self, key, offset=0, start_episode=0, end_episode=None):
         """Return data related to ``key`` of all experiments in a single
@@ -386,11 +417,11 @@ class Analysis:
             self.plot_grid(axis, 'a_curr')
         return axis
     
-    def plot_action_space_2d(self, axis=None, bins=30, offset=0, start_episode=0, end_episode=None, **kwargs):
+    def plot_action_space_2d(self, axis=None, bins=30, offset=0, start_episode=0, end_episode=None, key='a_curr', **kwargs):
         """make a scatter plot of actions"""
         if axis is None:
             axis = pylab.figure().add_subplot(111)
-        action = self.stack_data('a_curr', offset=offset, start_episode=start_episode, end_episode=end_episode)
+        action = self.stack_data(key, offset=offset, start_episode=start_episode, end_episode=end_episode)
 #        sc = axis.scatter(action[:,0], action[:,1], edgecolors='none')
         n, edges = np.histogramdd(action[:], bins)
         pc = axis.pcolor(edges[0], edges[1], n.T, **kwargs)
@@ -406,17 +437,11 @@ class Analysis:
         state1 = self.stack_data(key1, offset=offset, start_episode=start_episode, end_episode=end_episode)
         state2 = self.stack_data(key2, offset=offset, start_episode=start_episode, end_episode=end_episode)
         n, edges = np.histogramdd([state1,state2], bins)
-#        n /= n.sum()
         pc = axis.pcolor(edges[0], edges[1], n.T, **kwargs)
-#        pc = axis.imshow(n.T, interpolation='none', **kwargs)
         axis.set_xlabel(xlabel is None and key1 or xlabel)
         axis.set_ylabel(ylabel is None and key2 or ylabel)
         cb = pylab.colorbar(pc,ax=axis)
         return axis, cb
-    
-    def plot_action_vs_compass(self, axis=None):
-        if axis is None:
-            axis = pylab.figure().add_subplot(111)
         
         
     

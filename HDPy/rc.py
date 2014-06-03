@@ -854,19 +854,27 @@ class StabilizedRLS(PlainRLS):
 
 ## RESERVOIR MEMORY MEASUREMENT ##
 
-def reservoir_memory(reservoir, max_settling_time=10000):
+def reservoir_memory(reservoir, max_settling_time=10000, copy=True):
     """Measure the memory capacity of a ``reservoir``. Make sure, the
     reservoir is initialized. The settling time is measured, which is
     the number of steps it takes until the reservoir has converged after
     some non-zero input.
     """
-    res_eval = reservoir.copy()
+    if copy:
+        res_eval = reservoir.copy()
+    else:
+        res_eval = reservoir
+        reset =  res_eval.reset_states
     res_eval.reset_states = True
     step_input = np.zeros((max_settling_time, reservoir.get_input_dim()))
     step_input[0] += 1.0
     ret = res_eval(step_input)
     hist = (abs(ret[1:, :] - ret[:-1, :]) < 1e-5).sum(axis=1)
     settling_time = hist.argmax()
+    if copy:
+        del res_eval
+    else:
+        res_eval.reset_states = reset
     return settling_time
 
 def query_reservoir_memory(reservoir, steps=1000, max_settling_time=10000):
@@ -948,18 +956,21 @@ def find_radius_for_mc(reservoir, num_steps, tol=1.0, max_settling_time=10000, t
         prev_settling_time = settling_time
         settling_time = hist.argmax()
         
+        #if abs(num_steps - settling_time) > tol: # Nico: shouldn't this be the other way round (<)?
+        if abs(num_steps - settling_time) < tol:
+            break
+            
+        if num_iter < 0:
+            raise Exception('No solution found (num_iter, mc=%d, rad=%f)' % (settling_time,rad))
+        if abs(settling_time - prev_settling_time) < tol_settling:
+            raise Exception('No solution found (tol_setting, mc=%d, rad=%f)' % (settling_time,rad))
+        
         if settling_time < num_steps:
             rad_lo = rad
             rad = rad + (rad_hi - rad)/2.0
         else:
             rad_hi = rad
             rad = rad - (rad - rad_lo)/2.0
-        
-        if abs(num_steps - settling_time) > tol:
-            break
-            
-        if num_iter < 0 or abs(settling_time - prev_settling_time) < tol_settling:
-            raise Exception('No solution found')
         
         # continue
         num_iter -= 1

@@ -32,7 +32,7 @@ def plot_all_trajectories(analysis, axis=None, key='loc'):
     else:
         for idx, episode in enumerate(data):
             #col = 0.75 - (0.75 * (idx - 1))/N
-            col = 0.75 * (1.0 - float(idx) / N)
+            col = 0.75 * (1.0 - float(idx) / N) # earlier episodes are bright, later episodes are dark
             axis.plot(episode[:, 0], episode[:, 1], color=str(col), label=str(idx))
     
     return axis

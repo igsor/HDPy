@@ -8,10 +8,14 @@ hence can be used in the same fashion.
 
 Simulation with [Webots]_ is often time consuming. Therefore, a method
 is provided to collect data in the simulation and replay it later. This
-is implemented through :py:class:`OfflineCollector` and
+is implemented through :py:class:`OfflinePuppy` and
 :py:func:`puppy.offline_playback`. An example of how to approach this
 is documented in :ref:`puppy_offline`.
 
+Change log:
+    02.06.2014: removed tumbling detection from PuppyHDP. Tumbling can be
+                recorded by a PuPy.TumbleCollector and handled directly
+                in the Plant to calculate the appropriate reward.
 """
 from ..hdp import ADHDP
 from ..rl import Plant
@@ -25,105 +29,35 @@ SENSOR_NAMES = ['trg0', 'trg1', 'trg2', 'trg3', 'accelerometer_x', 'acceleromete
 class PuppyHDP(ADHDP):
     """ADHDP subtype for simulations using Puppy in webots.
     
-    This class adds some code considering restarts of Puppy. It adds
-    an optional argument ``tumbled_reward``. The reward will be forced
-    to this value after the supervisor detected tumbling. If
-    :py:const:`None` (the default) is used, the reward remains
-    unchanged.
+    This class adds some code considering restarts of Puppy.
     
     """
     def __init__(self, *args, **kwargs):
-        self._tumbled_reward = kwargs.pop('tumbled_reward', None)
-        self.has_tumbled = False
-        self.supervisor_tumbled_notice = 0
         super(PuppyHDP, self).__init__(*args, **kwargs)
+        self._start_new_episode = False
     
     def _signal(self, msg, **kwargs):
         """Handle messages from the supervisor. Messages are expected
         when the robot has tumbled and thus the robot has to be reset.
         """
-        super(PuppyHDP, self)._signal(msg, **kwargs)
-        # msg is 'reset', 'out_of_arena', 'tumbled'
-        # for msg==reset, the robot is reset immediately
-        # msg==tumbled marks the start of the grace period of the tumbled robot
-        if msg == 'tumbled':
-            #print "Tumbling received", self.num_step
-            self.supervisor_tumbled_notice = 1
-        
+        super(PuppyHDP, self)._signal(msg, **kwargs)        
         if msg == 'reset':
             #print "Reset received", self.num_step
-            self.child.reset()
-            self.new_episode()
-    
-    def new_episode(self):
-        """After restarting, reset the tumbled values and start the
-        new episode.
-        """
-        super(PuppyHDP, self).new_episode()
-        self.has_tumbled = False
-        self.supervisor_tumbled_notice = 0
+            self._start_new_episode = True # remember to start a new episode at next __call__
     
     def _step(self, s_curr, epoch, a_curr, reward):
-        """Ensure the tumbled reward and initiate behaviour between
-        restarts. The step of the parent is then invoked.
+        """If reset is triggered, invoke new_episode.
         """
-        if self.has_tumbled:
-            epoch['a_next'] = np.zeros(shape=a_curr.shape[::-1])
-            return epoch
-        
-        if self.supervisor_tumbled_notice > 0:
-            if self.supervisor_tumbled_notice > 1:
-                if self._tumbled_reward is not None:
-                    reward = np.atleast_2d([self._tumbled_reward])
-                
-                #reward /= (1.0 - self.gamma(self.num_episode, self.num_step))
-                # geometric series to incorporate future rewards
-                # note that with this, its err = r/(1-gamma) - J * (1-gamma)
-                # but should be err = r/(1-gamma) - J
-                # thus, there's an difference of J*gamma
-                # is solved this by temporarily set gamma = 0.0
-                self.has_tumbled = True
-                #old_gamma = self.gamma
-                #self.set_gamma(0.0)
-            self.supervisor_tumbled_notice += 1
-        
-        #reward += np.random.normal(scale=0.001)
+        a_curr_orig = a_curr.copy()
         epoch = super(PuppyHDP, self)._step(s_curr, epoch, a_curr, reward)
-        
-        #if self.supervisor_tumbled_notice > 2:
-        #    self.gamma = old_gamma
-        
-        #print self.num_step, reward, a_curr.T, a_next.T, epoch['puppyGPS_x'][-1]
-        return epoch
-    
-    def init_episode(self, epoch, time_start_ms, time_end_ms, step_size_ms):
-        """Initial behaviour (after reset)
-        
-        .. note::
-            Assuming identical initial trajectories, the initial state
-            is the same - and thus doesn't matter.
-            Non-identical initial trajectories will result in
-            non-identical behaviour, therefore the initial state should
-            be different (initial state w.r.t. start of learning).
-            Due to this, the critic is already updated in the initial
-            trajectory.
-        """
-        if self.num_step > 2:
-#            in_state = self.plant.state_input(self.s_curr)
-#            a_curr_nrm = self.normalizer.normalize_value('a_curr', self.a_curr)
-#            i_curr = np.vstack((in_state, a_curr_nrm)).T
-#            x_curr = self.reservoir(i_curr, simulate=False)
-#            x_curr = np.hstack((x_curr, i_curr)) # FIXME: Input/Output ESN Model
-            i_curr, x_curr, _ = self._critic_eval(self.s_curr, self.a_curr, False, 'a_curr')
-            epoch['x_curr'] = x_curr
-            epoch['i_curr'] = i_curr
+        if self._start_new_episode:
+            self._start_new_episode = False
+            self.new_episode()
             epoch['a_next'] = self.a_curr.T
-            epoch['a_curr'] = self.a_curr.T
-        
-        self.s_curr = epoch
-        return self.child(epoch, time_start_ms, time_end_ms, step_size_ms)
+            self.a_curr = a_curr_orig
+        return epoch
 
-class OfflineCollector(ADHDP):
+class OfflinePuppy(PuppyHDP):
     """Collect sensor data for Puppy in webots, such that it can be
     reused later to train a critic offline.
     
@@ -138,12 +72,7 @@ class OfflineCollector(ADHDP):
     """
     def __init__(self, *args, **kwargs):
         # look for policy's member 'action_space_dim' (policy is hidden in child or sub-child)
-        policy = kwargs['policy']
-        if hasattr(policy, 'action_space_dim'):
-            action_space_dim = policy.action_space_dim
-        else:
-            from ..hdp import return_none
-            action_space_dim = return_none
+        action_space_dim = kwargs['policy'].action_space_dim
         if 'plant' not in kwargs:
             kwargs['plant'] = Plant(state_space_dim=0)
         plant = kwargs['plant']
@@ -161,15 +90,7 @@ class OfflineCollector(ADHDP):
         
         kwargs['reservoir'] = Phony()
         kwargs['readout'] = None
-        self.supervisor_tumbled_notice = 0
-        super(OfflineCollector, self).__init__(*args, **kwargs)
-    
-    def new_episode(self):
-        """After restarting, reset the tumbled values and start the
-        new episode.
-        """
-        super(OfflineCollector, self).new_episode()
-        self.supervisor_tumbled_notice = 0
+        super(OfflinePuppy, self).__init__(*args, **kwargs)
     
     def __call__(self, epoch, time_start_ms, time_end_ms, step_size_ms):
         """Store the sensor measurements of an epoch in the datafile
@@ -179,38 +100,19 @@ class OfflineCollector(ADHDP):
         are covered by :py:class:`PuppyHDP`.
         
         """
-        #print "(call)", time_start_ms, self.a_curr.T, ('puppyGPS_x' in epoch and epoch['puppyGPS_x'][-1] or 'NOX')
-        if len(epoch) == 0:
-            # TODO: epoch length will never be 0 I think(?) Use _get_initial_target() for this purpose.  
-            # the very first initial epoch of the first episode
-            # this case occurs when the simulation starts or after it is reverted
-            self.num_step += 1
-            #self._pre_increment_hook(dict(), empty_initial_step=np.array([1]))
-            self._pre_increment_hook(dict(), init_step=np.array([self.num_step]))
-            return self.child.get_iterator(time_start_ms, time_end_ms, step_size_ms)
+        self.num_step += 1
         
         # Determine next action
         if self.num_step <= self._init_steps:
             # Init
             a_next = self.a_curr
-        elif self.supervisor_tumbled_notice > 2:
-            # Tumbled, prepare for reset
-            a_next = np.zeros(shape=self.a_curr.shape)
-            self.supervisor_tumbled_notice += 1
-        elif self.supervisor_tumbled_notice > 0:
-            # Tumbled, still walking
-            a_next = self._next_action_hook(self.a_curr)
-            self.supervisor_tumbled_notice += 1
+            if self.verbose:
+                print "(init)", a_next.T
         else:
             # Normal walking
             a_next = self._next_action_hook(self.a_curr)
-        
-        if self.num_step <= self._init_steps:
-            print "(init)", a_next.T
-        elif self.supervisor_tumbled_notice > 2:
-            print time_start_ms, self.a_curr.T, self.num_step
-        else:
-            print 't:', time_start_ms, ' a:', self.a_curr.T, ' x:', epoch['puppyGPS_x'][-1], 'y:', epoch['puppyGPS_y'][-1]
+            if self.verbose:
+                print 't:', time_start_ms, ' a:', self.a_curr.T
         
         try:
             epoch['reward'] = np.atleast_2d(self.plant.reward(epoch))
@@ -218,30 +120,9 @@ class OfflineCollector(ADHDP):
             pass
         epoch['a_curr'] = self.a_curr.T
         epoch['a_next'] = a_next.T
-        
         self.a_curr = a_next
-        self.num_step += 1
         
-        #print "(call-end)", self.num_step, a_next.T, a_next.shape, self.a_curr.shape
         return self.child(epoch, time_start_ms, time_end_ms, step_size_ms)
-    
-    def _signal(self, msg, **kwargs):
-        """Handle messages from the supervisor. Messages are expected
-        when the robot has tumbled and thus the robot has to be reset.
-        """
-        super(OfflineCollector, self)._signal(msg, **kwargs)
-        # msg is 'reset', 'out_of_arena', tumbled'
-        # for msg==reset, the robot is reset immediately
-        # msg==tumbled marks the start of the grace period of the tumbled robot
-        if msg == 'tumbled':
-            #print "Tumbling received", self.num_step
-            self.supervisor_tumbled_notice = 1
-            self._pre_increment_hook(dict(), tumbled=np.array([self.num_step]))
-        
-        if msg == 'reset':
-            #print "Reset received", self.num_step
-            self.child.reset()
-            self.new_episode()
     
     def _next_action_hook(self, a_next):
         """Defines the action sampling policy of the offline data
@@ -257,7 +138,7 @@ class OfflineCollector(ADHDP):
         
         return a_next
 
-def offline_playback(pth_data, critic, samples_per_action, ms_per_step, episode_start=None, episode_end=None, min_episode_len=0, sensor_names=SENSOR_NAMES):
+def offline_playback(pth_data, critic, samples_per_action, ms_per_step, episode_start=None, episode_end=None, min_episode_len=0, sensor_names=SENSOR_NAMES, sensor_sampling_key='trg0'):
     """Simulate an experiment run for the critic by using offline data.
     The data has to be collected in webots, using the respective
     robot and supervisor. Note that the behaviour of the simulation
@@ -334,14 +215,12 @@ def offline_playback(pth_data, critic, samples_per_action, ms_per_step, episode_
         print episode_idx,'/',len(storages)
         
         data_grp = f[episode]
-        N = data_grp['trg0'].shape[0]
-        #N = data_grp['hip0'].shape[0]
+        N = data_grp[sensor_sampling_key].shape[0]
         assert N % samples_per_action == 0
         
         # get tumbled infos
         if 'tumble' in data_grp:
-            from pylab import find
-            time_tumbled = find(data_grp['tumble'])
+            time_tumbled = np.where(data_grp['tumble'])[0]
             if len(time_tumbled)<1:
                 time_tumbled = -1
             else:  

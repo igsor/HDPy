@@ -29,7 +29,7 @@ def random_initial_action():
 policy.initial_action = random_initial_action
 
 # Offline data collector setup
-class OfflinePuppy(HDPy.puppy.OfflineCollector):
+class OfflinePuppy(HDPy.puppy.OfflinePuppy):
     def _next_action_hook(self, a_next):
         """Define the schema according to which actions will be selected.
         Hence, this function defines the action and state space sampling

@@ -23,6 +23,8 @@ Reinforcement Learning problem may be more abstract. For example, gait
 parameters could be used as action. From these, a motor target sequence
 has to be generated to actually steer the robot.
 
+change log:
+    02.06.2014: ActorCritic.num_step is increased in the beginning of __call__ (not in the end)
 """
 import PuPy
 import numpy as np
@@ -277,8 +279,9 @@ class ActorCritic(PuPy.RobotActor):
         exchangable, since it's really the same kind of 'sensor'.
     
     """
-    def __init__(self, plant, policy, gamma=1.0, alpha=1.0, init_steps=1, norm=None, momentum=0.0):
-        super(ActorCritic, self).__init__(child=policy)
+    def __init__(self, plant, policy, gamma=1.0, alpha=1.0, init_steps=1, norm=None, momentum=0.0, **kwargs):
+        super(ActorCritic, self).__init__(child=policy, **kwargs)
+        self.policy = self.child # refer to child as policy 
         
         # Initial members
         self.plant = plant
@@ -286,8 +289,8 @@ class ActorCritic(PuPy.RobotActor):
         self.num_episode = 0
         self._init_steps = init_steps
         self.a_curr = None
-        self._motor_action_dim = None
-        self.s_curr = dict()
+        self._action_space_dim = None
+        self.s_curr = None
         self.alpha = None
         self.momentum = None
         self.gamma = None
@@ -300,8 +303,8 @@ class ActorCritic(PuPy.RobotActor):
         self.set_momentum(momentum)
         
         # Check assumptions
-        assert self.child.initial_action().shape[0] >= 1
-        assert self.child.initial_action().shape[1] == 1
+        assert self.policy.initial_action().shape[0] >= 1
+        assert self.policy.initial_action().shape[1] == 1
         
         # Start a new episode
         self.new_episode()
@@ -311,10 +314,12 @@ class ActorCritic(PuPy.RobotActor):
         also be used to initialize the *ActorCritic*, for example when
         it is loaded from a file.
         """
-        self.num_episode += 1
-        self.a_curr = self.child.initial_action()
-        self._motor_action_dim = self.child.action_space_dim()
+        self.plant.reset()
+        self.policy.reset()
+        self._action_space_dim = self.policy.action_space_dim()
+        self.a_curr = self.policy.initial_action()
         self.s_curr = dict()
+        self.num_episode += 1
         self.num_step = 0
     
     def init_episode(self, epoch, time_start_ms, time_end_ms, step_size_ms):
@@ -332,7 +337,9 @@ class ActorCritic(PuPy.RobotActor):
             method is called.
         
         """
-        self.s_curr = epoch
+        self.s_curr = epoch.copy()
+        epoch['a_curr'] = self.a_curr.T
+        epoch['a_next'] = self.a_curr.T
         self._pre_increment_hook(epoch)
         return self.child(epoch, time_start_ms, time_end_ms, step_size_ms)
     
@@ -347,8 +354,8 @@ class ActorCritic(PuPy.RobotActor):
         action.
         
         """
+        self.num_step += 1
         if self.num_step <= self._init_steps:
-            self.num_step += 1
             return self.init_episode(epoch, time_start_ms, time_end_ms, step_size_ms)
         
         # extern through the robot:
@@ -363,17 +370,19 @@ class ActorCritic(PuPy.RobotActor):
         # by Sutton/Barto indicate the reward as being from the next
         # state, n+1. Experiments indicate that it doesn't really matter.
         # To be consistent with other work, I go with time n.
-        # Nico: I changed it to be epoch (n+1). It should be the reward of performing
+        # Nico: changed it to be epoch (n+1). It should be the reward of performing
         # action a_n when being in state s_n. The reward is calculated on the 
-        # outcome of that, so on the new state s_n+1.
+        # outcome of that, so on the new state s_n+1 (which is epoch).
+        
+        epoch_raw = epoch.copy() # store only raw sensor values in self.s_curr
         
         # do the actual work
         epoch = self._step(self.s_curr, epoch, self.a_curr, reward)
         
         # increment
+        epoch['a_curr'] = self.a_curr.T
         self.a_curr = np.atleast_2d(epoch['a_next']).T
-        self.s_curr = epoch
-        self.num_step += 1
+        self.s_curr = epoch_raw
         
         # return next action
         return self.child(epoch, time_start_ms, time_end_ms, step_size_ms)
@@ -432,12 +441,14 @@ class ActorCritic(PuPy.RobotActor):
         """
         child = self.child
         self.child = None
+        self.policy = None
         
         f = open(pth, 'w')
         pickle.dump(self, f)
         f.close()
         
         self.child = child
+        self.policy = self.child
     
     @staticmethod
     def load(pth):
@@ -482,5 +493,5 @@ class ActorCritic(PuPy.RobotActor):
             norm = PuPy.Normalization()
         self.normalizer = norm
         self.plant.set_normalization(norm)
-        self.child.set_normalization(norm) # for the policy.
+        self.policy.set_normalization(norm)
 

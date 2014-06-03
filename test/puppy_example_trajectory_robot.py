@@ -14,9 +14,9 @@ bound_gait = {
 
 policy = HDPy.puppy.policy.LRA(PuPy.Gait(bound_gait, 'bounding'))
 
-# OfflineCollector which follows a predefined sequence of actions
+# OfflinePuppy which follows a predefined sequence of actions
 # after the initial behaviour (policy with default params for 25 steps).
-class TrajectoryFollower(HDPy.puppy.OfflineCollector):
+class TrajectoryFollower(HDPy.puppy.OfflinePuppy):
     def __init__(self, trajectory, *args, **kwargs):
         super(TrajectoryFollower, self).__init__(*args, **kwargs)
         self.trajectory = trajectory

@@ -72,7 +72,6 @@ class ADHDP(ActorCritic):
         it is loaded from a file.
         """
         self.reservoir.reset()
-        self.plant.reset()
         super(ADHDP, self).new_episode()
     
     def _critic_eval(self, state, action, simulate, action_name='a_curr'):
@@ -101,9 +100,9 @@ class ADHDP(ActorCritic):
         direct_input_size = self.plant.state_space_dim()+self.child.action_space_dim() # Input/Output ESN Model
         r_state = r_state[:, :-direct_input_size] # this is because _critic_eval appends the input to the state
         dtanh = (np.ones(r_state.shape) - r_state**2).T # Nx1
-        dstate = dtanh * self.reservoir.w_in[:, -self._motor_action_dim:].toarray() # Nx1 .* NxA => NxA
+        dstate = dtanh * self.reservoir.w_in[:, -self._action_space_dim:].toarray() # Nx1 .* NxA => NxA
         deriv = self.readout.beta[1:-direct_input_size].T.dot(dstate) # Input/Output ESN Model
-        deriv += self.readout.beta[-self._motor_action_dim:].T # Input/Output ESN Model
+        deriv += self.readout.beta[-self._action_space_dim:].T # Input/Output ESN Model
         deriv = deriv.T # AxL
         scale = self.normalizer.get('a_curr')[1]
         deriv *= scale # Derivative denormalization
@@ -112,7 +111,7 @@ class ADHDP(ActorCritic):
     def _critic_deriv_direct_model(self, r_state):
         """Return the critic's derivative at ``r_state``."""
         dtanh = (np.ones(r_state.shape) - r_state**2).T # Nx1
-        dstate = dtanh * self.reservoir.w_in[:, -self._motor_action_dim:].toarray() # Nx1 .* NxA => NxA
+        dstate = dtanh * self.reservoir.w_in[:, -self._action_space_dim:].toarray() # Nx1 .* NxA => NxA
         deriv = self.readout.beta[1:].T.dot(dstate) #  LxA # Direct ESN Model
         deriv = deriv.T # AxL
         scale = self.normalizer.get('a_curr')[1]
@@ -167,6 +166,7 @@ class ADHDP(ActorCritic):
         # One-step RLS training => Trained ESN
         if self.train:
             self.readout.train(x_curr[np.newaxis, -1], err=err)
+#            self.readout._stop_training() ## !!!! Nico: Hack for mdp-LinearRegressionNode to work here! !!!! XXXX
         
         # TODO: make optional list with locals to store in epoch
         # update epoch with locals:
@@ -178,7 +178,6 @@ class ADHDP(ActorCritic):
         epoch['i_curr'] = i_curr
         epoch['x_curr'] = x_curr
         epoch['j_curr'] = j_curr
-        epoch['a_curr'] = a_curr.T
         epoch['i_next'] = i_next
         epoch['x_next'] = x_next
         epoch['j_next'] = j_next
@@ -199,17 +198,96 @@ class ADHDP(ActorCritic):
             Due to this, the critic is already updated in the initial
             trajectory.
         """
+        epoch_raw = epoch.copy()
         if self.num_step > 1:
             i_curr, x_curr, j_curr = self._critic_eval(self.s_curr, self.a_curr, False, 'a_curr')
             epoch['x_curr'] = x_curr
             epoch['i_curr'] = i_curr
-            epoch['a_next'] = self.a_curr.T
-            epoch['a_curr'] = self.a_curr.T
-                    
-        self.s_curr = epoch
+        
+        epoch['a_curr'] = self.a_curr.T
+        epoch['a_next'] = self.a_curr.T
+        self.s_curr = epoch_raw
         return self.child(epoch, time_start_ms, time_end_ms, step_size_ms)
 
 ## HDP VARIATIONS ##
+
+
+class LinearADHDP(ActorCritic):
+    def __init__(self, readout, train=True, *args, **kwargs):
+        self.readout = readout
+        self.train = train
+        super(LinearADHDP, self).__init__(*args, **kwargs)
+    
+    def _critic_eval(self, state, action, action_name='a_curr'):
+        """Evaluate the critic at ``state`` and ``action``."""        
+        in_state = self.plant.state_input(state)
+        action_nrm = self.normalizer.normalize_value(action_name, action)
+        i_curr = np.vstack((in_state, np.repeat(action_nrm, in_state.shape[1], axis=1))).T
+        j_curr = self.readout(i_curr[np.newaxis, -1])
+        
+        return i_curr, j_curr
+    
+    def _step(self, s_curr, epoch, a_curr, reward):
+        # ESN-critic, first instance: in(k) => J(k)
+        i_curr, j_curr = self._critic_eval(s_curr, a_curr, action_name='a_curr')
+        
+        # Next action
+        deriv = self.readout.beta[-self._action_space_dim:] # Input/Output ESN Model
+        scale = self.normalizer.get('a_curr')[1]
+        deriv *= scale # Derivative denormalization
+        
+        # gradient training of action (acc. to eq. 10)
+        a_next = a_curr + self.alpha(self.num_episode, self.num_step) * deriv
+        a_next = self.momentum(a_curr, a_next, self.num_episode, self.num_step)
+        a_next = self._next_action_hook(a_next)
+        
+        # ESN-critic, second instance: in(k+1) => J(k+1)
+        i_next, j_next = self._critic_eval(epoch, a_next, action_name='a_next')
+        
+        # TD_error(k) = J(k) - U(k) - gamma * J(k+1)
+        err = reward + self.gamma(self.num_episode, self.num_step) * j_next - j_curr
+        
+        # One-step RLS training => Trained ESN
+        if self.train:
+            self.readout.train(i_curr[np.newaxis, -1], err=err)
+        
+        # TODO: make optional list with locals to store in epoch
+        # update epoch with locals:
+        epoch['reward'] = np.atleast_2d([reward]).T
+        epoch['deriv'] = deriv.T
+        epoch['err'] = err.T
+        epoch['readout'] = self.readout.beta.T
+        epoch['gamma'] = np.atleast_2d([self.gamma(self.num_episode, self.num_step)]).T
+        epoch['i_curr'] = i_curr
+        epoch['j_curr'] = j_curr
+        epoch['i_next'] = i_next
+        epoch['j_next'] = j_next
+        epoch['a_next'] = a_next.T
+        
+        # increment
+        return epoch
+    
+    def init_episode(self, epoch, time_start_ms, time_end_ms, step_size_ms):
+        """Initial behaviour (after reset)
+        
+        .. note::
+            Assuming identical initial trajectories, the initial state
+            is the same - and thus doesn't matter.
+            Non-identical initial trajectories will result in
+            non-identical behaviour, therefore the initial state should
+            be different (initial state w.r.t. start of learning).
+            Due to this, the critic is already updated in the initial
+            trajectory.
+        """
+        epoch_raw = epoch.copy()
+        if self.num_step > 1:
+            i_curr, j_curr = self._critic_eval(self.s_curr, self.a_curr, 'a_curr')
+            epoch['i_curr'] = i_curr
+        
+        epoch['a_curr'] = self.a_curr.T
+        epoch['a_next'] = self.a_curr.T
+        self.s_curr = epoch_raw
+        return self.child(epoch, time_start_ms, time_end_ms, step_size_ms)
 
 class ReservoirActorADHDP(ADHDP):
     """The next action is determined by a separate readout of the reservoir.
@@ -238,9 +316,9 @@ class ReservoirActorADHDP(ADHDP):
         # Gradient ascent of J(a|s_{t+1})
         direct_input_size = self.plant.state_space_dim()+self.child.action_space_dim() # Input/Output ESN Model
         dtanh = (np.ones(r_state.shape) - r_state**2).T # Nx1
-        dstate = dtanh * self.reservoir.w_in[:, -self._motor_action_dim:].toarray() # Nx1 .* NxA => NxA
+        dstate = dtanh * self.reservoir.w_in[:, -self._action_space_dim:].toarray() # Nx1 .* NxA => NxA
         deriv = self.readout.beta[1:-direct_input_size].T.dot(dstate) # Input/Output ESN Model
-        deriv += self.readout.beta[-self._motor_action_dim:].T # Input/Output ESN Model
+        deriv += self.readout.beta[-self._action_space_dim:].T # Input/Output ESN Model
         deriv = deriv.T # AxL
         scale = self.normalizer.get('a_curr')[1]
         deriv *= scale # Derivative denormalization
@@ -272,7 +350,6 @@ class ReservoirActorADHDP(ADHDP):
         epoch['i_curr'] = i_curr
         epoch['x_curr'] = x_curr
         epoch['j_curr'] = j_curr
-        epoch['a_curr'] = a_curr.T
         epoch['i_next'] = i_next
         epoch['x_next'] = x_next
         epoch['j_next'] = j_next
@@ -334,7 +411,6 @@ class ActionGradient(ADHDP):
         epoch['i_curr'] = i_curr
         epoch['x_curr'] = x_curr
         epoch['j_curr'] = j_curr
-        epoch['a_curr'] = a_curr.T
         epoch['i_next'] = i_next
         epoch['x_next'] = x_next
         epoch['j_next'] = j_next
@@ -512,7 +588,6 @@ class ActionRecomputation(ADHDP):
         epoch['i_curr'] = i_curr
         epoch['x_curr'] = x_curr
         epoch['j_curr'] = j_curr
-        epoch['a_curr'] = a_curr.T
         epoch['i_next'] = i_next
         epoch['x_next'] = x_next
         epoch['j_next'] = j_next
@@ -576,7 +651,6 @@ class ActionBruteForce(ADHDP):
         epoch['i_curr'] = i_curr
         epoch['x_curr'] = x_curr
         epoch['j_curr'] = j_curr
-        epoch['a_curr'] = a_curr.T
         epoch['i_next'] = i_next
         epoch['x_next'] = x_next
         epoch['j_next'] = j_next

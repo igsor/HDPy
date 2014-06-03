@@ -29,7 +29,7 @@ Reference
     :members: new_episode, init_episode, _step, event_handler
     :show-inheritance:
 
-.. autoclass:: HDPy.puppy.OfflineCollector
+.. autoclass:: HDPy.puppy.OfflinePuppy
     :members: new_episode, __call__, _next_action_hook, event_handler
     :show-inheritance:
 
