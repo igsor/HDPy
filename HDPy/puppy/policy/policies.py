@@ -36,6 +36,9 @@ and <Param>:
 If several parameters are controlled at once, the <Param> identifier is
 repeated up to four times. The order is A, P, F, O.
 
+
+Change log:
+    18.06.2014: All policies have optional kwargs that are forwarded to their base class.
 """
 from ...rl import Policy
 import numpy as np
@@ -46,8 +49,8 @@ class _GaitPolicy(Policy):
     """A concrete implementation of the :py:class:`Policy`. This one
     updates the *amplitude* parameter of a :py:class:`PuPy.Gait`.
     """
-    def __init__(self, gait, action_space_dim=None):
-        super(_GaitPolicy, self).__init__(action_space_dim)
+    def __init__(self, gait, action_space_dim=None, **kwargs):
+        super(_GaitPolicy, self).__init__(action_space_dim, **kwargs)
         self.gait = gait
         self.gait_orig = gait.copy()
     
@@ -402,8 +405,8 @@ class FRAPFO(_FR4):
 
 class _LR1(_GaitPolicy):
     """Left/Right; One parameter"""
-    def __init__(self, gait, param_name):
-        super(_LR1, self).__init__(gait, 2)
+    def __init__(self, gait, param_name, **kwargs):
+        super(_LR1, self).__init__(gait, 2, **kwargs)
         self.param = param_name
     
     def initial_action(self):
@@ -416,7 +419,7 @@ class _LR1(_GaitPolicy):
 
 class _LR2(_GaitPolicy):
     """Left/Right; Two parameters"""
-    def __init__(self, gait, param_name_a, param_name_b):
+    def __init__(self, gait, param_name_a, param_name_b, **kwargs):
         assert param_name_a != param_name_b
         super(_LR2, self).__init__(gait, 4)
         self.params = (param_name_a, param_name_b)
@@ -439,11 +442,11 @@ class _LR2(_GaitPolicy):
 
 class _LR3(_GaitPolicy):
     """Left/Right; Three parameters"""
-    def __init__(self, gait, param_name_a, param_name_b, param_name_c):
+    def __init__(self, gait, param_name_a, param_name_b, param_name_c, **kwargs):
         assert param_name_a != param_name_b
         assert param_name_a != param_name_c
         assert param_name_b != param_name_c
-        super(_LR3, self).__init__(gait, 6)
+        super(_LR3, self).__init__(gait, 6, **kwargs)
         self.params = (param_name_a, param_name_b, param_name_c)
     
     def initial_action(self):
@@ -468,8 +471,8 @@ class _LR3(_GaitPolicy):
 
 class _LR4(_GaitPolicy):
     """Front/Rear; Three parameters"""
-    def __init__(self, gait):
-        super(_LR4, self).__init__(gait, 8)
+    def __init__(self, gait, **kwargs):
+        super(_LR4, self).__init__(gait, 8, **kwargs)
     
     def initial_action(self):
         params = ('amplitude', 'frequency', 'offset', 'phase')
@@ -490,77 +493,77 @@ class _LR4(_GaitPolicy):
 
 class LRA(_LR1):
     """Left/Right; Amplitude"""
-    def __init__(self, gait):
-        super(LRA, self).__init__(gait, 'amplitude')
+    def __init__(self, gait, **kwargs):
+        super(LRA, self).__init__(gait, 'amplitude', **kwargs)
 
 class LRP(_LR1):
     """Left/Right; Phase"""
-    def __init__(self, gait):
-        super(LRP, self).__init__(gait, 'phase')
+    def __init__(self, gait, **kwargs):
+        super(LRP, self).__init__(gait, 'phase', **kwargs)
 
 class LRF(_LR1):
     """Left/Right; Frequency"""
-    def __init__(self, gait):
-        super(LRF, self).__init__(gait, 'frequency')
+    def __init__(self, gait, **kwargs):
+        super(LRF, self).__init__(gait, 'frequency', **kwargs)
 
 class LRO(_LR1):
     """Left/Right; Offset"""
-    def __init__(self, gait):
-        super(LRO, self).__init__(gait, 'offset')
+    def __init__(self, gait, **kwargs):
+        super(LRO, self).__init__(gait, 'offset', **kwargs)
 
 # Left/Right, Two
 
 class LRAP(_LR2):
     """Left/Right; Amplitude, Phase"""
-    def __init__(self, gait):
-        super(LRAP, self).__init__(gait, 'amplitude', 'phase')
+    def __init__(self, gait, **kwargs):
+        super(LRAP, self).__init__(gait, 'amplitude', 'phase', **kwargs)
 
 class LRAF(_LR2):
     """Left/Right; Amplitude, Frequency"""
-    def __init__(self, gait):
-        super(LRAF, self).__init__(gait, 'amplitude', 'frequency')
+    def __init__(self, gait, **kwargs):
+        super(LRAF, self).__init__(gait, 'amplitude', 'frequency', **kwargs)
 
 class LRAO(_LR2):
     """Left/Right; Amplitude, Offset"""
-    def __init__(self, gait):
-        super(LRAO, self).__init__(gait, 'amplitude', 'offset')
+    def __init__(self, gait, **kwargs):
+        super(LRAO, self).__init__(gait, 'amplitude', 'offset', **kwargs)
 
 class LRPF(_LR2):
     """Left/Right; Phase, Frequency"""
-    def __init__(self, gait):
-        super(LRPF, self).__init__(gait, 'phase', 'frequency')
+    def __init__(self, gait, **kwargs):
+        super(LRPF, self).__init__(gait, 'phase', 'frequency', **kwargs)
 
 class LRPO(_LR2):
     """Left/Right; Phase, Offset"""
-    def __init__(self, gait):
-        super(LRPO, self).__init__(gait, 'phase', 'offset')
+    def __init__(self, gait, **kwargs):
+        super(LRPO, self).__init__(gait, 'phase', 'offset', **kwargs)
 
 class LRFO(_LR2):
     """Left/Right; Frequency, Offset"""
-    def __init__(self, gait):
-        super(LRFO, self).__init__(gait, 'frequency', 'offset')
+    def __init__(self, gait, **kwargs):
+        super(LRFO, self).__init__(gait, 'frequency', 'offset', **kwargs)
 
 # Left/Right, Three
 
 class LRAPF(_LR3):
     """Left/Right; Amplitude, Phase, Frequency"""
-    def __init__(self, gait):
-        super(LRAPF, self).__init__(gait, 'amplitude', 'phase', 'frequency')
+    def __init__(self, gait, **kwargs):
+        super(LRAPF, self).__init__(gait, 'amplitude', 'phase', 'frequency', **kwargs)
 
 class LRAPO(_LR3):
     """Left/Right; Amplitude, Phase, Offset"""
-    def __init__(self, gait):
-        super(LRAPO, self).__init__(gait, 'amplitude', 'phase', 'offset')
+    def __init__(self, gait, **kwargs):
+        super(LRAPO, self).__init__(gait, 'amplitude', 'phase', 'offset', **kwargs)
 
 class LRAFO(_LR3):
     """Left/Right; Amplitude, Frequency, Offset"""
-    def __init__(self, gait):
-        super(LRAFO, self).__init__(gait, 'amplitude', 'frequency', 'offset')
+    def __init__(self, gait, **kwargs):
+        super(LRAFO, self).__init__(gait, 'amplitude', 'frequency', 'offset', **kwargs)
 
 class LRPFO(_LR3):
     """Left/Right; Phase, Frequency, Offset"""
-    def __init__(self, gait):
-        super(LRPFO, self).__init__(gait, 'phase', 'frequency', 'offset')
+    def __init__(self, gait, **kwargs):
+        super(LRPFO, self).__init__(gait, 'phase', 'frequency', 'offset', **kwargs)
 
 # Left/Right, Four
 
@@ -575,8 +578,8 @@ class LRAPFO(_LR4):
 
 class _II1(_GaitPolicy):
     """All legs; One parameter"""
-    def __init__(self, gait, param_name):
-        super(_II1, self).__init__(gait, 4)
+    def __init__(self, gait, param_name, **kwargs):
+        super(_II1, self).__init__(gait, 4, **kwargs)
         self.param = param_name
     
     def initial_action(self):
@@ -587,9 +590,9 @@ class _II1(_GaitPolicy):
 
 class _II2(_GaitPolicy):
     """All legs; Two parameters"""
-    def __init__(self, gait, param_name_a, param_name_b):
+    def __init__(self, gait, param_name_a, param_name_b, **kwargs):
         assert param_name_a != param_name_b
-        super(_II2, self).__init__(gait, 8)
+        super(_II2, self).__init__(gait, 8, **kwargs)
         self.params = (param_name_a, param_name_b)
     
     def initial_action(self):
@@ -605,11 +608,11 @@ class _II2(_GaitPolicy):
 
 class _II3(_GaitPolicy):
     """All legs; Three parameters"""
-    def __init__(self, gait, param_name_a, param_name_b, param_name_c):
+    def __init__(self, gait, param_name_a, param_name_b, param_name_c, **kwargs):
         assert param_name_a != param_name_b
         assert param_name_a != param_name_c
         assert param_name_b != param_name_c
-        super(_II3, self).__init__(gait, 12)
+        super(_II3, self).__init__(gait, 12, **kwargs)
         self.params = (param_name_a, param_name_b, param_name_c)
     
     def initial_action(self):
@@ -627,8 +630,8 @@ class _II3(_GaitPolicy):
 
 class _II4(_GaitPolicy):
     """All legs; Three parameters"""
-    def __init__(self, gait):
-        super(_II4, self).__init__(gait, 16)
+    def __init__(self, gait, **kwargs):
+        super(_II4, self).__init__(gait, 16, **kwargs)
     
     def initial_action(self):
         params = ('amplitude', 'frequency', 'offset', 'phase')
@@ -647,77 +650,77 @@ class _II4(_GaitPolicy):
 
 class IIA(_II1):
     """Individual; Amplitude"""
-    def __init__(self, gait):
-        super(IIA, self).__init__(gait, 'amplitude')
+    def __init__(self, gait, **kwargs):
+        super(IIA, self).__init__(gait, 'amplitude', **kwargs)
 
 class IIP(_II1):
     """Individual; Phase"""
-    def __init__(self, gait):
-        super(IIP, self).__init__(gait, 'phase')
+    def __init__(self, gait, **kwargs):
+        super(IIP, self).__init__(gait, 'phase', **kwargs)
 
 class IIF(_II1):
     """Individual; Frequency"""
-    def __init__(self, gait):
-        super(IIF, self).__init__(gait, 'frequency')
+    def __init__(self, gait, **kwargs):
+        super(IIF, self).__init__(gait, 'frequency', **kwargs)
 
 class IIO(_II1):
     """Individual; Offset"""
-    def __init__(self, gait):
-        super(IIO, self).__init__(gait, 'offset')
+    def __init__(self, gait, **kwargs):
+        super(IIO, self).__init__(gait, 'offset', **kwargs)
 
 # Individual, Two
 
 class IIAP(_II2):
     """Individual; Amplitude, Phase"""
-    def __init__(self, gait):
-        super(IIAP, self).__init__(gait, 'amplitude', 'phase')
+    def __init__(self, gait, **kwargs):
+        super(IIAP, self).__init__(gait, 'amplitude', 'phase', **kwargs)
 
 class IIAF(_II2):
     """Individual; Amplitude, Frequency"""
-    def __init__(self, gait):
-        super(IIAF, self).__init__(gait, 'amplitude', 'frequency')
+    def __init__(self, gait, **kwargs):
+        super(IIAF, self).__init__(gait, 'amplitude', 'frequency', **kwargs)
 
 class IIAO(_II2):
     """Individual; Amplitude, Offset"""
-    def __init__(self, gait):
-        super(IIAO, self).__init__(gait, 'amplitude', 'offset')
+    def __init__(self, gait, **kwargs):
+        super(IIAO, self).__init__(gait, 'amplitude', 'offset', **kwargs)
 
 class IIPF(_II2):
     """Individual; Phase, Frequency"""
-    def __init__(self, gait):
-        super(IIPF, self).__init__(gait, 'phase', 'frequency')
+    def __init__(self, gait, **kwargs):
+        super(IIPF, self).__init__(gait, 'phase', 'frequency', **kwargs)
 
 class IIPO(_II2):
     """Individual; Phase, Offset"""
-    def __init__(self, gait):
-        super(IIPO, self).__init__(gait, 'phase', 'offset')
+    def __init__(self, gait, **kwargs):
+        super(IIPO, self).__init__(gait, 'phase', 'offset', **kwargs)
 
 class IIFO(_II2):
     """Individual; Frequency, Offset"""
-    def __init__(self, gait):
-        super(IIFO, self).__init__(gait, 'frequency', 'offset')
+    def __init__(self, gait, **kwargs):
+        super(IIFO, self).__init__(gait, 'frequency', 'offset', **kwargs)
 
 # Individual, Three
 
 class IIAPF(_II3):
     """Individual; Amplitude, Phase, Frequency"""
-    def __init__(self, gait):
-        super(IIAPF, self).__init__(gait, 'amplitude', 'phase', 'frequency')
+    def __init__(self, gait, **kwargs):
+        super(IIAPF, self).__init__(gait, 'amplitude', 'phase', 'frequency', **kwargs)
 
 class IIAPO(_II3):
     """Individual; Amplitude, Phase, Offset"""
-    def __init__(self, gait):
-        super(IIAPO, self).__init__(gait, 'amplitude', 'phase', 'offset')
+    def __init__(self, gait, **kwargs):
+        super(IIAPO, self).__init__(gait, 'amplitude', 'phase', 'offset', **kwargs)
 
 class IIAFO(_II3):
     """Individual; Amplitude, Frequency, Offset"""
-    def __init__(self, gait):
-        super(IIAFO, self).__init__(gait, 'amplitude', 'frequency', 'offset')
+    def __init__(self, gait, **kwargs):
+        super(IIAFO, self).__init__(gait, 'amplitude', 'frequency', 'offset', **kwargs)
 
 class IIPFO(_II3):
     """Individual; Phase, Frequency, Offset"""
-    def __init__(self, gait):
-        super(IIPFO, self).__init__(gait, 'phase', 'frequency', 'offset')
+    def __init__(self, gait, **kwargs):
+        super(IIPFO, self).__init__(gait, 'phase', 'frequency', 'offset', **kwargs)
 
 # Individual, Four
 
@@ -728,8 +731,8 @@ class IIAPFO(_II4):
 # Policy with raw motor targets
 class RawTrgPolicy(Policy):
     """not yet working well..."""
-    def __init__(self, init_trg=np.atleast_2d([0.0, 0.0, 0.0, 0.0]).T, init_gait=None):
-        super(RawTrgPolicy, self).__init__(4)
+    def __init__(self, init_trg=np.atleast_2d([0.0, 0.0, 0.0, 0.0]).T, init_gait=None, **kwargs):
+        super(RawTrgPolicy, self).__init__(4, **kwargs)
         self.init_gait = init_gait
 #        if self.init_gait is not None:
 #            self.init=

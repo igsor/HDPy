@@ -444,6 +444,7 @@ def simulation_loop(acd, robot, max_step=-1, max_episodes=-1, max_total_iter=-1)
             
             # Observe sensors
             s_next = robot.read_sensors()
+            s_next['a_curr'] = a_curr # Nico: Hack to be able to access action when calculating reward
             
             # Execute ACD
             a_next = acd(s_next, num_step, num_step+1, 1)

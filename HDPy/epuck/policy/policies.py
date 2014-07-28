@@ -46,6 +46,14 @@ class HeadingRandInit(Heading):
         """Sample an action and return it as initial one."""
         rnd = np.random.uniform(0.0, 2*np.pi)
         return np.atleast_2d([rnd]).T
+    
+class HeadingRandInitZero(Heading):
+    """Nico's Hack: choose action between -pi and pi (zero-centered) as new heading direction.
+    """
+    def initial_action(self):
+        """Sample an action and return it as initial one."""
+        rnd = np.random.uniform(-np.pi, np.pi)
+        return np.atleast_2d([rnd]).T
 
 class Trivial(Heading):
     """ePuck policy with the heading as action.

@@ -78,14 +78,15 @@ def plot_trajectory_with_reward(analysis, axis=None, episode=None, reward_key='r
         end_episode = episode+1
     
     reward = analysis.stack_data(reward_key, start_episode=start_episode, end_episode=end_episode)
-    if reward_min is not None:
-        reward[reward<reward_min] = reward_min
-    if reward_max is not None:
-        reward[reward>reward_max] = reward_max
+    if reward_min is None:
+        reward_min = reward.min()
+    if reward_max is None:
+        reward_max = reward.max()
     gps_x = analysis.stack_data('puppyGPS_x', offset=reward_offset*reward_step, start_episode=start_episode, end_episode=end_episode)
     gps_y = analysis.stack_data('puppyGPS_y', offset=reward_offset*reward_step, start_episode=start_episode, end_episode=end_episode)
     
-    sc = axis.scatter(gps_x[::reward_step], gps_y[::reward_step], c=reward, edgecolors='none', **kwargs)
+#    sc = axis.scatter(gps_x[::reward_step], gps_y[::reward_step], c=reward[:,0], edgecolors='none', vmin=reward_min, vmax=reward_max, **kwargs)
+    sc = axis.scatter(gps_y[::reward_step], gps_x[::reward_step], c=reward[:,0], edgecolors='none', vmin=reward_min, vmax=reward_max, **kwargs) # north being in top direction
     cb = pylab.colorbar(sc, ax=axis)
     
     return axis, cb

@@ -25,6 +25,11 @@ has to be generated to actually steer the robot.
 
 change log:
     02.06.2014: ActorCritic.num_step is increased in the beginning of __call__ (not in the end)
+    03.06.2014: Removed ActorCritic.init_episode(). Instead use ActorCritic.step_init(epoch) to
+                define the behavior during the initial steps.
+                ActorCritic._step is changed to have only arguments ActorCritic._step(epoch, reward)
+    18.06.2014: reward is written to epoch in rl.ActorCritic
+    18.06.2014: rl.ActorCritic.policy is new alias for rl.ActorCritic.child (for convenience and back-compatibility)
 """
 import PuPy
 import numpy as np
@@ -39,10 +44,11 @@ class Plant(object):
     An additional instance to :py:class:`PuPy.Normalization` may be 
     supplied in ``norm`` for normalizing sensor values.
     """
-    def __init__(self, state_space_dim=None, norm=None):
+    def __init__(self, state_space_dim=None, norm=None, verbose=False):
         self._state_space_dim = state_space_dim
         self.normalization = None
         self.set_normalization(norm)
+        self.verbose = verbose
     
     def state_input(self, state):
         """Return the state-part of the critic input
@@ -97,8 +103,8 @@ class Policy(PuPy.RobotActor):
     An additional instance to :py:class:`PuPy.Normalization` may be 
     supplied in ``norm`` for normalizing sensor values.
     """
-    def __init__(self, action_space_dim=None, norm=None):
-        super(Policy, self).__init__()
+    def __init__(self, action_space_dim=None, norm=None, **kwargs):
+        super(Policy, self).__init__(**kwargs)
         self._action_space_dim = action_space_dim
         self.normalization = None
         self.set_normalization(norm)
@@ -278,6 +284,17 @@ class ActorCritic(PuPy.RobotActor):
         Note that the parameters for *a_curr* and *a_next* should be
         exchangable, since it's really the same kind of 'sensor'.
     
+    Important members of the :py:class:`ActorCritic` are:
+        
+        ``s_curr``
+            Last observed state. :py:keyword:`dict`, same as ``epoch``
+            of the :py:meth:`__call__`.
+        
+        ``a_curr``
+            Last executed action. This is the action which lead
+            from ``s_curr`` into ``epoch``. Type specified through
+            the :py:class:`Policy`.
+    
     """
     def __init__(self, plant, policy, gamma=1.0, alpha=1.0, init_steps=1, norm=None, momentum=0.0, **kwargs):
         super(ActorCritic, self).__init__(child=policy, **kwargs)
@@ -318,30 +335,10 @@ class ActorCritic(PuPy.RobotActor):
         self.policy.reset()
         self._action_space_dim = self.policy.action_space_dim()
         self.a_curr = self.policy.initial_action()
+        if self.verbose: print '\nt:    0 n: 0 (new episode) a_curr:', self.a_curr.T
         self.s_curr = dict()
         self.num_episode += 1
         self.num_step = 0
-    
-    def init_episode(self, epoch, time_start_ms, time_end_ms, step_size_ms):
-        """Define the behaviour during the initial phase, i.e. as long
-        as
-        
-            num_step <= init_steps
-        
-        with ``num_step`` the episode's step iterator and ``init_steps``
-        given at construction (default 1). The default is to store the
-        ``epoch`` but do nothing else.
-        
-        .. note::
-            The step iterator ``num_step`` is incremented before this
-            method is called.
-        
-        """
-        self.s_curr = epoch.copy()
-        epoch['a_curr'] = self.a_curr.T
-        epoch['a_next'] = self.a_curr.T
-        self._pre_increment_hook(epoch)
-        return self.child(epoch, time_start_ms, time_end_ms, step_size_ms)
     
     def __call__(self, epoch, time_start_ms, time_end_ms, step_size_ms):
         """One round in the actor-critic cycle. The current observations
@@ -355,39 +352,66 @@ class ActorCritic(PuPy.RobotActor):
         
         """
         self.num_step += 1
-        if self.num_step <= self._init_steps:
-            return self.init_episode(epoch, time_start_ms, time_end_ms, step_size_ms)
-        
-        # extern through the robot:
-        # take action (a_curr = a_next in the previous run)
-        # observe sensors values produced by the action (a_curr = previous a_next)
-        
-        # Generate reinforcement signal U(k), given in(k)
-        reward = self.plant.reward(epoch)
-        #reward = self.plant.reward(self.s_curr)
-        # Matthias: It's not clear, which reward should be the input to the critic:
-        # While the ACD papers imply the reward of time step n, the book
-        # by Sutton/Barto indicate the reward as being from the next
-        # state, n+1. Experiments indicate that it doesn't really matter.
-        # To be consistent with other work, I go with time n.
-        # Nico: changed it to be epoch (n+1). It should be the reward of performing
-        # action a_n when being in state s_n. The reward is calculated on the 
-        # outcome of that, so on the new state s_n+1 (which is epoch).
-        
+        if self.verbose: print 't:', time_start_ms, 'n:', self.num_step, 
         epoch_raw = epoch.copy() # store only raw sensor values in self.s_curr
-        
-        # do the actual work
-        epoch = self._step(self.s_curr, epoch, self.a_curr, reward)
+        if self.num_step <= self._init_steps-1:
+            
+            epoch = self._step_init(epoch)
+            
+            if self.verbose:
+                print '(init)',
+            
+        else:       
+            # extern through the robot:
+            # take action (a_curr = a_next in the previous run)
+            # observe sensors values produced by the action (a_curr = previous a_next)
+            
+            # Generate reinforcement signal U(k), given in(k)
+            reward = self.plant.reward(epoch)
+            #reward = self.plant.reward(self.s_curr)
+            # Matthias: It's not clear, which reward should be the input to the critic:
+            # While the ACD papers imply the reward of time step n, the book
+            # by Sutton/Barto indicate the reward as being from the next
+            # state, n+1. Experiments indicate that it doesn't really matter.
+            # To be consistent with other work, I go with time n.
+            # Nico: changed it to be epoch (n+1). It should be the reward of performing
+            # action a_n when being in state s_n. The reward is calculated on the 
+            # outcome of that, so on the new state s_n+1 (which is epoch).
+            if self.verbose:
+                print 'reward:', reward,
+            
+            # do the actual work
+            epoch = self._step(epoch, reward)
+            
+            # save reward
+            epoch['reward'] = np.atleast_2d([reward]).T
         
         # increment
         epoch['a_curr'] = self.a_curr.T
         self.a_curr = np.atleast_2d(epoch['a_next']).T
         self.s_curr = epoch_raw
+        self._pre_increment_hook(epoch)
+        
+        if self.verbose:
+            print 'a_next:', epoch['a_next']
         
         # return next action
         return self.child(epoch, time_start_ms, time_end_ms, step_size_ms)
     
-    def _step(self, s_curr, s_next, a_curr, reward):
+    def _step_init(self, epoch):
+        """Define the behaviour during the initial phase, i.e. as long
+        as
+        
+            num_step <= init_steps
+        
+        with ``num_step`` the episode's step iterator and ``init_steps``
+        given at construction (default 1). The default is to store the
+        ``epoch`` but do nothing else.
+        """
+        epoch['a_next'] = self.a_curr.T
+        return epoch
+    
+    def _step(self, epoch, reward):
         """Execute one step of the actor and return the next action.
         
         When overloading this method, it must be ensured that
@@ -400,7 +424,7 @@ class ActorCritic(PuPy.RobotActor):
             Previous observed state. :py:keyword:`dict`, same as ``epoch``
             of the :py:meth:`__call__`.
         
-        ``s_next``
+        ``epoch``
             Latest observed state. :py:keyword:`dict`, same as ``epoch``
             of the :py:meth:`__call__`.
         

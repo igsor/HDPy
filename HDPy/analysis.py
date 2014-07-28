@@ -67,8 +67,6 @@ class Analysis:
         else:
             self.pth = pth
             self.f = h5py.File(pth, 'r')
-        if isinstance(min_sample_length, (list, tuple)):
-            key_sl, min_sample_length = min_sample_length
         exp = map(int, self.f.keys())
         exp = sorted(exp)
         exp = map(str, exp)
@@ -100,11 +98,19 @@ class Analysis:
         
         return data
     
-    def get_data(self, key, offset=0, start_episode=0, end_episode=None):
+    def get_data(self, key, offset=0, start_episode=0, end_episode=None, all_experiments=False):
         """Return a list of all data belonging to ``key``."""
-        return [self.f[exp][key][offset:] for exp in self.experiments[start_episode:(end_episode is None and len(self.experiments) or end_episode)] if key in self.f[exp] and self.f[exp][key].shape[0]>offset]
+        experiments = self.experiments[start_episode:(end_episode is None and len(self.experiments) or end_episode)]
+        ret = []
+        for exp in experiments:
+            if key in self.f[exp] and self.f[exp][key].shape[0]>offset:
+                ret.append(self.f[exp][key][offset:])
+            elif all_experiments:
+                ret.append(np.zeros([0,0])) # append empty array instead
+        return ret
+#        return [self.f[exp][key][offset:] for exp in self.experiments[start_episode:(end_episode is None and len(self.experiments) or end_episode)] if key in self.f[exp] and self.f[exp][key].shape[0]>offset]
     
-    def get_all_data(self, keys, **kwargs):
+    def get_all_data(self, keys=None, **kwargs):
         """Return a list of arrays containing all data specified by ``keys``.
         Each array in the list is the concatenated matrix of size [len_experiment, len_keys] of one experiment.
         """
@@ -157,6 +163,21 @@ class Analysis:
     
     ## Plotters
     
+    def plot_data(self, key, axis=None, episodes=None, offset=0, **kwargs):
+        """Plot a certain data set specified by ``key``.
+        """
+        if axis is None:
+            axis = pylab.figure().add_subplot(111)
+        if episodes is None:
+            episodes = map(int, self.experiments)
+        data = self.get_data(key, offset=offset)
+        data = np.concatenate([data[i] for i in episodes])
+        color = kwargs.pop('color', 'k')
+        axis.plot(data, color=color, **kwargs)
+        if self.always_plot_grid:
+            self.plot_grid(axis, key, offset=offset)
+        return axis
+    
     def plot_episode_len(self, axis=None, **kwargs):
         """Plot the length of the episodes in ``axis``."""
         if axis is None:
@@ -170,11 +191,11 @@ class Analysis:
             self.plot_grid(axis, 'a_curr')
         return axis
     
-    def plot_grid(self, axis, key=None):
+    def plot_grid(self, axis, key=None, fs=1, offset=0):
         """Add a vertical bar to ``axis`` to mark experiment
         boundaries."""
-        steps = self.num_steps(key)
-        for i in np.array(steps).cumsum():
+        steps = map(lambda x: x-offset, self.num_steps(key))
+        for i in np.array(steps).cumsum()*fs:
             axis.axvline(i, linestyle='-', color='0.7')
         
         return axis
@@ -249,6 +270,8 @@ class Analysis:
         diff = diff.sum(axis=1)**2
         color = kwargs.pop('color','k')
         lbl = kwargs.pop('label', 'Readout difference')
+        fs = kwargs.pop('fs', 1) # factor to multiply the x-steps with
+        idx = np.arange(diff.shape[0]) * fs
         axis.plot(diff, color=color, label=lbl, **kwargs)
         if log_scale:
             axis.set_yscale('log')
@@ -258,23 +281,27 @@ class Analysis:
             self.plot_grid(axis, key)
         return axis
     
-    def plot_readout_diff_avg_per_episode(self, axis=None, key='readout', log_scale=False, **kwargs):
+    def plot_readout_diff_avg_per_episode(self, axis=None, key='readout', log_scale=False, idx_key='a_curr', **kwargs):
         """Plot the difference of absolute readout weights in
         ``axis``."""
         if axis is None:
             axis = pylab.figure().add_subplot(111)
-        data = self.get_data(key)
-        diff = map(lambda x:np.repeat(np.mean(np.abs(np.diff(x, axis=0))), len(x)), data)
-        diff = np.concatenate(diff)
+        fs = kwargs.pop('fs', 1) # factor to multiply the x-steps with
         color = kwargs.pop('color','k')
         lbl = kwargs.pop('label', 'Readout difference')
-        axis.plot(diff, color=color, label=lbl, **kwargs)
+        data = self.get_data(key, all_experiments=True)
+        diff = np.array([np.mean(np.abs(np.diff(dat, axis=0))) if dat.shape[0]>0 else np.nan for dat in data])
+        diff = np.where(np.isnan(diff), np.hstack([[np.nan],diff[:-1]]), diff) # fill nans with value from previous episode
+        diff = np.repeat(diff, 2)
+        idx = np.hstack([[0], np.cumsum(self.num_steps(idx_key)).repeat(2)[:-1]]) * fs
+        axis.plot(idx, diff, color=color, label=lbl, **kwargs)
         if log_scale:
             axis.set_yscale('log')
         axis.set_xlabel('step')
         axis.set_ylabel('Readout difference')
+        axis.set_xlim([0,idx[-1]])
         if self.always_plot_grid:
-            self.plot_grid(axis, key)
+            self.plot_grid(axis, idx_key, fs=fs)
         return axis
     
     def plot_cumulative_readout_diff(self, axis=None, **kwargs):
@@ -371,18 +398,19 @@ class Analysis:
         reward = self.stack_data(key_reward, offset=offset)
         state = np.vstack([self.stack_data(key1, offset=(offset+reward_offset)*state_step)[::state_step],
                            self.stack_data(key2, offset=(offset+reward_offset)*state_step)[::state_step]]).T
-        print reward.shape, state.shape
+        print reward.shape, state.shape, reward_offset, state_step, key_reward
         assert reward.shape[0] == state.shape[0], 'wrong shapes'
         if reward_min is None:
             reward_min = reward.min()
         if reward_max is None:
             reward_max = reward.max()
-        idx = np.logical_and(reward>=reward_min, reward<=reward_max)[:,0]
-        sc = axis.scatter(state[idx,0], state[idx,1], c=reward[idx], edgecolors='none')
+#        idx = np.logical_and(reward>=reward_min, reward<=reward_max)[:,0]
+        idx = range(reward.shape[0])
+        sc = axis.scatter(state[idx,0], state[idx,1], c=reward[idx], edgecolors='none', vmin=reward_min, vmax=reward_max)
         axis.set_xlabel(key1)
         axis.set_ylabel(key2)
         cb = pylab.colorbar(sc, ax=axis)
-        cb.set_label(key_reward)
+        cb.set_label('$'+key_reward+'$')
         pylab.axis('equal', ax=axis)
         return axis, cb
     
@@ -437,7 +465,8 @@ class Analysis:
         state1 = self.stack_data(key1, offset=offset, start_episode=start_episode, end_episode=end_episode)
         state2 = self.stack_data(key2, offset=offset, start_episode=start_episode, end_episode=end_episode)
         n, edges = np.histogramdd([state1,state2], bins)
-        pc = axis.pcolor(edges[0], edges[1], n.T, **kwargs)
+#        pc = axis.pcolor(edges[0], edges[1], n.T, **kwargs)
+        pc = axis.imshow(n.T, extent=[edges[0][0],edges[0][-1], edges[1][0], edges[1][-1]], origin='lower', **kwargs)
         axis.set_xlabel(xlabel is None and key1 or xlabel)
         axis.set_ylabel(ylabel is None and key2 or ylabel)
         cb = pylab.colorbar(pc,ax=axis)
@@ -450,22 +479,8 @@ class Analysis:
         if axis is None:
             axis = pylab.figure().add_subplot(111)
         data = abs(self.stack_data('err'))
-        lbl = kwargs.pop('label', 'error')
-        col = kwargs.pop('color', 'k')
-        axis.plot(data, col, label=lbl, **kwargs)
-        axis.set_xlabel('step')
-        axis.set_ylabel('TD-error')
-        if self.always_plot_grid:
-            self.plot_grid(axis, 'err')
-        return axis
-    
-    def plot_absolute_avg_error_per_episode(self, axis=None, **kwargs):
-        """Plot the absolute error over time in ``axis``."""
-        if axis is None:
-            axis = pylab.figure().add_subplot(111)
-        error = self.get_data('err')
-        idx = np.hstack([[0], np.cumsum([e.shape[0] for e in error]).repeat(2)[:-1]])
-        data = np.repeat([np.abs(e[:,0]).mean() for e in error], 2)
+        fs = kwargs.pop('fs', 1) # factor to multiply the x-steps with
+        idx = np.arange(len(data)) * fs
         lbl = kwargs.pop('label', 'error')
         col = kwargs.pop('color', 'k')
         axis.plot(idx, data, col, label=lbl, **kwargs)
@@ -475,14 +490,36 @@ class Analysis:
             self.plot_grid(axis, 'err')
         return axis
     
+    def plot_absolute_avg_error_per_episode(self, axis=None, idx_key='a_curr', **kwargs):
+        """Plot the absolute error over time in ``axis``."""
+        if axis is None:
+            axis = pylab.figure().add_subplot(111)
+        fs = kwargs.pop('fs', 1) # factor to multiply the x-steps with        
+        error = self.get_data('err', all_experiments=True)
+        error = np.array([np.mean(np.abs(e[:,0])) if e.shape[0]>0 else np.nan for e in error])
+        error = np.where(np.isnan(error), np.hstack([[np.nan],error[:-1]]), error) # fill nans with value from previous episode
+        error = np.repeat(error, 2)
+        idx = np.hstack([[0], np.cumsum(self.num_steps(idx_key)).repeat(2)[:-1]]) * fs
+        lbl = kwargs.pop('label', 'error')
+        col = kwargs.pop('color', 'k')
+        axis.plot(idx, error, col, label=lbl, **kwargs)
+        axis.set_xlabel('step')
+        axis.set_ylabel('TD-error')
+        axis.set_xlim(0,idx[-1])
+        if self.always_plot_grid:
+            self.plot_grid(axis, idx_key, fs=fs)
+        return axis
+    
     def plot_error(self, axis=None, **kwargs):
         """Plot the error over time in ``axis``."""
         if axis is None:
             axis = pylab.figure().add_subplot(111)
-        data = self.stack_data('err')
+        fs = kwargs.pop('fs', 1) # factor to multiply the x-steps with
         col = kwargs.pop('color', 'k')
         lbl = kwargs.pop('label', 'error')
-        axis.plot(data, col, label=lbl, **kwargs)
+        data = self.stack_data('err')
+        idx = np.arange(data.shape[0])*fs
+        axis.plot(idx, data, col, label=lbl, **kwargs)
         axis.set_xlabel('step')
         axis.set_ylabel('TD-error')
         if self.always_plot_grid:
